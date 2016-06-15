@@ -2,5 +2,5 @@
 
 // DATAWIRE MDK
 
-use https://raw.githubusercontent.com/datawire/discovery/flynn/defect/package-names/quark/discovery-2.0.0.q;
-use https://raw.githubusercontent.com/datawire/discovery/flynn/defect/package-names/quark/datawire_introspection.q;
+use https://raw.githubusercontent.com/datawire/discovery/dev/2.0/quark/discovery-2.0.0.q;
+use https://raw.githubusercontent.com/datawire/discovery/dev/2.0/quark/datawire_introspection.q;
