@@ -1,2 +1,4 @@
-# mdk
-Microservices Developer Kit
+MDK
+=======
+
+This is the Datawire Microservices Developer Kit.
