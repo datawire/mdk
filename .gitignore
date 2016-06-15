@@ -4,6 +4,8 @@ build
 *.qc
 *.pyc
 
+node_modules
+
 quark/output
 
 venv
