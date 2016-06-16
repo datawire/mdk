@@ -2,9 +2,9 @@
 
 set -e
 
-PYVER=$(python -c "import platform ; print(platform.python_version())" 2>/dev/null)
 echo "= Installing the Datawire MDK"
 
+PYVER=$(python -c "import platform ; print(platform.python_version())" 2>/dev/null || true)
 
 if [ -z "$PYVER" ]; then
   # No python. That's a problem.
