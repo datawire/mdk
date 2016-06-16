@@ -35,13 +35,33 @@ EOF
   exit 1
 fi
 
-if ! command -v quark >/dev/null 2>&1; then
-  if [ ! -f $HOME/.quark/config.sh ]; then
-    # No quark. Install it.
-    echo "== Installing Quark!"
+QVER=$(quark --version 2>/dev/null || true)
 
-    curl -# -L https://raw.githubusercontent.com/datawire/quark/master/install.sh | bash -s -- rel/0.7.6
+if [ -n "$QVER" -a -f $HOME/.quark/config.sh ]; then
+  # Pull in this version of Quark and try again.
+  . $HOME/.quark/config.sh
+
+  QVER=$(quark --version 2>/dev/null || true)
+fi
+
+if [ -n "$QVER" ]; then
+  if [ "$QVER" != "Quark 0.7.6" ]; then
+    # We need Quark 0.7.6.
+    cat <<EOF >&2
+You seem to have $QVER already installed. We presently need Quark 0.7.6.
+If you remove your existing Quark and rerun this installer, we'll install
+Quark 0.7.6 for you.
+EOF
+    exit 1
   fi
+
+  # If here, we're good.
+  echo "== MDK found $QVER, good"
+else
+  # No Quark at all. Install.
+  echo "== MDK needs the Quark compiler; installing it now."
+
+  curl -# -L https://raw.githubusercontent.com/datawire/quark/master/install.sh | bash -s -- -q rel/0.7.6
 
   . $HOME/.quark/config.sh
 fi
