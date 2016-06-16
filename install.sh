@@ -72,7 +72,13 @@ quark install --python https://raw.githubusercontent.com/datawire/discovery/dev/
 
 # Get Python set up.
 echo "== Setting up Flask and Requests"
-pip install requests flask
+
+# check if we are in a virtualenv or not
+python -c 'import sys; print sys.real_prefix' > /dev/null 2>&1 && PIPARGS="" || PIPARGS="--user"
+
+echo pip install $PIPARGS requests flask
+pip install $PIPARGS requests flask
+
 
 # All done.
 echo "== All done"
