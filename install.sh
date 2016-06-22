@@ -43,7 +43,7 @@ fi
 
 QVER=$(quark --version 2>/dev/null || true)
 
-if [ -n "$QVER" -a -f $HOME/.quark/config.sh ]; then
+if [ -z "$QVER" -a -f $HOME/.quark/config.sh ]; then
   # Pull in this version of Quark and try again.
   . $HOME/.quark/config.sh
 
