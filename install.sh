@@ -74,7 +74,7 @@ fi
 
 # Compile quark packages.
 echo "== Compiling the MDK"
-quark install --python https://raw.githubusercontent.com/datawire/mdk/${BRANCH}/quark/philadelphia-1.0.q
+quark install --python https://raw.githubusercontent.com/datawire/mdk/${BRANCH}/quark/mdk-1.0.q
 
 # Get Python set up.
 echo "== Setting up Flask and Requests"
