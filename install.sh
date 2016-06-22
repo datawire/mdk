@@ -1,8 +1,13 @@
 #!/bin/bash
 
+# Usage: install.sh --python|--ruby [<branch>]
+#
+# Branch is "master" if unspecified.
+
 set -e
 
-BRANCH=${1:-master}
+LANGUAGE=$1
+BRANCH=${2:-master}
 
 fromStr=
 
@@ -74,17 +79,21 @@ fi
 
 # Compile quark packages.
 echo "== Compiling the MDK"
-quark install --python https://raw.githubusercontent.com/datawire/mdk/${BRANCH}/quark/mdk-1.0.q
+quark install $LANGUAGE https://raw.githubusercontent.com/datawire/mdk/${BRANCH}/quark/mdk-1.0.q
 
-# Get Python set up.
-echo "== Setting up Flask and Requests"
+if [ "$LANGUAGE" == "--python" ]; then
+    # Get Python set up.
+    echo "== Setting up Flask and Requests"
 
-# check if we are in a virtualenv or not
-python -c 'import sys; print sys.real_prefix' > /dev/null 2>&1 && PIPARGS="" || PIPARGS="--user"
+    # check if we are in a virtualenv or not
+    python -c 'import sys; print sys.real_prefix' > /dev/null 2>&1 && PIPARGS="" || PIPARGS="--user"
 
-echo pip install $PIPARGS requests flask
-pip install $PIPARGS requests flask
-
+    echo pip install $PIPARGS requests flask
+    pip install $PIPARGS requests flask
+elif [ "$LANGUAGE" == "--ruby" ]; then
+    echo "== Setting up Sinatra"
+    gem install --no-document sinatra
+fi
 
 # All done.
 echo "== All done"
