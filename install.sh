@@ -45,12 +45,12 @@ if [ -n "$QVER" -a -f $HOME/.quark/config.sh ]; then
 fi
 
 if [ -n "$QVER" ]; then
-  if [ "$QVER" != "Quark 0.7.6" ]; then
-    # We need Quark 0.7.6.
+  if [ $(echo "$QVER" | egrep -c '^Quark 1\.0\.') -ne 1 ]; then
+    # We need Quark 1.0.
     cat <<EOF >&2
-You seem to have $QVER already installed. We presently need Quark 0.7.6.
+You seem to have $QVER already installed. We presently need Quark 1.0.
 If you remove your existing Quark and rerun this installer, we'll install
-Quark 0.7.6 for you.
+Quark 1.0 for you.
 EOF
     exit 1
   fi
@@ -61,14 +61,14 @@ else
   # No Quark at all. Install.
   echo "== MDK needs the Quark compiler; installing it now."
 
-  curl -# -L https://raw.githubusercontent.com/datawire/quark/master/install.sh | bash -s -- -q rel/0.7.6
+  curl -# -L https://raw.githubusercontent.com/datawire/quark/master/install.sh | bash -s -- -q 1.0.133
 
   . $HOME/.quark/config.sh
 fi
 
 # Compile quark packages.
 echo "== Compiling the MDK"
-quark install --python https://raw.githubusercontent.com/datawire/discovery/dev/2.0/quark/{discovery-2.0.0,datawire_introspection}.q
+quark install --python https://raw.githubusercontent.com/datawire/mdk/master/mdk.q
 
 # Get Python set up.
 echo "== Setting up Flask and Requests"

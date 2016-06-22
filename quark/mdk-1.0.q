@@ -1,6 +1,6 @@
-// quark 0.7;
+quark 1.0;
 
 // DATAWIRE MDK
 
-use https://raw.githubusercontent.com/datawire/discovery/dev/2.0/quark/discovery-2.0.0.q;
-use https://raw.githubusercontent.com/datawire/discovery/dev/2.0/quark/datawire_introspection.q;
+use https://raw.githubusercontent.com/datawire/discovery/develop/quark/discovery-2.0.0.q;
+use https://raw.githubusercontent.com/datawire/discovery/develop/quark/datawire_introspection.q;
