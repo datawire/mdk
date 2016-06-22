@@ -2,7 +2,13 @@
 
 set -e
 
-echo "= Installing the Datawire MDK"
+BRANCH=${1:-master}
+
+fromStr=
+
+if [ -n "$1" ]; then fromStr=" from $BRANCH"; fi
+
+echo "= Installing the Datawire MDK${fromStr}"
 
 PYVER=$(python -c "import platform ; print(platform.python_version())" 2>/dev/null || true)
 
@@ -68,7 +74,7 @@ fi
 
 # Compile quark packages.
 echo "== Compiling the MDK"
-quark install --python https://raw.githubusercontent.com/datawire/mdk/master/quark/mdk-1.0.q
+quark install --python https://raw.githubusercontent.com/datawire/mdk/${BRANCH}/quark/philadelphia-1.0.q
 
 # Get Python set up.
 echo "== Setting up Flask and Requests"
