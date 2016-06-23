@@ -2,7 +2,7 @@ quark 1.0;
 
 package datawire_tracing 1.0.0;
 
-use datawire_common.q;
+use protocol.q;
 
 import protocol;
 

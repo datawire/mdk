@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_common 1.0.0;
+package datawire_protocol 1.0.0;
 
 import quark.reflect;
 

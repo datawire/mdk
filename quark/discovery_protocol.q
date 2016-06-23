@@ -1,6 +1,6 @@
 quark 1.0;
 
-use datawire_common.q;
+use protocol.q;
 
 import quark.concurrent;
 import protocol;
