@@ -2,54 +2,32 @@ quark 1.0;
 
 use protocol.q;
 
-import quark.concurrent;
 import protocol;
 
 namespace discovery {
     namespace protocol {
 
         @doc("The protocol machinery that wires together the public disco API to a server.")
-        class DiscoClient extends DiscoHandler, HTTPHandler, WSHandler, Task {
+        class DiscoClient extends WSClient, DiscoHandler {
 
-            static Logger log = new Logger("discovery");
+            static Logger dlog = new Logger("discovery");
 
             Discovery disco;
-            float firstDelay = 1.0;
-            float maxDelay = 16.0;
-            float reconnectDelay = firstDelay;
-            float ttl = 30.0;
-
-            WebSocket sock = null;
-            bool authenticating = false;
-            long lastHeartbeat = 0L;
 
             DiscoClient(Discovery discovery) {
                 disco = discovery;
             }
 
-            bool isConnected() {
-                return sock != null;
+            String url() {
+                return disco.url;
             }
 
-            void start() {
-                schedule(0.0);
+            String token() {
+                return disco.token;
             }
 
-            void stop() {
-                schedule(0.0);
-            }
-
-            void schedule(float time) {
-                Context.runtime().schedule(self, time);
-            }
-
-            void scheduleReconnect() {
-                schedule(reconnectDelay);
-                reconnectDelay = 2.0*reconnectDelay;
-
-                if (reconnectDelay > maxDelay) {
-                    reconnectDelay = maxDelay;
-                }
+            bool isStarted() {
+                return disco.started;
             }
 
             void register(Node node) {
@@ -57,7 +35,7 @@ namespace discovery {
                 // nothing because the full set of nodes will be resent
                 // when we connect/reconnect.
 
-                if (isConnected()) {
+                if (self.isConnected()) {
                     active(node);
                 }
             }
@@ -65,9 +43,9 @@ namespace discovery {
             void active(Node node) {
                 Active active = new Active();
                 active.node = node;
-                active.ttl = ttl;
-                sock.send(active.encode());
-                log.info("active " + node.toString());
+                active.ttl = self.ttl;
+                self.sock.send(active.encode());
+                dlog.info("active " + node.toString());
             }
 
             void resolve(Node node) {
@@ -76,10 +54,6 @@ namespace discovery {
                 // wanted to change this, we'd have to track the set of
                 // nodes we are interested in resolving and communicate as
                 // this changes.
-            }
-
-            void onOpen(Open open) {
-                // Should assert version here ...
             }
 
             void onActive(Active active) {
@@ -106,56 +80,6 @@ namespace discovery {
                 // ???
             }
 
-            void onClose(Close close) {
-                // ???
-            }
-
-            void onExecute(Runtime runtime) {
-                /*
-                  Do our periodic chores here, this will involve checking
-                  the desired state held by disco against our actual
-                  state and taking any measures necessary to address the
-                  difference:
-          
-          
-                  - Disco.started holds the desired connectedness
-                  state. The isConnected() accessor holds the actual
-                  connectedness state. If these differ then do what is
-                  necessry to make the desired state actual.
-          
-                  - If we haven't sent a heartbeat recently enough, then
-                  do that.
-                */
-
-                if (isConnected()) {
-                    if (disco.started) {
-                        long interval = ((ttl/2.0)*1000.0).round();
-                        long rightNow = now();
-
-                        if (rightNow - lastHeartbeat >= interval) {
-                            heartbeat();
-                        }
-                    }
-                    else {
-                        sock.close();
-                        sock = null;
-                    }
-                }
-                else {
-                    open(disco.url);
-                }
-            }
-
-            void open(String url) {
-                if (disco.token != null) {
-                    url = url + "/?token=" + disco.token;
-                }
-
-                log.info("opening " + url);
-
-                Context.runtime().open(url, self);
-            }
-
             void heartbeat() {
                 List<String> services = disco.registered.keys();
 
@@ -173,24 +97,6 @@ namespace discovery {
 
                     idx = idx + 1;
                 }
-
-                lastHeartbeat = now();
-                schedule(ttl/2.0);
-            }
-
-            void onWSInit(WebSocket socket) {/* unused */ }
-
-            void onWSConnected(WebSocket socket) {
-                // Whenever we (re)connect, notify the server of any
-                // nodes we have registered.
-                log.info("connected to " + disco.url);
-
-                reconnectDelay = firstDelay;
-                sock = socket;
-
-                sock.send(new Open().encode());
-
-                heartbeat();
             }
 
             void onWSMessage(WebSocket socket, String message) {
@@ -201,27 +107,6 @@ namespace discovery {
                 // disco.mutex.release();
             }
 
-            void onWSBinary(WebSocket socket, Buffer message) { /* unused */ }
-
-            void onWSClosed(WebSocket socket) { /* unused */ }
-
-            void onWSError(WebSocket socket, WSError error) {
-                log.error(error.toString());
-                // Any non-transient errors should be reported back to the
-                // user via any Nodes they have requested.
-            }
-
-            void onWSFinal(WebSocket socket) {
-                log.info("closed " + disco.url);
-                sock = null;
-                disco.mutex.acquire();
-
-                if (disco.started) {
-                    scheduleReconnect();
-                }
-
-                disco.mutex.release();
-            }
         }
 
         interface DiscoHandler extends ProtocolHandler {
