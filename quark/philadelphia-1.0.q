@@ -99,7 +99,7 @@ namespace philadelphia {
       @doc("""Filter out all logging events from the response that occurred before this time. Milliseconds since UNIX
       epoch. If this key is not set OR the value is null then all events since the beginning of time will be returned.
       """)
-      long startTime = 0;
+      long startTime = 0L;
 
       @doc("""Filter out all logging events from the response that occurred after this time. Milliseconds since UNIX
       epoch. If this key is not set OR the value is null then all recorded events since the startTime will be
