@@ -45,7 +45,7 @@ namespace tracing {
             GetLogEventsResult getLogEvents(GetLogEventsRequest request);
         }
 
-        class GetLogEventsRequest {
+        class GetLogEventsRequest extends Serializable {
             @doc("""
                  Filter out all log events from the response that
                  occurred before this time. Milliseconds since UNIX
@@ -70,7 +70,7 @@ namespace tracing {
             //int maximumResults;
         }
 
-        class GetLogEventsResult {
+        class GetLogEventsResult extends Serializable {
             @doc("The result of the query operation.")
             List<protocol.LogEvent> result;
 

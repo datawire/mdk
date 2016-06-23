@@ -81,7 +81,7 @@ namespace protocol {
 
     // XXX: this should probably go somewhere in the library
     @doc("A value class for sending error informationto a remote peer.")
-    class Error {
+    class ProtocolError {
         @doc("Symbolic error code, alphanumerics and underscores only.")
         String code;
 
@@ -97,7 +97,7 @@ namespace protocol {
 
     @doc("Close the event stream.")
     class Close extends ProtocolEvent {
-        Error error;
+        ProtocolError error;
 
         void dispatch(ProtocolHandler handler) {
             handler.onClose(self);
