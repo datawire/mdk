@@ -1,6 +1,9 @@
 quark 1.0;
 
+package datawire_mdk 1.0.0;
+
 // DATAWIRE MDK
 
-use https://raw.githubusercontent.com/datawire/discovery/develop/quark/discovery-2.0.0.q;
-use https://raw.githubusercontent.com/datawire/discovery/develop/quark/datawire_introspection.q;
+use discovery-2.0.q;
+use tracing-1.0.q;
+use datawire_introspection.q;
