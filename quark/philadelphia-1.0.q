@@ -5,6 +5,43 @@ use mdk-1.0.q;
 import discovery;
 
 namespace philadelphia {
+
+  namespace api {
+
+    interface ApiHandler {
+      @doc("Retrieves zero or more events based on the provided request parameters.")
+      GetLoggingEventsResponse getLoggingEvents(GetLoggingEventsRequest request);
+    }
+
+    class GetLoggingEventsRequest {
+      @doc("""Filter out all logging events from the response that occurred before this time. Milliseconds since UNIX
+      epoch. If this key is not set OR the value is null then all events since the beginning of time will be returned.
+      """)
+      long startTime = 0;
+
+      @doc("""Filter out all logging events from the response that occurred after this time. Milliseconds since UNIX
+      epoch. If this key is not set OR the value is null then all recorded events since the startTime will be
+      returned.
+      """)
+      long endTime = now();
+
+      // TODO: concept of pagination and page size will likely be necessary before long.
+      //@doc("Return the next page of results.")
+      //String nextPageId;
+      //int maximumResults;
+    }
+
+    class GetLoggingEventsResponse {
+      @doc("The result of the query operation.")
+      List<Object> result;
+
+      // TODO: concept of pagination size will likely be necessary before long.
+      //@doc("Indicates the ID of the next page to return. If the ID is null then this is the last page.")
+      //String nextPageId;
+    }
+
+  }
+
   namespace protocol {
     interface PhiladelphiaHandler {
       void onReqStart(RequestStart event);

@@ -12,6 +12,13 @@ venv
 virtualenv
 build-tools
 
+# KDE
+.directory
+
+# IntelliJ
+.idea
+*.iml
+
 # Keys and Credentials
 *.key
 *.pem
