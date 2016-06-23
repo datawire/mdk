@@ -115,7 +115,7 @@ namespace philadelphia {
 
     class GetLoggingEventsResponse {
       @doc("The result of the query operation.")
-      List<Object> result;
+      List<protocol.LoggingEvent> result;
 
       // TODO: concept of pagination size will likely be necessary before long.
       //@doc("Indicates the ID of the next page to return. If the ID is null then this is the last page.")
