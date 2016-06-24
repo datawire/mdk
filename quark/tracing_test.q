@@ -46,10 +46,23 @@ class TracingTest extends ProtocolTest {
     // Tests
 
     void testLog() {
+        doTestLog(null);
+    }
+
+    void testLogCustomURL() {
+        doTestLog("custom");
+    }
+
+    void doTestLog(String url) {
         tracing.Logger logger = new tracing.Logger();
+        if (url != null) {
+            logger.url = url;
+        } else {
+            url = logger.url;
+        }
         logger.log("DEBUG", "blah", "testing...");
         self.pump();
-        SocketEvent sev = self.expectSocket(logger.url + "?token=" + logger.token);
+        SocketEvent sev = self.expectSocket(url + "?token=" + logger.token);
         if (sev == null) { return; }
         sev.accept();
         self.pump();
