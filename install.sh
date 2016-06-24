@@ -81,19 +81,5 @@ fi
 echo "== Compiling the MDK"
 quark install $LANGUAGE https://raw.githubusercontent.com/datawire/mdk/${BRANCH}/quark/mdk-1.0.q
 
-if [ "$LANGUAGE" = "--python" ]; then
-    # Get Python set up.
-    echo "== Setting up Flask and Requests"
-
-    # check if we are in a virtualenv or not
-    python -c 'import sys; print sys.real_prefix' > /dev/null 2>&1 && PIPARGS="" || PIPARGS="--user"
-
-    echo pip install $PIPARGS requests flask
-    pip install $PIPARGS requests flask
-elif [ "$LANGUAGE" = "--ruby" ]; then
-    echo "== Setting up Sinatra"
-    gem install --no-document sinatra
-fi
-
 # All done.
 echo "== All done"
