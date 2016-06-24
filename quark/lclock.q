@@ -124,9 +124,14 @@ namespace mdk {
 
         int _lastEntry = 0;
 
-        SharedContext(String origin) {
-            self.originId = origin;
-            self._lastEntry = self.clock.enter();
+        SharedContext() {}
+
+        static SharedContext withOrigin(String originId) {
+            SharedContext newContext = new SharedContext();
+            newContext.originId = originId;
+            newContext._lastEntry = newContext.clock.enter();
+
+            return newContext;
         }
 
         // XXX ew.
