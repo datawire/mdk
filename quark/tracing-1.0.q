@@ -51,11 +51,15 @@ namespace tracing {
 
     class Logger {
 
-        String url = "wss://tracing-beta.datawire.io/ws";
+        String url = "wss://philadelphia-test.datawire.io/ws";
         String token = DatawireToken.getToken();
 
         TLS<SharedContext> _context = new TLS<SharedContext>(new SharedContextInitializer());
-        protocol.TracingClient client = new protocol.TracingClient(url, token);
+        protocol.TracingClient _client;
+
+        Logger() {
+            _client = new protocol.TracingClient(self);
+        }
 
         void setContext(SharedContext context) {
             _context.setValue(context);
@@ -89,7 +93,7 @@ namespace tracing {
             evt.context = getContext();
             evt.timestamp = now();
             evt.record = record;
-            client.log(evt);
+            _client.log(evt);
         }
 
     }
@@ -245,23 +249,22 @@ namespace tracing {
 
         class TracingClient extends WSClient {
 
-            String _url;
-            String _token;
+            Logger _logger;
+            bool _started = false;
+            Lock _mutex = new Lock();
 
             List<LogEvent> _buffered = [];
 
-            TracingClient(String url, String token) {
-                _url = url;
-                _token = token;
-                self.start();
+            TracingClient(Logger logger) {
+                _logger = logger;
             }
 
             String url() {
-                return _url;
+                return _logger.url;
             }
 
             String token() {
-                return _token;
+                return _logger.token;
             }
 
             bool isStarted() {
@@ -269,14 +272,22 @@ namespace tracing {
             }
 
             void heartbeat() {
+                _mutex.acquire();
                 while (_buffered.size() > 0) {
                     LogEvent evt = _buffered.remove(0);
                     self.sock.send(evt.encode());
                 }
+                _mutex.release();
             }
 
             void log(LogEvent evt) {
+                _mutex.acquire();
+                if (!_started) {
+                    self.start();
+                    _started = true;
+                }
                 _buffered.add(evt);
+                _mutex.release();
                 if (self.isConnected()) {
                     self.heartbeat();
                 }

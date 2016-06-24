@@ -9,6 +9,8 @@ namespace mdk {
 namespace protocol {
 
     class Serializable {
+        // XXX: should figure out a way to make the type stable and
+        // unrelated to namespaces
         static Serializable decode(String message) {
             JSONObject json = message.parseJSON();
             String type = json["type"];
@@ -154,7 +156,7 @@ namespace protocol {
         }
 
         void onClose(Close close) {
-            // ???
+            logger.info("close: " + close.toString());
         }
 
         void onExecute(Runtime runtime) {
@@ -194,7 +196,7 @@ namespace protocol {
         void open(String url) {
             String tok = token();
             if (tok != null) {
-                url = url + "/?token=" + tok;
+                url = url + "?token=" + tok;
             }
 
             logger.info("opening " + url);
