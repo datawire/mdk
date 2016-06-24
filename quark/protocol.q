@@ -5,6 +5,7 @@ package datawire_protocol 1.0.0;
 import quark.concurrent;
 import quark.reflect;
 
+namespace mdk {
 namespace protocol {
 
     class Serializable {
@@ -108,7 +109,7 @@ namespace protocol {
     @doc("Common protocol machinery for web socket based protocol clients.")
     class WSClient extends ProtocolHandler, WSHandler, Task {
 
-        static Logger log = new Logger("protocol");
+        static Logger logger = new Logger("protocol");
 
         float firstDelay = 1.0;
         float maxDelay = 16.0;
@@ -196,7 +197,7 @@ namespace protocol {
                 url = url + "/?token=" + tok;
             }
 
-            log.info("opening " + url);
+            logger.info("opening " + url);
 
             Context.runtime().open(url, self);
             sockUrl = url;
@@ -215,7 +216,7 @@ namespace protocol {
         void onWSConnected(WebSocket socket) {
             // Whenever we (re)connect, notify the server of any
             // nodes we have registered.
-            log.info("connected to " + sockUrl);
+            logger.info("connected to " + sockUrl);
 
             reconnectDelay = firstDelay;
             sock = socket;
@@ -230,13 +231,13 @@ namespace protocol {
         void onWSClosed(WebSocket socket) { /* unused */ }
 
         void onWSError(WebSocket socket, WSError error) {
-            log.error(error.toString());
+            logger.error(error.toString());
             // Any non-transient errors should be reported back to the
             // user via any Nodes they have requested.
         }
 
         void onWSFinal(WebSocket socket) {
-            log.info("closed " + sockUrl);
+            logger.info("closed " + sockUrl);
             sock = null;
             if (isStarted()) {
                 scheduleReconnect();
@@ -244,4 +245,4 @@ namespace protocol {
         }
     }
 
-}
+}}

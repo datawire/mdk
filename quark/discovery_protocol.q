@@ -2,7 +2,7 @@ quark 1.0;
 
 use protocol.q;
 
-import protocol;
+import mdk.protocol;
 
 namespace discovery {
     namespace protocol {

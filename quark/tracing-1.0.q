@@ -3,8 +3,13 @@ quark 1.0;
 package datawire_tracing 1.0.0;
 
 use protocol.q;
+use datawire_introspection.q;
 
-import protocol;
+import quark.concurrent;
+import mdk.protocol;
+import datawire_introspection;
+
+import tracing.protocol;
 
 @doc("""
 Tracing is the log collector for the MDK.
@@ -37,6 +42,57 @@ something like
 """)
 
 namespace tracing {
+
+    class SharedContextInitializer extends TLSInitializer<SharedContext> {
+        SharedContext getValue() {
+            return new SharedContext();
+        }
+    }
+
+    class Logger {
+
+        String url = "wss://tracing-beta.datawire.io/ws";
+        String token = DatawireToken.getToken();
+
+        TLS<SharedContext> _context = new TLS<SharedContext>(new SharedContextInitializer());
+        protocol.TracingClient client = new protocol.TracingClient(url, token);
+
+        void setContext(SharedContext context) {
+            _context.setValue(context);
+        }
+
+        SharedContext getContext() {
+            return _context.getValue();
+        }
+
+        void startRequest(String url) {
+            RequestStart start = new RequestStart();
+            start.url = url;
+            logRecord(start);
+        }
+
+        void endRequest() {
+            RequestEnd end = new RequestEnd();
+            logRecord(end);
+        }
+
+        void log(String level, String category, String text) {
+            LogMessage msg = new LogMessage();
+            msg.level = level;
+            msg.category = category;
+            msg.text = text;
+            logRecord(msg);
+        }
+
+        void logRecord(LogRecord record) {
+            LogEvent evt = new LogEvent();
+            evt.context = getContext();
+            evt.timestamp = now();
+            evt.record = record;
+            client.log(evt);
+        }
+
+    }
 
     namespace api {
 
@@ -103,7 +159,10 @@ namespace tracing {
                 return ?Serializable.decode(message);
             }
 
-            void dispatch(TracingHandler handler);
+            // XXX: serialization breaks if LogEvent is abstract (no _getClass is produced)
+            void dispatch(TracingHandler handler) {
+                handler.onLogEvent(self);
+            }
         }
 
         interface RecordHandler {
@@ -153,6 +212,7 @@ namespace tracing {
              event that assigns the reqctx for this request.
         """)
         class RequestStart extends LogRecord {
+            String url;
             @doc("Parameters of the new request, if any.")
             Map<String, String> params;
             @doc("Headers of the new request, if any.")
@@ -171,8 +231,6 @@ namespace tracing {
 
         @doc("Note that a request has ended.")
         class RequestEnd extends LogRecord {
-            @doc("An error if failure, or null for success.")
-            Error error;
 
             void dispatch(RecordHandler handler) {
                 handler.onRequestEnd(self);
@@ -183,6 +241,47 @@ namespace tracing {
             String toString() {
                 return "<ReqEnd " + self.node.toString() + ">";
             }
+        }
+
+        class TracingClient extends WSClient {
+
+            String _url;
+            String _token;
+
+            List<LogEvent> _buffered = [];
+
+            TracingClient(String url, String token) {
+                _url = url;
+                _token = token;
+                self.start();
+            }
+
+            String url() {
+                return _url;
+            }
+
+            String token() {
+                return _token;
+            }
+
+            bool isStarted() {
+                return true;
+            }
+
+            void heartbeat() {
+                while (_buffered.size() > 0) {
+                    LogEvent evt = _buffered.remove(0);
+                    self.sock.send(evt.encode());
+                }
+            }
+
+            void log(LogEvent evt) {
+                _buffered.add(evt);
+                if (self.isConnected()) {
+                    self.heartbeat();
+                }
+            }
+
         }
 
     }

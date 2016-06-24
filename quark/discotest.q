@@ -34,7 +34,7 @@ class DiscoTest extends ProtocolTest {
     }
 
     Open expectOpen(SocketEvent evt) {
-        return ?expectProtocolEvent(evt, "protocol.Open");
+        return ?expectProtocolEvent(evt, "mdk.protocol.Open");
     }
 
     Active expectActive(SocketEvent evt) {
