@@ -154,6 +154,9 @@ namespace mdk {
         }
 
         SharedContext enter() {
+            // Tick first.
+            self.tick();
+            
             // Duplicate this object...
             SharedContext newContext = SharedContext.decode(self.encode());
 
@@ -164,7 +167,7 @@ namespace mdk {
             return newContext;
         }
 
-        SharedContext leave(int popTo) {
+        SharedContext leave() {
             // Duplicate this object...
             SharedContext newContext = SharedContext.decode(self.encode());
 
