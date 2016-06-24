@@ -9,6 +9,8 @@ namespace mdk {
 namespace protocol {
 
     class Serializable {
+        // XXX: should figure out a way to make the type stable and
+        // unrelated to namespaces
         static Serializable decode(String message) {
             JSONObject json = message.parseJSON();
             String type = json["type"];
