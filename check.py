@@ -2,7 +2,7 @@
 
 import sys
 
-from mdk import SharedContext
+from mdk.protocol import SharedContext
 
 class TestState (object):
     def __init__(self, gold):

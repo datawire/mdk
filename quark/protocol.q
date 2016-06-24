@@ -29,6 +29,114 @@ namespace protocol {
         }
     }
 
+    @doc("""
+        A Lamport Clock is a logical structure meant to allow partial causal ordering. Ours is a list of
+        integers such that adding an integer implies adding a new level to the causality tree.
+
+        Within a level, time is indicated by incrementing the clock, so
+
+        [1,2,3] comes before [1,2,4] which comes before [1,2,5]
+
+        Adding an element to the clock implies causality, so [1,2,4,1-N] is _by definition_ a sequence that was
+        _caused by_ the sequence of [1,2,1-3].
+
+        Note that LamportClock is lowish-level support. SharedContext puts some more structure around this, too.
+    """)
+    class LamportClock extends Serializable {
+        // XXX Serialization breaks at the moment if this isn't a private element.
+        Lock _mutex = new Lock();
+        List<int> clocks = [];
+
+        // ew.
+        static LamportClock decode(String message) {
+            return ?Serializable.decode(message);
+        }
+
+        @doc("""
+            Return a neatly-formatted list of all of our clock elements (e.g. 1,2,4,1) for use as a name or
+            a key.
+        """)
+        String key() {
+            _mutex.acquire();
+
+            List<String> tmp = [];
+
+            int i = 0;
+
+            while (i < self.clocks.size()) {
+                tmp.add(self.clocks[i].toString());
+                i = i + 1;
+            }
+
+            String str = ",".join(tmp);
+
+            _mutex.release();
+
+            return str;
+        }
+
+        // XXX Not automagically mapped to str() or the like, even though
+        // something should be.
+        String toString() {
+            _mutex.acquire();
+
+            String str = "<LamportClock " + self.key() + ">";
+
+            _mutex.release();
+
+            return str;
+        }
+
+        @doc("""
+            Enter a new level of causality. Returns the value to pass to later pass to leave to get back to the
+            current level of causality.
+        """)
+        int enter() {
+            _mutex.acquire();
+
+            int current = -1;
+
+            self.clocks.add(0);
+            current = self.clocks.size();
+
+            _mutex.release();
+
+            return current;
+        }
+
+        @doc("""
+            Leave deeper levels of causality. popTo should be the value returned when you enter()d this level.
+        """)
+        int leave(int popTo) {
+            _mutex.acquire();
+
+            int current = -1;
+
+            self.clocks = self.clocks.slice(0, popTo);
+            current = self.clocks.size();
+
+            _mutex.release();
+
+            return current;
+        }
+
+        @doc("""
+            Increment the clock for our current level of causality (which is always the last element in the list).
+            If there are no elements in our clock, do nothing.
+        """)
+        void tick() {
+            _mutex.acquire();
+
+            int current = self.clocks.size();
+
+            if (current > 0) {
+                self.clocks[current - 1] = self.clocks[current - 1] + 1;
+            }
+
+            _mutex.release();
+        }
+    }
+
     class SharedContext extends Serializable {
         @doc("""
              Every SharedContext is given an ID at the moment of its
@@ -40,10 +148,9 @@ namespace protocol {
         String originId;
 
         @doc("""
-      To track causality, we use a Lamport clock, which we track as a
-      list of integers.
+            To track causality, we use a Lamport clock.
         """)
-        List<int> clocks;
+        LamportClock clock = new LamportClock();
 
         @doc("""
              We also provide a map of properties for later extension. Rememeber
@@ -51,15 +158,79 @@ namespace protocol {
         """)
         Map<String, Object> properties;
 
+        int _lastEntry = 0;
+
+        SharedContext() {}
+
+        @doc("""
+            Create a new SharedContext with the given originId.
+        """)
+        static SharedContext withOrigin(String originId) {
+            SharedContext newContext = new SharedContext();
+            newContext.originId = originId;
+            newContext._lastEntry = newContext.clock.enter();
+
+            return newContext;
+        }
+
         // XXX ew.
         static SharedContext decode(String message) {
             return ?Serializable.decode(message);
         }
 
+        String key() {
+            return self.originId + ":" + self.clock.key();
+        }
+
         // XXX Not automagically mapped to str() or the like, even though
         // something should be.
         String toString() {
-            return "<SharedContext " + self.originId + ">";
+            return "<SharedContext " + self.key() + ">";
+        }
+
+        @doc("""
+            Tick the clock at our current causality level.
+        """)
+        void tick() {
+            self.clock.tick();
+        }
+
+        @doc("""
+            Return a SharedContext one level deeper in causality.
+
+            NOTE WELL: THIS RETURNS A NEW SharedContext RATHER THAN MODIFYING THIS ONE. It is NOT SUPPORTED
+            to modify the causality level of a SharedContext in place.
+        """)
+        SharedContext enter() {
+            // Tick first.
+            self.tick();
+            
+            // Duplicate this object...
+            SharedContext newContext = SharedContext.decode(self.encode());
+
+            // ...enter...
+            newContext._lastEntry = newContext.clock.enter();
+
+            // ...and return the new context.
+            return newContext;
+        }
+
+        @doc("""
+            Return a SharedContext one level higher in causality. In practice, most callers should probably stop
+            using this context, and the new one, after calling this method.
+
+            NOTE WELL: THIS RETURNS A NEW SharedContext RATHER THAN MODIFYING THIS ONE. It is NOT SUPPORTED
+            to modify the causality level of a SharedContext in place.
+        """)
+        SharedContext leave() {
+            // Duplicate this object...
+            SharedContext newContext = SharedContext.decode(self.encode());
+
+            // ...leave...
+            newContext._lastEntry = newContext.clock.leave(newContext._lastEntry);
+
+            // ...and return the new context.
+            return newContext;
         }
     }
 
