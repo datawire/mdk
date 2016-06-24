@@ -51,7 +51,7 @@ namespace tracing {
 
     class Logger {
 
-        String url = "wss://tracing-beta.datawire.io/ws";
+        String url = "wss://philadelphia-test.datawire.io/ws";
         String token = DatawireToken.getToken();
 
         TLS<SharedContext> _context = new TLS<SharedContext>(new SharedContextInitializer());
@@ -247,13 +247,14 @@ namespace tracing {
 
             String _url;
             String _token;
+            bool _started = false;
+            Lock _mutex = new Lock();
 
             List<LogEvent> _buffered = [];
 
             TracingClient(String url, String token) {
                 _url = url;
                 _token = token;
-                self.start();
             }
 
             String url() {
@@ -269,14 +270,22 @@ namespace tracing {
             }
 
             void heartbeat() {
+                _mutex.acquire();
                 while (_buffered.size() > 0) {
                     LogEvent evt = _buffered.remove(0);
                     self.sock.send(evt.encode());
                 }
+                _mutex.release();
             }
 
             void log(LogEvent evt) {
+                _mutex.acquire();
+                if (!_started) {
+                    self.start();
+                    _started = true;
+                }
                 _buffered.add(evt);
+                _mutex.release();
                 if (self.isConnected()) {
                     self.heartbeat();
                 }

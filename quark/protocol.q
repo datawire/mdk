@@ -156,7 +156,7 @@ namespace protocol {
         }
 
         void onClose(Close close) {
-            // ???
+            logger.info("close: " + close.toString());
         }
 
         void onExecute(Runtime runtime) {
@@ -196,7 +196,7 @@ namespace protocol {
         void open(String url) {
             String tok = token();
             if (tok != null) {
-                url = url + "/?token=" + tok;
+                url = url + "?token=" + tok;
             }
 
             logger.info("opening " + url);

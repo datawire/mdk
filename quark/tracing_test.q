@@ -47,14 +47,14 @@ class TracingTest extends ProtocolTest {
 
     void testLog() {
         tracing.Logger logger = new tracing.Logger();
+        logger.log("DEBUG", "blah", "testing...");
         self.pump();
-        SocketEvent sev = self.expectSocket(logger.url + "/?token=" + logger.token);
+        SocketEvent sev = self.expectSocket(logger.url + "?token=" + logger.token);
         if (sev == null) { return; }
         sev.accept();
         self.pump();
         Open open = expectOpen(sev);
         if (open == null) { return; }
-        logger.log("DEBUG", "blah", "testing...");
         self.pump();
         LogEvent evt = expectLogEvent(sev);
         if (evt == null) { return; }
