@@ -149,6 +149,20 @@ namespace tracing {
 
         @doc("""A single event in the stream that Tracing has to manage.""")
         class LogEvent extends ProtocolEvent {
+
+            static String _descriminator = "log";
+
+            static ProtocolEvent construct(String type) {
+                ProtocolEvent result = ProtocolEvent.construct(type);
+                if (result != null) { return result; }
+                if (type == LogEvent._descriminator) { return new LogEvent(); }
+                return null;
+            }
+
+            static ProtocolEvent decode(String encoded) {
+                return ?Serializable.decodeClassName("tracing.protocol.LogEvent", encoded);
+            }
+
             @doc("""Shared context""")
             SharedContext context;
             @doc("""
@@ -158,13 +172,11 @@ namespace tracing {
             long timestamp;
             LogRecord record;
 
-            // XXX ew.
-            static LogEvent decode(String message) {
-                return ?Serializable.decode(message);
+            void dispatch(ProtocolHandler handler) {
+                dispatchLogEvent(?handler);
             }
 
-            // XXX: serialization breaks if LogEvent is abstract (no _getClass is produced)
-            void dispatch(TracingHandler handler) {
+            void dispatchLogEvent(TracingHandler handler) {
                 handler.onLogEvent(self);
             }
         }
@@ -176,14 +188,10 @@ namespace tracing {
         }
 
         @doc("""A event that contains information solely about tracing.""")
-        class LogRecord extends Serializable {
+        class LogRecord {
+
             @doc("The node at which we're tracing this record.")
             String node;
-
-            // XXX ew.
-            static LogRecord decode(String message) {
-                return ?Serializable.decode(message);
-            }
 
             void dispatch(RecordHandler handler);
         }

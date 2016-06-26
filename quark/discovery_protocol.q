@@ -101,7 +101,7 @@ namespace discovery {
 
             void onWSMessage(WebSocket socket, String message) {
                 // Decode and dispatch incoming messages.
-                DiscoveryEvent event = DiscoveryEvent.decode(message);
+                ProtocolEvent event = DiscoveryEvent.decode(message);
                 // disco.mutex.acquire();
                 event.dispatch(self);
                 // disco.mutex.release();
@@ -110,18 +110,31 @@ namespace discovery {
         }
 
         interface DiscoHandler extends ProtocolHandler {
-            void onOpen(Open open);
             void onActive(Active active);
             void onExpire(Expire expire);
             void onClear(Clear reset);
-            void onClose(Close close);
         }
 
         class DiscoveryEvent extends ProtocolEvent {
-            static DiscoveryEvent decode(String message) {
-                return ?Serializable.decode(message);
+
+            static ProtocolEvent construct(String type) {
+                ProtocolEvent result = ProtocolEvent.construct(type);
+                if (result != null) { return result; }
+                if (type == Active._descriminator) { return new Active(); }
+                if (type == Expire._descriminator) { return new Expire(); }
+                if (type == Clear._descriminator) { return new Clear(); }
+                return null;
             }
-            void dispatch(DiscoHandler handler);
+
+            static ProtocolEvent decode(String message) {
+                return ?Serializable.decodeClassName("discovery.protocol.DiscoveryEvent", message);
+            }
+
+            void dispatch(ProtocolHandler handler) {
+                dispatchDiscoveryEvent(?handler);
+            }
+
+            void dispatchDiscoveryEvent(DiscoHandler handler);
         }
 
         /*@doc("""
@@ -131,30 +144,42 @@ namespace discovery {
           specified ttl.
           """)*/
         class Active extends DiscoveryEvent {
+
+            static String _descriminator = "active";
+
             @doc("The advertised node.")
             Node node;
             @doc("The ttl of the node in seconds.")
             float ttl;
 
-            void dispatch(DiscoHandler handler) {
+            void dispatchDiscoveryEvent(DiscoHandler handler) {
                 handler.onActive(self);
             }
+
         }
 
         @doc("Expire a node.")
         class Expire extends DiscoveryEvent {
+
+            static String _descriminator = "expire";
+
             Node node;
 
-            void dispatch(DiscoHandler handler) {
+            void dispatchDiscoveryEvent(DiscoHandler handler) {
                 handler.onExpire(self);
             }
         }
 
         @doc("Expire all nodes.")
         class Clear extends DiscoveryEvent {
-            void dispatch(DiscoHandler handler) {
+
+            static String _descriminator = "clear";
+
+            void dispatchDiscoveryEvent(DiscoHandler handler) {
                 handler.onClear(self);
             }
         }
     }
 }
+
+// XXX: edit just this file to trigger spurious dup reflection
