@@ -176,6 +176,7 @@ namespace protocol {
               do that.
             */
 
+            // This really needs an explicit state machine.
             if (isConnected()) {
                 if (isStarted()) {
                     long interval = ((ttl/2.0)*1000.0).round();
@@ -189,7 +190,9 @@ namespace protocol {
                     sock = null;
                 }
             } else {
-                open(url());
+                if (isStarted()) {
+                    open(url());
+                }
             }
         }
 
@@ -206,8 +209,11 @@ namespace protocol {
         }
 
         void heartbeat() {}
-        
+
         void doHeartbeat() {
+            if (!isStarted()) {
+                return;
+            }
             heartbeat();
             lastHeartbeat = now();
             schedule(ttl/2.0);

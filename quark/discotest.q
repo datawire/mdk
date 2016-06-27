@@ -185,7 +185,32 @@ class DiscoTest extends ProtocolTest {
     }
 
     void testStop() {
-        // ...
+        Discovery disco = new Discovery().connect();
+        SocketEvent sev = startDisco(disco);
+
+        Node node = new Node();
+        node.service = "svc";
+        node.address = "addr";
+        node.version = "1.2.3";
+        disco.register(node);
+
+        Open open = expectOpen(sev);
+        if (open == null) { return; }
+        Active active = expectActive(sev);
+        if (active == null) { return; }
+
+        disco.stop();
+        // Might take some cleanup to stop everything:
+        self.mock.pump();
+        self.mock.pump();
+        self.mock.pump();
+        self.mock.pump();
+
+        // At this point we should have nothing scheduled and socket should be
+        // closed:
+        checkEqual([sev], self.mock.events);
+        checkEqual(true, sev.sock.closed);
+        checkEqual(self.mock.executed, self.mock.tasks.size());
     }
 
 }
