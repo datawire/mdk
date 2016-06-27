@@ -17,13 +17,15 @@ namespace protocol {
             Serializable obj;
             if (meth != null) {
                 obj = ?meth.invoke(null, [type]);
+                if (obj == null) {
+                    panic(clazz.getName() + "." + meth.getName() + " could not understand this json: " + encoded);
+                }
                 clazz = obj.getClass();
             } else {
                 obj = ?clazz.construct([]);
-            }
-
-            if (obj == null) {
-                panic(clazz.getName() + ": " + encoded);
+                if (obj == null) {
+                    panic("could not construct " + clazz.getName() + " from this json: " + encoded);
+                }
             }
 
             fromJSON(clazz, obj, json);
