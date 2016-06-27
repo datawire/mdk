@@ -106,6 +106,11 @@ namespace tracing {
         }
 
         class GetLogEventsRequest extends Serializable {
+
+            static GetLogEventsRequest decode(String encoded) {
+                return ?Serializable.decodeClassName("tracing.api.GetLogEventsRequest", encoded);
+            }
+
             @doc("""
                  Filter out all log events from the response that
                  occurred before this time. Milliseconds since UNIX
@@ -131,6 +136,11 @@ namespace tracing {
         }
 
         class GetLogEventsResult extends Serializable {
+
+            static GetLogEventsResult decode(String encoded) {
+                return ?Serializable.decodeClassName("tracing.api.GetLogEventsResult", encoded);
+            }
+
             @doc("The result of the query operation.")
             List<protocol.LogEvent> result;
 
