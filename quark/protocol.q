@@ -9,23 +9,41 @@ namespace mdk {
 namespace protocol {
 
     class Serializable {
-        // XXX: should figure out a way to make the type stable and
-        // unrelated to namespaces
-        static Serializable decode(String message) {
-            JSONObject json = message.parseJSON();
+
+        static Serializable decodeClass(Class clazz, String encoded) {
+            JSONObject json = encoded.parseJSON();
             String type = json["type"];
-            Class clazz = Class.get(type);
-            Serializable obj = ?clazz.construct([]);
+            Method meth = clazz.getMethod("construct");
+            Serializable obj;
+            if (meth != null) {
+                obj = ?meth.invoke(null, [type]);
+                clazz = obj.getClass();
+            } else {
+                obj = ?clazz.construct([]);
+            }
+
+            if (obj == null) {
+                panic(clazz.getName() + ": " + encoded);
+            }
+
             fromJSON(clazz, obj, json);
 
             return obj;
         }
 
+        static Serializable decodeClassName(String name, String encoded) {
+            return decodeClass(Class.get(name), encoded);
+        }
+
         String encode() {
             Class clazz = self.getClass();
             JSONObject json = toJSON(self, clazz);
-            json["type"] = clazz.getName();
-            return json.toString();
+            String type = ?self.getField("_descriminator");
+            if (type != null) {
+                json["type"] = type;
+            }
+            String encoded = json.toString();
+            return encoded;
         }
     }
 
@@ -173,9 +191,10 @@ namespace protocol {
             return newContext;
         }
 
-        // XXX ew.
-        static SharedContext decode(String message) {
-            return ?Serializable.decode(message);
+        // XXX this could work a lot nicer with a parameterized method
+        // in Serialize and a static class reference
+        static SharedContext decode(String encoded) {
+            return ?Serializable.decodeClassName("mdk.protocol.SharedContext", encoded);
         }
 
         String key() {
@@ -240,12 +259,17 @@ namespace protocol {
     }
 
     class ProtocolEvent extends Serializable {
-        static ProtocolEvent decode(String message) {
-            return ?Serializable.decode(message);
+        static ProtocolEvent construct(String type) {
+            if (type == Open._descriminator) { return new Open(); }
+            if (type == Close._descriminator) { return new Close(); }
+            return null;
         }
+        void dispatch(ProtocolHandler handler);
     }
 
     class Open extends ProtocolEvent {
+
+        static String _descriminator = "open";
 
         String version = "2.0.0";
 
@@ -272,6 +296,9 @@ namespace protocol {
 
     @doc("Close the event stream.")
     class Close extends ProtocolEvent {
+
+        static String _descriminator = "close";
+
         ProtocolError error;
 
         void dispatch(ProtocolHandler handler) {
