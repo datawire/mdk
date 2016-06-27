@@ -65,10 +65,11 @@ namespace protocol {
         Lock _mutex = new Lock();
         List<int> clocks = [];
 
-        // ew.
-        static LamportClock decode(String message) {
-            return ?Serializable.decode(message);
-        }
+        // XXX this could work a lot nicer with a parameterized method
+        // in Serialize and a static class reference
+        static LamportClock decode(String encoded) {
+            return ?Serializable.decodeClassName("mdk.protocol.LamportClock", encoded);
+        }       
 
         @doc("""
             Return a neatly-formatted list of all of our clock elements (e.g. 1,2,4,1) for use as a name or
