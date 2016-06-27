@@ -348,6 +348,16 @@ namespace discovery {
       return self;
     }
 
+    @doc("Register info about a service node with the discovery service. You must")
+    @doc("usually start the uplink before this will do much; see start().")
+    Discovery register_service(String service, String address, String version) {
+      Node node = new Node();
+      node.service = service;
+      node.address = address;
+      node.version = version;
+      return self.register(node);
+    }
+
     @doc("Resolve a service name into an available service node. You must")
     @doc("usually start the uplink before this will do much; see start().")
     @doc("")
