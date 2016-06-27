@@ -1,30 +1,34 @@
 quark 1.0;
 
-package discotest 2.0.0;
-
-use discovery-2.0.q;
-// We can switch to quark.mock whenever we switch to Quark > 1.0.133.
-include mock.q;
+package mdk_test 1.0.0;
 
 import quark.test;
-
-import discovery;
-import discovery.protocol;
-import mock;
 
 void main(List<String> args) {
     test.run(args);
 }
 
-class DiscoTest extends ProtocolTest {
+use discovery-2.0.q;
+use tracing-1.0.q;
+
+// We can switch to quark.mock whenever we switch to Quark > 1.0.133.
+include mock.q;
+
+import quark.test;
+
+import tracing;
+import tracing.protocol;
+import mock;
+
+class TracingTest extends ProtocolTest {
 
     /////////////////
     // Helpers
 
-    ProtocolEvent expectProtocolEvent(SocketEvent sev, String expectedType) {
+    ProtocolEvent expectTracingEvent(SocketEvent sev, String expectedType) {
         TextMessage msg = sev.expectTextMessage();
         if (msg == null) { return null; }
-        ProtocolEvent evt = ProtocolEvent.decode(msg.text);
+        ProtocolEvent evt = TracingEvent.decode(msg.text);
         String type = evt.getClass().getName();
         if (check(type == expectedType, "expected " + expectedType + " event, got " + type)) {
             return ?evt;
@@ -34,11 +38,80 @@ class DiscoTest extends ProtocolTest {
     }
 
     Open expectOpen(SocketEvent evt) {
-        return ?expectProtocolEvent(evt, "mdk.protocol.Open");
+        return ?expectTracingEvent(evt, "mdk.protocol.Open");
+    }
+
+    LogEvent expectLogEvent(SocketEvent evt) {
+        return ?expectTracingEvent(evt, "tracing.protocol.LogEvent");
+    }
+
+    /////////////////
+    // Tests
+
+    void testLog() {
+        doTestLog(null);
+    }
+
+    void testLogCustomURL() {
+        doTestLog("custom");
+    }
+
+    void doTestLog(String url) {
+        tracing.Tracer tracer = new tracing.Tracer();
+        if (url != null) {
+            tracer.url = url;
+        } else {
+            url = tracer.url;
+        }
+        tracer.log("DEBUG", "blah", "testing...");
+        self.pump();
+        SocketEvent sev = self.expectSocket(url + "?token=" + tracer.token);
+        if (sev == null) { return; }
+        sev.accept();
+        self.pump();
+        Open open = expectOpen(sev);
+        if (open == null) { return; }
+        self.pump();
+        LogEvent evt = expectLogEvent(sev);
+        if (evt == null) { return; }
+        LogMessage msg = ?evt.record;
+        if (msg == null) {
+            fail("expected a message");
+            return;
+        }
+        checkEqual("DEBUG", msg.level);
+        checkEqual("blah", msg.category);
+        checkEqual("testing...", msg.text);
+    }
+
+}
+
+import discovery;
+import discovery.protocol;
+
+class DiscoveryTest extends ProtocolTest {
+
+    /////////////////
+    // Helpers
+
+    ProtocolEvent expectDiscoveryEvent(SocketEvent sev, String expectedType) {
+        TextMessage msg = sev.expectTextMessage();
+        if (msg == null) { return null; }
+        ProtocolEvent evt = DiscoveryEvent.decode(msg.text);
+        String type = evt.getClass().getName();
+        if (check(type == expectedType, "expected " + expectedType + " event, got " + type)) {
+            return ?evt;
+        } else {
+            return null;
+        }
+    }
+
+    Open expectOpen(SocketEvent evt) {
+        return ?expectDiscoveryEvent(evt, "mdk.protocol.Open");
     }
 
     Active expectActive(SocketEvent evt) {
-        return ?expectProtocolEvent(evt, "discovery.protocol.Active");
+        return ?expectDiscoveryEvent(evt, "discovery.protocol.Active");
     }
 
     void checkEqualNodes(Node expected, Node actual) {
@@ -54,6 +127,7 @@ class DiscoTest extends ProtocolTest {
         SocketEvent sev = self.expectSocket(disco.url);
         if (sev == null) { return null; }
         sev.accept();
+        sev.send(new Open().encode());
         return sev;
     }
 
