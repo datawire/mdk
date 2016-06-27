@@ -49,7 +49,7 @@ namespace tracing {
         }
     }
 
-    class Logger {
+    class Tracer {
 
         String url = "wss://philadelphia-test.datawire.io/ws";
         String token = DatawireToken.getToken();
@@ -57,7 +57,7 @@ namespace tracing {
         TLS<SharedContext> _context = new TLS<SharedContext>(new SharedContextInitializer());
         protocol.TracingClient _client;
 
-        Logger() {
+        Tracer() {
             _client = new protocol.TracingClient(self);
         }
 
@@ -148,9 +148,7 @@ namespace tracing {
         }
 
         @doc("""A single event in the stream that Tracing has to manage.""")
-        class LogEvent extends ProtocolEvent {
-
-            static String _descriminator = "log";
+        class TracingEvent extends ProtocolEvent {
 
             static ProtocolEvent construct(String type) {
                 ProtocolEvent result = ProtocolEvent.construct(type);
@@ -163,6 +161,14 @@ namespace tracing {
                 return ?Serializable.decodeClassName("tracing.protocol.LogEvent", encoded);
             }
 
+            void dispatchTracingEvent(TracingHandler handler);
+
+        }
+
+        class LogEvent extends TracingEvent {
+
+            static String _descriminator = "log";
+
             @doc("""Shared context""")
             SharedContext context;
             @doc("""
@@ -173,10 +179,10 @@ namespace tracing {
             LogRecord record;
 
             void dispatch(ProtocolHandler handler) {
-                dispatchLogEvent(?handler);
+                dispatchTracingEvent(?handler);
             }
 
-            void dispatchLogEvent(TracingHandler handler) {
+            void dispatchTracingEvent(TracingHandler handler) {
                 handler.onLogEvent(self);
             }
         }
@@ -257,22 +263,22 @@ namespace tracing {
 
         class TracingClient extends WSClient {
 
-            Logger _logger;
+            Tracer _tracer;
             bool _started = false;
             Lock _mutex = new Lock();
 
             List<LogEvent> _buffered = [];
 
-            TracingClient(Logger logger) {
-                _logger = logger;
+            TracingClient(Tracer tracer) {
+                _tracer = tracer;
             }
 
             String url() {
-                return _logger.url;
+                return _tracer.url;
             }
 
             String token() {
-                return _logger.token;
+                return _tracer.token;
             }
 
             bool isStarted() {

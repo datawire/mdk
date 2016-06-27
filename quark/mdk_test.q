@@ -25,10 +25,10 @@ class TracingTest extends ProtocolTest {
     /////////////////
     // Helpers
 
-    ProtocolEvent expectProtocolEvent(SocketEvent sev, String expectedType) {
+    ProtocolEvent expectTracingEvent(SocketEvent sev, String expectedType) {
         TextMessage msg = sev.expectTextMessage();
         if (msg == null) { return null; }
-        ProtocolEvent evt = LogEvent.decode(msg.text);
+        ProtocolEvent evt = TracingEvent.decode(msg.text);
         String type = evt.getClass().getName();
         if (check(type == expectedType, "expected " + expectedType + " event, got " + type)) {
             return ?evt;
@@ -38,11 +38,11 @@ class TracingTest extends ProtocolTest {
     }
 
     Open expectOpen(SocketEvent evt) {
-        return ?expectProtocolEvent(evt, "mdk.protocol.Open");
+        return ?expectTracingEvent(evt, "mdk.protocol.Open");
     }
 
     LogEvent expectLogEvent(SocketEvent evt) {
-        return ?expectProtocolEvent(evt, "tracing.protocol.LogEvent");
+        return ?expectTracingEvent(evt, "tracing.protocol.LogEvent");
     }
 
     /////////////////
@@ -57,15 +57,15 @@ class TracingTest extends ProtocolTest {
     }
 
     void doTestLog(String url) {
-        tracing.Logger logger = new tracing.Logger();
+        tracing.Tracer tracer = new tracing.Tracer();
         if (url != null) {
-            logger.url = url;
+            tracer.url = url;
         } else {
-            url = logger.url;
+            url = tracer.url;
         }
-        logger.log("DEBUG", "blah", "testing...");
+        tracer.log("DEBUG", "blah", "testing...");
         self.pump();
-        SocketEvent sev = self.expectSocket(url + "?token=" + logger.token);
+        SocketEvent sev = self.expectSocket(url + "?token=" + tracer.token);
         if (sev == null) { return; }
         sev.accept();
         self.pump();
