@@ -312,6 +312,11 @@ namespace discovery {
       return self;
     }
 
+    @doc("Easy startup of a Discovery service with a given token and the default URL.")
+    static Discovery init(String token) {
+        return new Discovery().withToken(token).connect().start();
+    }
+
     @doc("Stop the uplink to the discovery service.")
     Discovery stop() {
       self._lock();

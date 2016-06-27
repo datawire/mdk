@@ -254,6 +254,14 @@ class DiscoveryTest extends ProtocolTest {
         }
     }
 
+    // Discovery.init() connects to the server, and sends the token:
+    void testInit() {
+        String token = "1234";
+        Discovery disco = Discovery.init(token);
+        self.pump();
+        self.expectSocket(disco.url + "?token=" + token);
+    }
+
     void testReconnect() {
         // ...
     }
