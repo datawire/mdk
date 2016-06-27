@@ -181,6 +181,23 @@ class DiscoveryTest extends ProtocolTest {
         checkEqualNodes(node, active.node);
     }
 
+    void testRegisterTheNiceWay() {
+        Discovery disco = new Discovery().connect();
+        SocketEvent sev = startDisco(disco);
+
+        Node node = new Node();
+        node.service = "svc";
+        node.address = "addr";
+        node.version = "1.2.3";
+        disco.register_service(node.service, node.address, node.version);
+
+        Open open = expectOpen(sev);
+        if (open == null) { return; }
+        Active active = expectActive(sev);
+        if (active == null) { return; }
+        checkEqualNodes(node, active.node);
+    }
+
     void testResolvePreStart() {
         Discovery disco = new Discovery().connect();
 

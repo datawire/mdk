@@ -380,6 +380,20 @@ namespace discovery {
       return result;
     }
 
+    // XXX blocking API, never call from Javascript or Quark code.
+    @doc("Wait for service name to resolve into an available service node, or fail")
+    @doc("appropriately (typically by raising an exception if the language")
+    @doc("supports it). This should only be used in blocking runtimes (e.g. ")
+    @doc("you do not want to use this in Javascript).")
+    Node resolve_until(String service, float timeout) {
+      Node result = self.resolve(service);
+      result.await(timeout);
+      if (result.address == null) {
+        panic("Timeout looking up service " + service);
+      }
+      return result;
+    }
+
     // XXX PRIVATE API -- needs to not be here.
     // @doc("Add a given node.")
     void active(Node node) {
