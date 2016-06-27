@@ -50,8 +50,10 @@ namespace tracing {
     }
 
     class Tracer {
+        static Logger logger = new Logger("MDK Tracer");
 
-        String url = "wss://philadelphia-test.datawire.io/ws";
+        String host = "philadelphia-test.datawire.io";
+        String url = "wss://" + host + "/ws";
         String token = DatawireToken.getToken();
 
         TLS<SharedContext> _context = new TLS<SharedContext>(new SharedContextInitializer());
@@ -96,6 +98,78 @@ namespace tracing {
             _client.log(evt);
         }
 
+        @doc("Query the trace logs. startTimeMillis and endTimeMillis are milliseconds since the UNIX epoch.")
+        Promise query(long startTimeMillis, long endTimeMillis) {
+            // Set up args.
+            List<String> args = [];
+            String reqID = "Query ";
+
+            if (startTimeMillis >= 0) {
+                args.add("startTime=" + startTimeMillis.toString());
+                reqID = reqID + startTimeMillis.toString();
+            }
+
+            reqID = reqID + "-";
+
+            if (endTimeMillis >= 0) {
+                args.add("endTime=" + endTimeMillis.toString());
+                reqID = reqID + endTimeMillis.toString();
+            }
+
+            // Grab the full URL...
+
+            String url = "https://" + self.host + "/api/logs";
+
+            if (args.size() > 0) {
+                url = url + "?" + "&".join(args);
+            }
+
+            // Off we go.
+            HTTPRequest req = new HTTPRequest(url);
+
+            req.setMethod("GET");
+            req.setHeader("Content-Type", "application/json");
+            req.setHeader("Authorization", "Bearer " + self.token);
+
+            logger.info("curl -H 'Content-Type: application/json' \\");
+            logger.info("     -H 'Authorization: Bearer " + self.token + "' \\");
+            logger.info("     '" + url + "'");
+
+            return IO.httpRequest(req).andThen(bind(self, "handleQueryResponse", []));
+        }
+
+        Object handleQueryResponse(HTTPResponse response) {
+            int code = response.getCode();      // HTTP status code
+            String body = response.getBody();   // just to save keystrokes later
+
+            logger.info("query got: " + code.toString());
+            logger.info("body: " + body);
+
+            if (code == 200) {
+                // All good. Parse the JSON in the body...
+                logger.info("All good!");
+                return api.GetLogEventsResult.decode(body);
+            }
+            else {
+                // Per the HTTP status code, something has gone wrong. Try to pull a
+                // sensible error out of the body...
+                String error = "";
+
+                if (body.size() > 0) {
+                    error = body;
+                }
+
+                // In any case, if we have no error, synthesize something from the
+                // status code.
+                if (error.size() < 1) {
+                    error = "HTTP response " + code.toString();
+                }
+
+                logger.info("OH NO! " + error);
+
+                return new HTTPError(error);
+            } 
+        }
     }
 
     namespace api {
@@ -148,7 +222,6 @@ namespace tracing {
             //@doc("Indicates the ID of the next page to return. If the ID is null then this is the last page.")
             //String nextPageId;
         }
-
     }
 
     namespace protocol {
