@@ -99,7 +99,7 @@ namespace tracing {
         }
 
         @doc("Query the trace logs. startTimeMillis and endTimeMillis are milliseconds since the UNIX epoch.")
-        void query(api.GetLogEventsResult result, long startTimeMillis, long endTimeMillis) {
+        Promise query(long startTimeMillis, long endTimeMillis) {
             // Set up args.
             List<String> args = [];
             String reqID = "Query ";
@@ -120,63 +120,35 @@ namespace tracing {
 
             String url = "https://" + self.host + "/api/logs";
 
-            if (args.size > 0) {
+            if (args.size() > 0) {
                 url = url + "?" + "&".join(args);
             }
-
-            // ...and then create an !@*#!&@#*& TraceQueryListener to handle the response.
-            // Sigh.
-            TraceQueryListener listener = new TraceQueryListener(reqID, result, logger);
 
             // Off we go.
             HTTPRequest req = new HTTPRequest(url);
 
             req.setMethod("GET");
             req.setHeader("Content-Type", "application/json");
-            req.setHeader("Authentication", "Bearer " + self.token);
-            self.runtime.request(req, listener);
+            req.setHeader("Authorization", "Bearer " + self.token);
 
-            return result;
-        }
-    }
+            logger.info("curl -H 'Content-Type: application/json' \\");
+            logger.info("     -H 'Authorization: Bearer " + self.token + "' \\");
+            logger.info("     '" + url + "'");
 
-    // XXX This class should go away in favor of promises.
-    class TraceQueryListener extends HTTPHandler {
-        String reqID;
-        api.GetLogEventsResult response;
-        Logger logger;
-
-        @doc("Params:")
-        @doc("reqID: a request ID, used only for tracing")
-        @doc("response: the api.GetLogEventsResult object to be filled in when this call completes")
-        @doc("logger: Logger to use for debugging and tracing")
-        TraceQueryListener(String reqID, api.GetLogEventsResult response, Logger logger) {
-            self.reqID = reqID;
-            self.response = response;
-            self.logger = logger;
+            return IO.httpRequest(req).andThen(bind(self, "handleQueryResponse", []));
         }
 
-        // onHTTPInit gets called whenever our HTTP connection is completed and
-        // we're ready to make calls over it.
-        void onHTTPInit(HTTPRequest request) {
-            self.logger.trace("onHTTPInit for " + self.reqID);
-        }
-
-        // onHTTPResponse gets called whenever our HTTP request has succeeded and
-        // we have the server's final response.
-        void onHTTPResponse(HTTPRequest request, HTTPResponse response) {
-            JSONObject results = null;          // results from call
-
+        Object handleQueryResponse(HTTPResponse response) {
             int code = response.getCode();      // HTTP status code
             String body = response.getBody();   // just to save keystrokes later
 
-            self.logger.trace("onHTTPResponse for " + self.reqID + ": " + code.toString());
-            self.logger.trace("body: " + body);
+            logger.info("query got: " + code.toString());
+            logger.info("body: " + body);
 
             if (code == 200) {
                 // All good. Parse the JSON in the body...
-                self.response.result = body.parseJSON();
-                self.response.finish(null);
+                logger.info("All good!");
+                return api.GetLogEventsResult.decode(body);
             }
             else {
                 // Per the HTTP status code, something has gone wrong. Try to pull a
@@ -184,9 +156,7 @@ namespace tracing {
                 String error = "";
 
                 if (body.size() > 0) {
-                    results = body.parseJSON();
-
-                    error = results["error"];
+                    error = body;
                 }
 
                 // In any case, if we have no error, synthesize something from the
@@ -195,19 +165,11 @@ namespace tracing {
                     error = "HTTP response " + code.toString();
                 }
 
-                self.response.finish(new HTTPError(error));
+                logger.info("OH NO! " + error);
+
+                return new HTTPError(error);
             } 
         }
-
-        void onHTTPError(HTTPRequest request, HTTPError err) {
-            // This seems to just be informational.
-            self.logger.trace("onHTTPError for " + self.reqID + ": " + err.toString());
-        }
-        
-        void onHTTPFinal(HTTPRequest request) {
-            // This seems to just be informational.
-            self.logger.trace("onHTTPFinal for " + self.reqID);
-        }   
     }
 
     namespace api {
@@ -247,7 +209,7 @@ namespace tracing {
             //int maximumResults;
         }
 
-        class GetLogEventsResult extends Serializable, Future {
+        class GetLogEventsResult extends Serializable {
 
             static GetLogEventsResult decode(String encoded) {
                 return ?Serializable.decodeClassName("tracing.api.GetLogEventsResult", encoded);
