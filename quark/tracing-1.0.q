@@ -56,7 +56,7 @@ namespace tracing {
         String queryURL = "https://philadelphia-test.datawire.io/api/logs";
 
         String token = DatawireToken.getToken();
-        long lastPoll = 0;
+        long lastPoll = 0L;
 
         // String url = 'wss://localhost:52690/ws';
         // String queryURL = 'https://localhost:52690/api/logs';
