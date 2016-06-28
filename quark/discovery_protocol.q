@@ -48,6 +48,13 @@ namespace discovery {
                 dlog.info("active " + node.toString());
             }
 
+            void expire(Node node) {
+                Expire expire = new Expire();
+                expire.node = node;
+                self.sock.send(expire.encode());
+                dlog.info("expire " + node.toString());
+            }
+
             void resolve(Node node) {
                 // Right now the disco protocol will notify about any
                 // node, so we don't need to do anything here, if we
@@ -80,21 +87,34 @@ namespace discovery {
                 // ???
             }
 
+            void startup() {
+                heartbeat();
+            }
+
             void heartbeat() {
                 List<String> services = disco.registered.keys();
-
                 int idx = 0;
-
                 while (idx < services.size()) {
                     int jdx = 0;
-
                     List<Node> nodes = disco.registered[services[idx]].nodes;
-
                     while (jdx < nodes.size()) {
                         active(nodes[jdx]);
                         jdx = jdx + 1;
                     }
+                    idx = idx + 1;
+                }
+            }
 
+            void shutdown() {
+                List<String> services = disco.registered.keys();
+                int idx = 0;
+                while (idx < services.size()) {
+                    int jdx = 0;
+                    List<Node> nodes = disco.registered[services[idx]].nodes;
+                    while (jdx < nodes.size()) {
+                        expire(nodes[jdx]);
+                        jdx = jdx + 1;
+                    }
                     idx = idx + 1;
                 }
             }

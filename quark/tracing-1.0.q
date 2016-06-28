@@ -55,12 +55,17 @@ namespace tracing {
         String host = "philadelphia-test.datawire.io";
         String url = "wss://" + host + "/ws";
         String token = DatawireToken.getToken();
+        long lastPoll = 0;
 
         TLS<SharedContext> _context = new TLS<SharedContext>(new SharedContextInitializer());
         protocol.TracingClient _client;
 
         Tracer() {
             _client = new protocol.TracingClient(self);
+        }
+
+        void stop() {
+            _client.stop();
         }
 
         void setContext(SharedContext context) {
@@ -96,6 +101,17 @@ namespace tracing {
             evt.timestamp = now();
             evt.record = record;
             _client.log(evt);
+        }
+
+        Promise poll() {
+            long rightNow = now();
+            Promise result = query(lastPoll, rightNow);
+            lastPoll = rightNow;
+            return result.andThen(bind(self, "deresultify", []));
+        }
+
+        List<LogEvent> deresultify(api.GetLogEventsResult result) {
+            return result.result;
         }
 
         @doc("Query the trace logs. startTimeMillis and endTimeMillis are milliseconds since the UNIX epoch.")
@@ -268,6 +284,11 @@ namespace tracing {
             void dispatchTracingEvent(TracingHandler handler) {
                 handler.onLogEvent(self);
             }
+
+            String toString() {
+                return "LogEvent(" + context.toString() + ", " + timestamp.toString() + ", " + record.toString() + ")";
+            }
+
         }
 
         interface RecordHandler {
@@ -365,10 +386,15 @@ namespace tracing {
             }
 
             bool isStarted() {
-                return true;
+                return _started;
             }
 
-            void heartbeat() {
+            void stop() {
+                _started = false;
+                super.stop();
+            }
+
+            void pump() {
                 _mutex.acquire();
                 while (_buffered.size() > 0) {
                     LogEvent evt = _buffered.remove(0);

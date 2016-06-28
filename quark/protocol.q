@@ -77,9 +77,9 @@ namespace protocol {
              creation; this is its originId. Every operation started
              as a result of the thing that caused the SharedContext to
              be created must use the same SharedContext, and its
-             originId will _never_ _change_.
+             traceId will _never_ _change_.
         """)
-        String originId;
+        String traceId;
 
         @doc("""
       To track causality, we use a Lamport clock, which we track as a
@@ -102,7 +102,7 @@ namespace protocol {
         // XXX Not automagically mapped to str() or the like, even though
         // something should be.
         String toString() {
-            return "<SharedContext " + self.originId + ">";
+            return "<SharedContext " + self.traceId.toString() + ">";
         }
     }
 
@@ -168,10 +168,13 @@ namespace protocol {
         float maxDelay = 16.0;
         float reconnectDelay = firstDelay;
         float ttl = 30.0;
+        float tick = 1.0;
 
         WebSocket sock = null;
-        long lastHeartbeat = 0L;
         String sockUrl = null;
+
+        long lastConnectAttempt = 0L;
+        long lastHeartbeat = 0L;
 
         String url();
         String token();
@@ -195,6 +198,13 @@ namespace protocol {
 
         void scheduleReconnect() {
             schedule(reconnectDelay);
+        }
+
+        void onOpen(Open open) {
+            // Should assert version here ...
+        }
+
+        void doBackoff() {
             reconnectDelay = 2.0*reconnectDelay;
 
             if (reconnectDelay > maxDelay) {
@@ -202,12 +212,13 @@ namespace protocol {
             }
         }
 
-        void onOpen(Open open) {
-            // Should assert version here ...
-        }
-
         void onClose(Close close) {
             logger.info("close: " + close.toString());
+            if (close.error != null) {
+                reconnectDelay = firstDelay;
+            } else {
+                doBackoff();
+            }
         }
 
         void onExecute(Runtime runtime) {
@@ -227,21 +238,40 @@ namespace protocol {
               do that.
             */
 
+            long rightNow = now();
+            long heartbeatInterval = ((ttl/2.0)*1000.0).round();
+            long reconnectInterval = (reconnectDelay*1000.0).round();
+
             if (isConnected()) {
                 if (isStarted()) {
-                    long interval = ((ttl/2.0)*1000.0).round();
-                    long rightNow = now();
-
-                    if (rightNow - lastHeartbeat >= interval) {
+                    pump();
+                    if (rightNow - lastHeartbeat >= heartbeatInterval) {
                         doHeartbeat();
                     }
                 } else {
+                    shutdown();
                     sock.close();
                     sock = null;
                 }
             } else {
-                open(url());
+                if (isStarted() && (rightNow - lastConnectAttempt) >= reconnectInterval) {
+                    doOpen();
+                }
             }
+
+            if (isStarted()) {
+                schedule(tick);
+            }
+        }
+
+        void doOpen() {
+            open(url());
+            lastConnectAttempt = now();
+        }
+
+        void doHeartbeat() {
+            heartbeat();
+            lastHeartbeat = now();
         }
 
         void open(String url) {
@@ -256,13 +286,13 @@ namespace protocol {
             sockUrl = url;
         }
 
+        void startup() {}
+
+        void pump() {}
+
         void heartbeat() {}
-        
-        void doHeartbeat() {
-            heartbeat();
-            lastHeartbeat = now();
-            schedule(ttl/2.0);
-        }
+
+        void shutdown() {}
 
         void onWSInit(WebSocket socket) {/* unused */ }
 
@@ -276,7 +306,8 @@ namespace protocol {
 
             sock.send(new Open().encode());
 
-            doHeartbeat();
+            startup();
+            pump();
         }
 
         void onWSBinary(WebSocket socket, Buffer message) { /* unused */ }
@@ -287,14 +318,12 @@ namespace protocol {
             logger.error(error.toString());
             // Any non-transient errors should be reported back to the
             // user via any Nodes they have requested.
+            doBackoff();
         }
 
         void onWSFinal(WebSocket socket) {
             logger.info("closed " + sockUrl);
             sock = null;
-            if (isStarted()) {
-                scheduleReconnect();
-            }
         }
     }
 
