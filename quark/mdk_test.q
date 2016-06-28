@@ -181,6 +181,23 @@ class DiscoveryTest extends ProtocolTest {
         checkEqualNodes(node, active.node);
     }
 
+    void testRegisterTheNiceWay() {
+        Discovery disco = new Discovery().connect();
+        SocketEvent sev = startDisco(disco);
+
+        Node node = new Node();
+        node.service = "svc";
+        node.address = "addr";
+        node.version = "1.2.3";
+        disco.register_service(node.service, node.address, node.version);
+
+        Open open = expectOpen(sev);
+        if (open == null) { return; }
+        Active active = expectActive(sev);
+        if (active == null) { return; }
+        checkEqualNodes(node, active.node);
+    }
+
     void testResolvePreStart() {
         Discovery disco = new Discovery().connect();
 
@@ -252,6 +269,14 @@ class DiscoveryTest extends ProtocolTest {
             checkEqual("addr" + (idx % count).toString(), node.address);
             idx = idx + 1;
         }
+    }
+
+    // Discovery.init() connects to the server, and sends the token:
+    void testInit() {
+        String token = "1234";
+        Discovery disco = Discovery.init(token);
+        self.pump();
+        self.expectSocket(disco.url + "?token=" + token);
     }
 
     void testReconnect() {

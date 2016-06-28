@@ -50,15 +50,22 @@ namespace tracing {
     }
 
     class Tracer {
+        static Logger logger = new Logger("MDK Tracer");
 
-        String url = "wss://philadelphia-test.datawire.io/ws";
+        String host = "philadelphia-test.datawire.io";
+        String url = "wss://" + host + "/ws";
         String token = DatawireToken.getToken();
+        long lastPoll = 0;
 
         TLS<SharedContext> _context = new TLS<SharedContext>(new SharedContextInitializer());
         protocol.TracingClient _client;
 
         Tracer() {
             _client = new protocol.TracingClient(self);
+        }
+
+        void stop() {
+            _client.stop();
         }
 
         void setContext(SharedContext context) {
@@ -96,6 +103,89 @@ namespace tracing {
             _client.log(evt);
         }
 
+        Promise poll() {
+            long rightNow = now();
+            Promise result = query(lastPoll, rightNow);
+            lastPoll = rightNow;
+            return result.andThen(bind(self, "deresultify", []));
+        }
+
+        List<LogEvent> deresultify(api.GetLogEventsResult result) {
+            return result.result;
+        }
+
+        @doc("Query the trace logs. startTimeMillis and endTimeMillis are milliseconds since the UNIX epoch.")
+        Promise query(long startTimeMillis, long endTimeMillis) {
+            // Set up args.
+            List<String> args = [];
+            String reqID = "Query ";
+
+            if (startTimeMillis >= 0) {
+                args.add("startTime=" + startTimeMillis.toString());
+                reqID = reqID + startTimeMillis.toString();
+            }
+
+            reqID = reqID + "-";
+
+            if (endTimeMillis >= 0) {
+                args.add("endTime=" + endTimeMillis.toString());
+                reqID = reqID + endTimeMillis.toString();
+            }
+
+            // Grab the full URL...
+
+            String url = "https://" + self.host + "/api/logs";
+
+            if (args.size() > 0) {
+                url = url + "?" + "&".join(args);
+            }
+
+            // Off we go.
+            HTTPRequest req = new HTTPRequest(url);
+
+            req.setMethod("GET");
+            req.setHeader("Content-Type", "application/json");
+            req.setHeader("Authorization", "Bearer " + self.token);
+
+            logger.info("curl -H 'Content-Type: application/json' \\");
+            logger.info("     -H 'Authorization: Bearer " + self.token + "' \\");
+            logger.info("     '" + url + "'");
+
+            return IO.httpRequest(req).andThen(bind(self, "handleQueryResponse", []));
+        }
+
+        Object handleQueryResponse(HTTPResponse response) {
+            int code = response.getCode();      // HTTP status code
+            String body = response.getBody();   // just to save keystrokes later
+
+            logger.info("query got: " + code.toString());
+            logger.info("body: " + body);
+
+            if (code == 200) {
+                // All good. Parse the JSON in the body...
+                logger.info("All good!");
+                return api.GetLogEventsResult.decode(body);
+            }
+            else {
+                // Per the HTTP status code, something has gone wrong. Try to pull a
+                // sensible error out of the body...
+                String error = "";
+
+                if (body.size() > 0) {
+                    error = body;
+                }
+
+                // In any case, if we have no error, synthesize something from the
+                // status code.
+                if (error.size() < 1) {
+                    error = "HTTP response " + code.toString();
+                }
+
+                logger.info("OH NO! " + error);
+
+                return new HTTPError(error);
+            } 
+        }
     }
 
     namespace api {
@@ -148,7 +238,6 @@ namespace tracing {
             //@doc("Indicates the ID of the next page to return. If the ID is null then this is the last page.")
             //String nextPageId;
         }
-
     }
 
     namespace protocol {
@@ -163,7 +252,7 @@ namespace tracing {
             static ProtocolEvent construct(String type) {
                 ProtocolEvent result = ProtocolEvent.construct(type);
                 if (result != null) { return result; }
-                if (type == LogEvent._descriminator) { return new LogEvent(); }
+                if (LogEvent._discriminator.matches(type)) { return new LogEvent(); }
                 return null;
             }
 
@@ -177,7 +266,7 @@ namespace tracing {
 
         class LogEvent extends TracingEvent {
 
-            static String _descriminator = "log";
+            static Discriminator _discriminator = anyof(["log"]);
 
             @doc("""Shared context""")
             SharedContext context;
@@ -195,6 +284,11 @@ namespace tracing {
             void dispatchTracingEvent(TracingHandler handler) {
                 handler.onLogEvent(self);
             }
+
+            String toString() {
+                return "LogEvent(" + context.toString() + ", " + timestamp.toString() + ", " + record.toString() + ")";
+            }
+
         }
 
         interface RecordHandler {
@@ -292,10 +386,18 @@ namespace tracing {
             }
 
             bool isStarted() {
-                return true;
+                _mutex.acquire();
+                int size = _buffered.size();
+                _mutex.release();
+                return _started || size > 0;
             }
 
-            void heartbeat() {
+            void stop() {
+                _started = false;
+                super.stop();
+            }
+
+            void pump() {
                 _mutex.acquire();
                 while (_buffered.size() > 0) {
                     LogEvent evt = _buffered.remove(0);
@@ -306,15 +408,12 @@ namespace tracing {
 
             void log(LogEvent evt) {
                 _mutex.acquire();
+                _buffered.add(evt);
                 if (!_started) {
                     self.start();
                     _started = true;
                 }
-                _buffered.add(evt);
                 _mutex.release();
-                if (self.isConnected()) {
-                    self.heartbeat();
-                }
             }
 
         }
