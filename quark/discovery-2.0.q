@@ -389,18 +389,36 @@ namespace discovery {
       return factory.promise;
     }
 
+    bool _resolvedCallback(Node result, Condition done) {
+      done.acquire();
+      done.wakeup();
+      done.release();
+      return true;
+    }
+
     // XXX blocking API, never call from Javascript or Quark code.
     @doc("Wait for service name to resolve into an available service node, or fail")
     @doc("appropriately (typically by raising an exception if the language")
     @doc("supports it). This should only be used in blocking runtimes (e.g. ")
     @doc("you do not want to use this in Javascript).")
     Node resolve_until(String service, float timeout) {
-      Node result = self.resolve(service);
-      result.await(timeout);
-      if (result.address == null) {
+      Condition done = new Condition();
+      Promise result = self.resolve(service);
+      // Trigger condition if we get a result:
+      result.andThen(bind(self, "_resolvedCallback", done));
+
+      // Wait until promise has result or we hit timeout:
+      // XXX do we need to do while loop that's in FutureWait?
+      long msTimeout = (timeout * 1000).round();
+      done.waitWakeup(msTimeout);
+
+      PromiseValue snapshot = result.value();
+      if (!snapshot.hasValue()) {
+        // XXX when we port this to Quark itself we should use a custom timeout
+        // exception class.
         panic("Timeout looking up service " + service);
       }
-      return result;
+      return ?snapshot.getValue();
     }
 
     // XXX PRIVATE API -- needs to not be here.
