@@ -55,13 +55,11 @@ namespace tracing {
         String url = "wss://philadelphia-test.datawire.io/ws";
         String queryURL = "https://philadelphia-test.datawire.io/api/logs";
 
-        String token = DatawireToken.getToken();
+        String token;
         long lastPoll = 0L;
 
         // String url = 'wss://localhost:52690/ws';
         // String queryURL = 'https://localhost:52690/api/logs';
-
-        String token;
 
         TLS<SharedContext> _context = new TLS<SharedContext>(new SharedContextInitializer());
         protocol.TracingClient _client;
