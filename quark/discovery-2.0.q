@@ -312,6 +312,11 @@ namespace discovery {
       return self;
     }
 
+    @doc("Easy startup of a Discovery service with a given token and the default URL.")
+    static Discovery init(String token) {
+        return new Discovery().withToken(token).connect().start();
+    }
+
     @doc("Stop the uplink to the discovery service.")
     Discovery stop() {
       self._lock();
@@ -343,6 +348,16 @@ namespace discovery {
       return self;
     }
 
+    @doc("Register info about a service node with the discovery service. You must")
+    @doc("usually start the uplink before this will do much; see start().")
+    Discovery register_service(String service, String address, String version) {
+      Node node = new Node();
+      node.service = service;
+      node.address = address;
+      node.version = version;
+      return self.register(node);
+    }
+
     @doc("Resolve a service name into an available service node. You must")
     @doc("usually start the uplink before this will do much; see start().")
     @doc("")
@@ -362,6 +377,20 @@ namespace discovery {
       }
 
       self._release();
+      return result;
+    }
+
+    // XXX blocking API, never call from Javascript or Quark code.
+    @doc("Wait for service name to resolve into an available service node, or fail")
+    @doc("appropriately (typically by raising an exception if the language")
+    @doc("supports it). This should only be used in blocking runtimes (e.g. ")
+    @doc("you do not want to use this in Javascript).")
+    Node resolve_until(String service, float timeout) {
+      Node result = self.resolve(service);
+      result.await(timeout);
+      if (result.address == null) {
+        panic("Timeout looking up service " + service);
+      }
       return result;
     }
 
