@@ -189,10 +189,6 @@ namespace tracing {
             req.setHeader("Content-Type", "application/json");
             req.setHeader("Authorization", "Bearer " + self.token);
 
-            logger.info("curl -H 'Content-Type: application/json' \\");
-            logger.info("     -H 'Authorization: Bearer " + self.token + "' \\");
-            logger.info("     '" + url + "'");
-
             return IO.httpRequest(req).andThen(bind(self, "handleQueryResponse", []));
         }
 
@@ -200,12 +196,8 @@ namespace tracing {
             int code = response.getCode();      // HTTP status code
             String body = response.getBody();   // just to save keystrokes later
 
-            logger.info("query got: " + code.toString());
-            logger.info("body: " + body);
-
             if (code == 200) {
                 // All good. Parse the JSON in the body...
-                logger.info("All good!");
                 return api.GetLogEventsResult.decode(body);
             }
             else {
