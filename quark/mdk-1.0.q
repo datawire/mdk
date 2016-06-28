@@ -17,6 +17,10 @@ import datawire_introspection;
 
 namespace msdk {
 
+    String _get(String var, String value) {
+        return os.Environment.ENV.get(var, value);
+    }
+
     MDK init() {
         return new MDKImpl();
     }
@@ -27,13 +31,15 @@ namespace msdk {
 
         void stop();
 
-        void register(String service, String version);
+        void register(String service, String version, String address);
 
         Node resolve(String service, String version);
 
         void begin();
 
-        void fail();
+        SharedContext context();
+
+        void fail(String message);
 
         void end();
 
@@ -65,9 +71,9 @@ namespace msdk {
         List<Node> _resolved = [];
 
         MDKImpl() {
-            //_disco.url = "wss://discovery-beta.datawire.io";
-            _disco.url = "ws://discovery-temp.datawire.io";
+            _disco.url = _get("MDK_DISCOVERY_URL", "wss://discovery-beta.datawire.io");
             _disco.token = DatawireToken.getToken();
+            _tracer.url = _get("MDK_TRACING_URL", "wss://philadelphia-test.datawire.io/ws");
         }
 
         void start() {
@@ -133,6 +139,10 @@ namespace msdk {
 
         void begin() {
             // XXX: pushes a level on the stack
+        }
+
+        SharedContext context() {
+            return _tracer.getContext();
         }
 
         void fail(String message) {
