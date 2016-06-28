@@ -89,7 +89,7 @@ namespace discovery {
       // Resolve waiting promises:
       if (self._waiting.size() > 0) {
         List<PromiseFactory> waiting = self._waiting;
-        self._waiting = new List<PromiseFactory();
+        self._waiting = new List<PromiseFactory>();
         int jdx = 0;
         while (jdx < waiting.size()) {
           waiting[jdx].resolve(node);
@@ -113,7 +113,7 @@ namespace discovery {
 
     // Internal method, add PromiseFactory to fill in when a new Node is added.
     void _addPromise(PromiseFactory factory) {
-      _waiters.add(factory);
+      _waiting.add(factory);
     }
 
     @doc("Remove a Node from the cluster, if it's present. If it's not present, do")
@@ -361,10 +361,7 @@ namespace discovery {
     @doc("Register info about a service node with the discovery service. You must")
     @doc("usually start the uplink before this will do much; see start().")
     Discovery register_service(String service, String address, String version) {
-      Node node = new Node();
-      node.service = service;
-      node.address = address;
-      node.version = version;
+      Node node = new Node(service, address, version, new Map<String,Object>());
       return self.register(node);
     }
 
@@ -379,10 +376,8 @@ namespace discovery {
         factory.resolve(services[service].choose());
       }
       else {
-        result.service = service;
         services[service] = new Cluster();
         services[service]._addPromise(factory);
-        client.resolve(result);
       }
 
       self._release();
@@ -405,11 +400,11 @@ namespace discovery {
       Condition done = new Condition();
       Promise result = self.resolve(service);
       // Trigger condition if we get a result:
-      result.andThen(bind(self, "_resolvedCallback", done));
+      result.andThen(bind(self, "_resolvedCallback", [done]));
 
       // Wait until promise has result or we hit timeout:
       // XXX do we need to do while loop that's in FutureWait?
-      long msTimeout = (timeout * 1000).round();
+      long msTimeout = (timeout * 1000.0).round();
       done.waitWakeup(msTimeout);
 
       PromiseValue snapshot = result.value();
@@ -423,7 +418,7 @@ namespace discovery {
 
     // XXX PRIVATE API -- needs to not be here.
     // @doc("Add a given node.")
-    void active(Node node) {
+    void _active(Node node) {
       self._lock();
 
       String service = node.service;
@@ -442,7 +437,7 @@ namespace discovery {
 
     // XXX PRIVATE API -- needs to not be here.
     // @doc("Expire a given node.")
-    void expire(Node node) {
+    void _expire(Node node) {
       self._lock();
 
       String service = node.service;

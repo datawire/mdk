@@ -81,11 +81,7 @@ namespace msdk {
                 panic("already registered");
             }
 
-            _me = new Node();
-            _me.service = service;
-            _me.version = version;
-            _me.address = address;
-            _me.properties = {};
+            _me = new Node(service, version, address, {});
             _disco.register(_me);
             _mutex.release();
         }
@@ -125,10 +121,14 @@ namespace msdk {
             log("DEBUG", category, text);
         }
 
-        Node resolve(String service, String version) {
-            Node node = _disco.resolve(service);
-            _resolved.add(node);
-            return node;
+        Node _resolvedCallback(Node result) {
+            _resolved.add(result);
+            return result;
+        }
+
+        Promise resolve(String service, String version) {
+            return _disco.resolve(service).
+                andThen(bind(self, "_resolvedCallback", []));
         }
 
         void begin() {
