@@ -52,16 +52,55 @@ namespace tracing {
     class Tracer {
         static Logger logger = new Logger("MDK Tracer");
 
-        String host = "philadelphia-test.datawire.io";
-        String url = "wss://" + host + "/ws";
+        String url = "wss://philadelphia-test.datawire.io/ws";
+        String queryURL = "https://philadelphia-test.datawire.io/api/logs";
+
         String token = DatawireToken.getToken();
         long lastPoll = 0;
+
+        // String url = 'wss://localhost:52690/ws';
+        // String queryURL = 'https://localhost:52690/api/logs';
+
+        String token;
 
         TLS<SharedContext> _context = new TLS<SharedContext>(new SharedContextInitializer());
         protocol.TracingClient _client;
 
-        Tracer() {
-            _client = new protocol.TracingClient(self);
+        Tracer() { }
+
+        static Tracer withURLsAndToken(String url, String queryURL, String token) {
+            Tracer newTracer = new Tracer();
+
+            newTracer.url = url;
+
+            if ((queryURL == null) || (queryURL.size() == 0)) {
+                URL parsedURL = URL.parse(url);
+
+                if (parsedURL.scheme == "ws") {
+                    parsedURL.scheme = "http";
+                }
+                else {
+                    parsedURL.scheme = "https";
+                }
+
+                parsedURL.path = "/api/logs";
+
+                newTracer.queryURL = parsedURL.toString();
+            }
+
+            newTracer.token = token;
+
+            return newTracer;           
+        }
+
+        void _openIfNeeded() {
+            if (_client == null) {
+                _client = new protocol.TracingClient(self);
+            }
+
+            if (token == null) {
+                token = DatawireToken.getToken();
+            }
         }
 
         void stop() {
@@ -100,6 +139,9 @@ namespace tracing {
             evt.context = getContext();
             evt.timestamp = now();
             evt.record = record;
+
+            self._openIfNeeded();
+
             _client.log(evt);
         }
 
@@ -134,7 +176,7 @@ namespace tracing {
 
             // Grab the full URL...
 
-            String url = "https://" + self.host + "/api/logs";
+            String url = self.queryURL;
 
             if (args.size() > 0) {
                 url = url + "?" + "&".join(args);
