@@ -87,7 +87,11 @@ namespace msdk {
                 panic("already registered");
             }
 
-            _me = new Node(service, version, address, {});
+            _me = new Node();
+            _me.service = service;
+            _me.version = version;
+            _me.address = address;
+            _me.properties = {};
             _disco.register(_me);
             _mutex.release();
         }

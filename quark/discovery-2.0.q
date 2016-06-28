@@ -177,13 +177,6 @@ namespace discovery {
     @doc("Additional metadata associated with this service instance.")
     Map<String,Object> properties;
 
-    Node(String service, String version, String address, Map<String,Object> properties) {
-      self.service = service;
-      self.version = version;
-      self.address = address;
-      self.properties = properties;
-    }
-
     @doc("Return a string representation of the Node.")
     String toString() {
       // XXX: this doesn't get mapped into __str__, etc in targets
@@ -361,7 +354,10 @@ namespace discovery {
     @doc("Register info about a service node with the discovery service. You must")
     @doc("usually start the uplink before this will do much; see start().")
     Discovery register_service(String service, String address, String version) {
-      Node node = new Node(service, address, version, new Map<String,Object>());
+      Node node = new Node();
+      node.service = service;
+      node.address = address;
+      node.version = version;
       return self.register(node);
     }
 

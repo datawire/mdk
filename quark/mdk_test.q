@@ -201,11 +201,8 @@ class DiscoveryTest extends ProtocolTest {
     void testResolvePreStart() {
         Discovery disco = new Discovery().connect();
 
-        Node node = disco.resolve("svc");
-        checkEqual("svc", node.service);
-        checkEqual(null, node.address);
-        checkEqual(null, node.version);
-        checkEqual(null, node.properties);
+        Promise promise = disco.resolve("svc");
+        checkEqual(false, promise.value().hasValue());
 
         SocketEvent sev = startDisco(disco);
         if (sev == null) { return; }
@@ -217,18 +214,15 @@ class DiscoveryTest extends ProtocolTest {
         active.node.version = "1.2.3";
         sev.send(active.encode());
 
-        checkEqualNodes(active.node, node);
+        checkEqualNodes(active.node, ?promise.value().getValue());
     }
 
     void testResolvePostStart() {
         Discovery disco = new Discovery().connect();
         SocketEvent sev = startDisco(disco);
 
-        Node node = disco.resolve("svc");
-        checkEqual("svc", node.service);
-        checkEqual(null, node.address);
-        checkEqual(null, node.version);
-        checkEqual(null, node.properties);
+        Promise promise = disco.resolve("svc");
+        checkEqual(false, promise.value().hasValue());
 
         Active active = new Active();
         active.node = new Node();
@@ -237,18 +231,15 @@ class DiscoveryTest extends ProtocolTest {
         active.node.version = "1.2.3";
         sev.send(active.encode());
 
-        checkEqualNodes(active.node, node);
+        checkEqualNodes(active.node, ?promise.value().getValue());
     }
 
     void testLoadBalancing() {
         Discovery disco = new Discovery().connect();
         SocketEvent sev = startDisco(disco);
 
-        Node node = disco.resolve("svc");
-        checkEqual("svc", node.service);
-        checkEqual(null, node.address);
-        checkEqual(null, node.version);
-        checkEqual(null, node.properties);
+        Promise promise = disco.resolve("svc");
+        checkEqual(false, promise.value().hasValue());
 
         Active active = new Active();
 
@@ -265,7 +256,7 @@ class DiscoveryTest extends ProtocolTest {
 
         idx = 0;
         while (idx < count*10) {
-            node = disco.resolve("svc");
+            Node node = ?disco.resolve("svc").value().getValue();
             checkEqual("addr" + (idx % count).toString(), node.address);
             idx = idx + 1;
         }
