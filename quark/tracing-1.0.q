@@ -104,7 +104,9 @@ namespace tracing {
         }
 
         void stop() {
-            _client.stop();
+            if (_client != null) {
+                _client.stop();
+            }
         }
 
         void setContext(SharedContext context) {
