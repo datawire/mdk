@@ -386,7 +386,10 @@ namespace tracing {
             }
 
             bool isStarted() {
-                return _started;
+                _mutex.acquire();
+                int size = _buffered.size();
+                _mutex.release();
+                return _started || size > 0;
             }
 
             void stop() {
@@ -405,15 +408,12 @@ namespace tracing {
 
             void log(LogEvent evt) {
                 _mutex.acquire();
+                _buffered.add(evt);
                 if (!_started) {
                     self.start();
                     _started = true;
                 }
-                _buffered.add(evt);
                 _mutex.release();
-                if (self.isConnected()) {
-                    self.heartbeat();
-                }
             }
 
         }

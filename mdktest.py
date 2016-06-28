@@ -1,21 +1,22 @@
 import logging
-#logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO)
 
-import msdk
+import msdk, requests, traceback
 
 def bizlogic(m):
     n = m.resolve("asdf", "1.0")
     n.await(10.0)
-    try:
-        print n.address
-    except Exception, e:
-        m.fail(e.getMessage())
+    m.info("bizlogic", "Querying... %s" % n.address)
+    requests.get(n.address)
 
 m = msdk.init()
 
 m.start()
 try:
     m.register("asdf", "1.0", "http://localhost")
-    m.protect(bizlogic)
+    try:
+        m.protect(bizlogic)
+    except:
+        m.fail(traceback.format_exc())
 finally:
     m.stop()
