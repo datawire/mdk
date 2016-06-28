@@ -55,6 +55,8 @@ namespace msdk {
 
     class MDKImpl extends MDK {
 
+        static Logger logger = new Logger("mdk");
+
         Lock _mutex = new Lock();
         Discovery _disco = new Discovery();
         Tracer _tracer = new Tracer();
@@ -98,22 +100,28 @@ namespace msdk {
         }
 
         void critical(String category, String text) {
+            // XXX: no critical
+            logger.error(category + ": " + text);
             log("CRITICAL", category, text);
         }
 
         void error(String category, String text) {
+            logger.error(category + ": " + text);
             log("ERROR", category, text);
         }
 
         void warn(String category, String text) {
+            logger.warn(category + ": " + text);
             log("WARN", category, text);
         }
 
         void info(String category, String text) {
+            logger.info(category + ": " + text);
             log("INFO", category, text);
         }
 
         void debug(String category, String text) {
+            logger.debug(category + ": " + text);
             log("DEBUG", category, text);
         }
 
