@@ -120,9 +120,9 @@ namespace discovery {
             static ProtocolEvent construct(String type) {
                 ProtocolEvent result = ProtocolEvent.construct(type);
                 if (result != null) { return result; }
-                if (type == Active._descriminator) { return new Active(); }
-                if (type == Expire._descriminator) { return new Expire(); }
-                if (type == Clear._descriminator) { return new Clear(); }
+                if (Active._discriminator.matches(type)) { return new Active(); }
+                if (Expire._discriminator.matches(type)) { return new Expire(); }
+                if (Clear._discriminator.matches(type)) { return new Clear(); }
                 return null;
             }
 
@@ -145,7 +145,7 @@ namespace discovery {
           """)*/
         class Active extends DiscoveryEvent {
 
-            static String _descriminator = "active";
+            static Discriminator _discriminator = anyof(["active", "discovery.protocol.Active"]);
 
             @doc("The advertised node.")
             Node node;
@@ -161,7 +161,7 @@ namespace discovery {
         @doc("Expire a node.")
         class Expire extends DiscoveryEvent {
 
-            static String _descriminator = "expire";
+            static Discriminator _discriminator = anyof(["expire", "discovery.protocol.Expire"]);
 
             Node node;
 
@@ -173,7 +173,7 @@ namespace discovery {
         @doc("Expire all nodes.")
         class Clear extends DiscoveryEvent {
 
-            static String _descriminator = "clear";
+            static Discriminator _discriminator = anyof(["clear", "discovery.protocol.Clear"]);
 
             void dispatchDiscoveryEvent(DiscoHandler handler) {
                 handler.onClear(self);

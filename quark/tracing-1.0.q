@@ -236,7 +236,7 @@ namespace tracing {
             static ProtocolEvent construct(String type) {
                 ProtocolEvent result = ProtocolEvent.construct(type);
                 if (result != null) { return result; }
-                if (type == LogEvent._descriminator) { return new LogEvent(); }
+                if (LogEvent._discriminator.matches(type)) { return new LogEvent(); }
                 return null;
             }
 
@@ -250,7 +250,7 @@ namespace tracing {
 
         class LogEvent extends TracingEvent {
 
-            static String _descriminator = "log";
+            static Discriminator _discriminator = anyof(["log"]);
 
             @doc("""Shared context""")
             SharedContext context;

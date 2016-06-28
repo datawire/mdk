@@ -8,6 +8,28 @@ import quark.reflect;
 namespace mdk {
 namespace protocol {
 
+    class Discriminator {
+        List<String> values;
+        Descriminator(List<String> values) {
+            self.values = values;
+        }
+
+        bool matches(String value) {
+            int idx = 0;
+            while (idx < values.size()) {
+                if (value == values[idx]) {
+                    return true;
+                }
+                idx = idx + 1;
+            }
+            return false;
+        }
+    }
+
+    Discriminator anyof(List<String> values) {
+        return new Discriminator(values);
+    }
+
     class Serializable {
 
         static Serializable decodeClass(Class clazz, String encoded) {
@@ -40,9 +62,9 @@ namespace protocol {
         String encode() {
             Class clazz = self.getClass();
             JSONObject json = toJSON(self, clazz);
-            String type = ?self.getField("_descriminator");
-            if (type != null) {
-                json["type"] = type;
+            Discriminator desc = ?self.getField("_discriminator");
+            if (desc != null) {
+                json["type"] = desc.values[0];
             }
             String encoded = json.toString();
             return encoded;
@@ -91,8 +113,8 @@ namespace protocol {
 
     class ProtocolEvent extends Serializable {
         static ProtocolEvent construct(String type) {
-            if (type == Open._descriminator) { return new Open(); }
-            if (type == Close._descriminator) { return new Close(); }
+            if (Open._discriminator.matches(type)) { return new Open(); }
+            if (Close._discriminator.matches(type)) { return new Close(); }
             return null;
         }
         void dispatch(ProtocolHandler handler);
@@ -100,7 +122,7 @@ namespace protocol {
 
     class Open extends ProtocolEvent {
 
-        static String _descriminator = "open";
+        static Discriminator _discriminator = anyof(["open", "mdk.protocol.Open", "discovery.protocol.Open"]);
 
         String version = "2.0.0";
 
@@ -128,7 +150,7 @@ namespace protocol {
     @doc("Close the event stream.")
     class Close extends ProtocolEvent {
 
-        static String _descriminator = "close";
+        static Discriminator _discriminator = anyof(["close", "mdk.protocol.Close", "discovery.protocol.Close"]);
 
         ProtocolError error;
 
