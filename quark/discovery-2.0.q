@@ -66,14 +66,15 @@ namespace discovery {
   @doc("a single service. Each service provider is represented by a Node.")
   class Cluster {
     List<Node> nodes = [];
-    int idx = 0;
+    List<PromiseFactory> _waiting = [];
+    int _counter = 0;
 
     @doc("Choose a single Node to talk to. At present this is a simple round")
     @doc("robin.")
     Node choose() {
       if (nodes.size() > 0) {
-        int choice = idx % nodes.size();
-        idx = idx + 1;
+        int choice = _counter % nodes.size();
+        _counter = _counter + 1;
         return nodes[choice];
       }
       else {
@@ -85,13 +86,22 @@ namespace discovery {
     @doc("update its properties).  At present, this involves a linear search, so")
     @doc("very large Clusters are unlikely to perform well.")
     void add(Node node) {
+      // Resolve waiting promises:
+      if (self._waiting.size() > 0) {
+        List<PromiseFactory> waiting = self._waiting;
+        self._waiting = new List<PromiseFactory();
+        int jdx = 0;
+        while (jdx < waiting.size()) {
+          waiting[jdx].resolve(node);
+          jdx = jdx + 1;
+        }
+      }
+      // Update stored values:
       int idx = 0;
 
       while (idx < nodes.size()) {
-        Node ep = nodes[idx];
-      
-        if (ep.address == null || ep.address == node.address) {
-          ep.update(node);
+        if (nodes[idx].address == node.address) {
+          nodes[idx] = node;
           return;
         }
 
@@ -99,6 +109,11 @@ namespace discovery {
       }
 
       nodes.add(node);
+    }
+
+    // Internal method, add PromiseFactory to fill in when a new Node is added.
+    void _addPromise(PromiseFactory factory) {
+      _waiters.add(factory);
     }
 
     @doc("Remove a Node from the cluster, if it's present. If it's not present, do")
@@ -151,11 +166,8 @@ namespace discovery {
   }
 
   @doc("The Node class captures address and metadata information about a")
-  @doc("server functioning as a service instance. Node extends Future, since")
-  @doc("some operations involving Nodes can take awhile -- this means that")
-  @doc("you must be sure that a given Node has been finished before using")
-  @doc("its values. The Quark documentation for Future has more.")
-  class Node extends Future {
+  @doc("server functioning as a service instance.")
+  class Node {
     @doc("The service name.")
     String service;
     @doc("The service version (e.g. '1.2.3')")
@@ -165,13 +177,11 @@ namespace discovery {
     @doc("Additional metadata associated with this service instance.")
     Map<String,Object> properties;
 
-    @doc("Copy properties from some other Node to this one, and finish this Node.")
-    void update(Node node) {
-      service = node.service;
-      version = node.version;
-      address = node.address;
-      properties = node.properties;
-      self.finish(null);
+    Node(String service, String version, String address, Map<String,Object> properties) {
+      self.service = service;
+      self.version = version;
+      self.address = address;
+      self.properties = properties;
     }
 
     @doc("Return a string representation of the Node.")
@@ -360,24 +370,23 @@ namespace discovery {
 
     @doc("Resolve a service name into an available service node. You must")
     @doc("usually start the uplink before this will do much; see start().")
-    @doc("")
-    Node resolve(String service) {
-      Node result;
+    @doc("The returned Promise will end up with a Node as its value.")
+    Promise resolve(String service) {
+      PromiseFactory factory = new PromiseFactory();
       self._lock();
 
       if (services.contains(service)) {
-        result = services[service].choose();
+        factory.resolve(services[service].choose());
       }
       else {
-        result = new Node();
         result.service = service;
         services[service] = new Cluster();
-        services[service].add(result);
+        services[service]._addPromise(factory);
         client.resolve(result);
       }
 
       self._release();
-      return result;
+      return factory.promise;
     }
 
     // XXX blocking API, never call from Javascript or Quark code.
