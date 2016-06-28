@@ -33,7 +33,7 @@ namespace msdk {
 
         void register(String service, String version, String address);
 
-        Node resolve(String service, String version);
+        Promise resolve(String service, String version);
 
         void begin();
 
