@@ -234,6 +234,60 @@ class DiscoveryTest extends ProtocolTest {
         checkEqualNodes(active.node, ?promise.value().getValue());
     }
 
+    void testResolveAfterNotification() {
+        Discovery disco = new Discovery().connect();
+        SocketEvent sev = startDisco(disco);
+
+        Active active = new Active();
+        active.node = new Node();
+        active.node.service = "svc";
+        active.node.address = "addr";
+        active.node.version = "1.2.3";
+        sev.send(active.encode());
+
+        Promise promise = disco.resolve("svc");
+        checkEqualNodes(active.node, ?promise.value().getValue());
+    }
+
+    void testResolveBeforeAndAfterNotification() {
+        Discovery disco = new Discovery().connect();
+        SocketEvent sev = startDisco(disco);
+        Promise promise = disco.resolve("svc");
+
+        Active active = new Active();
+        active.node = new Node();
+        active.node.service = "svc";
+        active.node.address = "addr";
+        active.node.version = "1.2.3";
+        sev.send(active.encode());
+
+        Promise promise2 = disco.resolve("svc");
+        checkEqualNodes(active.node, ?promise.value().getValue());
+        checkEqualNodes(active.node, ?promise2.value().getValue());
+    }
+
+    void testResolveDifferentActive() {
+        Discovery disco = new Discovery().connect();
+        SocketEvent sev = startDisco(disco);
+
+        Active active = new Active();
+        active.node = new Node();
+        active.node.service = "svc";
+        active.node.address = "addr";
+        active.node.version = "1.2.3";
+        sev.send(active.encode());
+
+        Active active2 = new Active();
+        active2.node = new Node();
+        active2.node.service = "svc2";
+        active2.node.address = "addr";
+        active2.node.version = "1.2.3";
+        sev.send(active2.encode());
+
+        Promise promise = disco.resolve("svc");
+        checkEqualNodes(active.node, ?promise.value().getValue());
+    }
+
     void testLoadBalancing() {
         Discovery disco = new Discovery().connect();
         SocketEvent sev = startDisco(disco);
