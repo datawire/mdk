@@ -249,6 +249,27 @@ class DiscoveryTest extends ProtocolTest {
         checkEqualNodes(active.node, ?promise.value().getValue());
     }
 
+    // This variant caught a bug in the code, so it's useful to have all of
+    // these even though they're seemingly similar.
+    void testResolveBeforeAndBeforeNotification() {
+        Discovery disco = new Discovery().connect();
+        SocketEvent sev = startDisco(disco);
+        Promise promise = disco.resolve("svc");
+        Promise promise2 = disco.resolve("svc");
+        checkEqual(false, promise.value().hasValue());
+        checkEqual(false, promise2.value().hasValue());
+
+        Active active = new Active();
+        active.node = new Node();
+        active.node.service = "svc";
+        active.node.address = "addr";
+        active.node.version = "1.2.3";
+        sev.send(active.encode());
+
+        checkEqualNodes(active.node, ?promise.value().getValue());
+        checkEqualNodes(active.node, ?promise2.value().getValue());
+    }
+
     void testResolveBeforeAndAfterNotification() {
         Discovery disco = new Discovery().connect();
         SocketEvent sev = startDisco(disco);
