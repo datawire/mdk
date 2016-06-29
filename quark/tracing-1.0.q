@@ -146,6 +146,8 @@ namespace tracing {
         }
 
         Promise poll() {
+            self._openIfNeeded();
+
             long rightNow = now();
             Promise result = query(lastPoll, rightNow);
             lastPoll = rightNow;
