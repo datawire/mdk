@@ -235,9 +235,9 @@ for name, vectors, gold in Tests:
 
         if cmd == 'create':
             ctxID = fields[0]
-            originID = '%s-%s' % (name, ctxID)
+            traceId = '%s-%s' % (name, ctxID)
 
-            contexts[ctxID] = SharedContext.withOrigin(originID)
+            contexts[ctxID] = SharedContext.withTraceId(traceId)
             state.log(contexts[ctxID], "CREATED %s" % ctxID)
         elif cmd == 'step':
             ctxID = fields[0]

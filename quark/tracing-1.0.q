@@ -52,15 +52,59 @@ namespace tracing {
     class Tracer {
         static Logger logger = new Logger("MDK Tracer");
 
-        String host = "philadelphia-test.datawire.io";
-        String url = "wss://" + host + "/ws";
-        String token = DatawireToken.getToken();
+        String url = "wss://philadelphia-test.datawire.io/ws";
+        String queryURL = "https://philadelphia-test.datawire.io/api/logs";
+
+        String token;
+        long lastPoll = 0L;
+
+        // String url = 'wss://localhost:52690/ws';
+        // String queryURL = 'https://localhost:52690/api/logs';
 
         TLS<SharedContext> _context = new TLS<SharedContext>(new SharedContextInitializer());
         protocol.TracingClient _client;
 
-        Tracer() {
-            _client = new protocol.TracingClient(self);
+        Tracer() { }
+
+        static Tracer withURLsAndToken(String url, String queryURL, String token) {
+            Tracer newTracer = new Tracer();
+
+            newTracer.url = url;
+
+            if ((queryURL == null) || (queryURL.size() == 0)) {
+                URL parsedURL = URL.parse(url);
+
+                if (parsedURL.scheme == "ws") {
+                    parsedURL.scheme = "http";
+                }
+                else {
+                    parsedURL.scheme = "https";
+                }
+
+                parsedURL.path = "/api/logs";
+
+                newTracer.queryURL = parsedURL.toString();
+            }
+
+            newTracer.token = token;
+
+            return newTracer;           
+        }
+
+        void _openIfNeeded() {
+            if (_client == null) {
+                _client = new protocol.TracingClient(self);
+            }
+
+            if (token == null) {
+                token = DatawireToken.getToken();
+            }
+        }
+
+        void stop() {
+            if (_client != null) {
+                _client.stop();
+            }
         }
 
         void setContext(SharedContext context) {
@@ -95,7 +139,21 @@ namespace tracing {
             evt.context = getContext();
             evt.timestamp = now();
             evt.record = record;
+
+            self._openIfNeeded();
+
             _client.log(evt);
+        }
+
+        Promise poll() {
+            long rightNow = now();
+            Promise result = query(lastPoll, rightNow);
+            lastPoll = rightNow;
+            return result.andThen(bind(self, "deresultify", []));
+        }
+
+        List<LogEvent> deresultify(api.GetLogEventsResult result) {
+            return result.result;
         }
 
         @doc("Query the trace logs. startTimeMillis and endTimeMillis are milliseconds since the UNIX epoch.")
@@ -118,7 +176,7 @@ namespace tracing {
 
             // Grab the full URL...
 
-            String url = "https://" + self.host + "/api/logs";
+            String url = self.queryURL;
 
             if (args.size() > 0) {
                 url = url + "?" + "&".join(args);
@@ -131,10 +189,6 @@ namespace tracing {
             req.setHeader("Content-Type", "application/json");
             req.setHeader("Authorization", "Bearer " + self.token);
 
-            logger.info("curl -H 'Content-Type: application/json' \\");
-            logger.info("     -H 'Authorization: Bearer " + self.token + "' \\");
-            logger.info("     '" + url + "'");
-
             return IO.httpRequest(req).andThen(bind(self, "handleQueryResponse", []));
         }
 
@@ -142,12 +196,8 @@ namespace tracing {
             int code = response.getCode();      // HTTP status code
             String body = response.getBody();   // just to save keystrokes later
 
-            logger.info("query got: " + code.toString());
-            logger.info("body: " + body);
-
             if (code == 200) {
                 // All good. Parse the JSON in the body...
-                logger.info("All good!");
                 return api.GetLogEventsResult.decode(body);
             }
             else {
@@ -236,7 +286,7 @@ namespace tracing {
             static ProtocolEvent construct(String type) {
                 ProtocolEvent result = ProtocolEvent.construct(type);
                 if (result != null) { return result; }
-                if (type == LogEvent._descriminator) { return new LogEvent(); }
+                if (LogEvent._discriminator.matches(type)) { return new LogEvent(); }
                 return null;
             }
 
@@ -250,7 +300,7 @@ namespace tracing {
 
         class LogEvent extends TracingEvent {
 
-            static String _descriminator = "log";
+            static Discriminator _discriminator = anyof(["log"]);
 
             @doc("""Shared context""")
             SharedContext context;
@@ -268,6 +318,11 @@ namespace tracing {
             void dispatchTracingEvent(TracingHandler handler) {
                 handler.onLogEvent(self);
             }
+
+            String toString() {
+                return "LogEvent(" + context.toString() + ", " + timestamp.toString() + ", " + record.toString() + ")";
+            }
+
         }
 
         interface RecordHandler {
@@ -365,10 +420,18 @@ namespace tracing {
             }
 
             bool isStarted() {
-                return true;
+                _mutex.acquire();
+                int size = _buffered.size();
+                _mutex.release();
+                return _started || size > 0;
             }
 
-            void heartbeat() {
+            void stop() {
+                _started = false;
+                super.stop();
+            }
+
+            void pump() {
                 _mutex.acquire();
                 while (_buffered.size() > 0) {
                     LogEvent evt = _buffered.remove(0);
@@ -379,15 +442,12 @@ namespace tracing {
 
             void log(LogEvent evt) {
                 _mutex.acquire();
+                _buffered.add(evt);
                 if (!_started) {
                     self.start();
                     _started = true;
                 }
-                _buffered.add(evt);
                 _mutex.release();
-                if (self.isConnected()) {
-                    self.heartbeat();
-                }
             }
 
         }

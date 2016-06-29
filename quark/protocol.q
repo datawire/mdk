@@ -8,6 +8,29 @@ import quark.reflect;
 namespace mdk {
 namespace protocol {
 
+    class Discriminator {
+        List<String> values;
+
+        Discriminator(List<String> values) {
+            self.values = values;
+        }
+
+        bool matches(String value) {
+            int idx = 0;
+            while (idx < values.size()) {
+                if (value == values[idx]) {
+                    return true;
+                }
+                idx = idx + 1;
+            }
+            return false;
+        }
+    }
+
+    Discriminator anyof(List<String> values) {
+        return new Discriminator(values);
+    }
+
     class Serializable {
 
         static Serializable decodeClass(Class clazz, String encoded) {
@@ -40,9 +63,9 @@ namespace protocol {
         String encode() {
             Class clazz = self.getClass();
             JSONObject json = toJSON(self, clazz);
-            String type = ?self.getField("_descriminator");
-            if (type != null) {
-                json["type"] = type;
+            Discriminator desc = ?self.getField("_discriminator");
+            if (desc != null) {
+                json["type"] = desc.values[0];
             }
             String encoded = json.toString();
             return encoded;
@@ -161,12 +184,12 @@ namespace protocol {
     class SharedContext extends Serializable {
         @doc("""
              Every SharedContext is given an ID at the moment of its
-             creation; this is its originId. Every operation started
+             creation; this is its traceId. Every operation started
              as a result of the thing that caused the SharedContext to
              be created must use the same SharedContext, and its
-             originId will _never_ _change_.
+             traceId will _never_ _change_.
         """)
-        String originId;
+        String traceId;
 
         @doc("""
             To track causality, we use a Lamport clock.
@@ -184,11 +207,11 @@ namespace protocol {
         SharedContext() {}
 
         @doc("""
-            Create a new SharedContext with the given originId.
+            Create a new SharedContext with the given traceId.
         """)
-        static SharedContext withOrigin(String originId) {
+        static SharedContext withTraceId(String traceId) {
             SharedContext newContext = new SharedContext();
-            newContext.originId = originId;
+            newContext.traceId = traceId;
             newContext._lastEntry = newContext.clock.enter();
 
             return newContext;
@@ -201,7 +224,7 @@ namespace protocol {
         }
 
         String key() {
-            return self.originId + ":" + self.clock.key();
+            return self.traceId + ":" + self.clock.key();
         }
 
         // XXX Not automagically mapped to str() or the like, even though
@@ -263,8 +286,8 @@ namespace protocol {
 
     class ProtocolEvent extends Serializable {
         static ProtocolEvent construct(String type) {
-            if (type == Open._descriminator) { return new Open(); }
-            if (type == Close._descriminator) { return new Close(); }
+            if (Open._discriminator.matches(type)) { return new Open(); }
+            if (Close._discriminator.matches(type)) { return new Close(); }
             return null;
         }
         void dispatch(ProtocolHandler handler);
@@ -272,7 +295,7 @@ namespace protocol {
 
     class Open extends ProtocolEvent {
 
-        static String _descriminator = "open";
+        static Discriminator _discriminator = anyof(["open", "mdk.protocol.Open", "discovery.protocol.Open"]);
 
         String version = "2.0.0";
 
@@ -300,7 +323,7 @@ namespace protocol {
     @doc("Close the event stream.")
     class Close extends ProtocolEvent {
 
-        static String _descriminator = "close";
+        static Discriminator _discriminator = anyof(["close", "mdk.protocol.Close", "discovery.protocol.Close"]);
 
         ProtocolError error;
 
@@ -318,10 +341,13 @@ namespace protocol {
         float maxDelay = 16.0;
         float reconnectDelay = firstDelay;
         float ttl = 30.0;
+        float tick = 1.0;
 
         WebSocket sock = null;
-        long lastHeartbeat = 0L;
         String sockUrl = null;
+
+        long lastConnectAttempt = 0L;
+        long lastHeartbeat = 0L;
 
         String url();
         String token();
@@ -345,19 +371,28 @@ namespace protocol {
 
         void scheduleReconnect() {
             schedule(reconnectDelay);
-            reconnectDelay = 2.0*reconnectDelay;
-
-            if (reconnectDelay > maxDelay) {
-                reconnectDelay = maxDelay;
-            }
         }
 
         void onOpen(Open open) {
             // Should assert version here ...
         }
 
+        void doBackoff() {
+            reconnectDelay = 2.0*reconnectDelay;
+
+            if (reconnectDelay > maxDelay) {
+                reconnectDelay = maxDelay;
+            }
+            logger.info("backing off, reconnecting in " + reconnectDelay.toString() + " seconds");
+        }
+
         void onClose(Close close) {
             logger.info("close: " + close.toString());
+            if (close.error == null) {
+                reconnectDelay = firstDelay;
+            } else {
+                doBackoff();
+            }
         }
 
         void onExecute(Runtime runtime) {
@@ -377,21 +412,40 @@ namespace protocol {
               do that.
             */
 
+            long rightNow = now();
+            long heartbeatInterval = ((ttl/2.0)*1000.0).round();
+            long reconnectInterval = (reconnectDelay*1000.0).round();
+
             if (isConnected()) {
                 if (isStarted()) {
-                    long interval = ((ttl/2.0)*1000.0).round();
-                    long rightNow = now();
-
-                    if (rightNow - lastHeartbeat >= interval) {
+                    pump();
+                    if (rightNow - lastHeartbeat >= heartbeatInterval) {
                         doHeartbeat();
                     }
                 } else {
+                    shutdown();
                     sock.close();
                     sock = null;
                 }
             } else {
-                open(url());
+                if (isStarted() && (rightNow - lastConnectAttempt) >= reconnectInterval) {
+                    doOpen();
+                }
             }
+
+            if (isStarted()) {
+                schedule(tick);
+            }
+        }
+
+        void doOpen() {
+            open(url());
+            lastConnectAttempt = now();
+        }
+
+        void doHeartbeat() {
+            heartbeat();
+            lastHeartbeat = now();
         }
 
         void open(String url) {
@@ -406,13 +460,13 @@ namespace protocol {
             sockUrl = url;
         }
 
+        void startup() {}
+
+        void pump() {}
+
         void heartbeat() {}
-        
-        void doHeartbeat() {
-            heartbeat();
-            lastHeartbeat = now();
-            schedule(ttl/2.0);
-        }
+
+        void shutdown() {}
 
         void onWSInit(WebSocket socket) {/* unused */ }
 
@@ -426,7 +480,8 @@ namespace protocol {
 
             sock.send(new Open().encode());
 
-            doHeartbeat();
+            startup();
+            pump();
         }
 
         void onWSBinary(WebSocket socket, Buffer message) { /* unused */ }
@@ -437,14 +492,12 @@ namespace protocol {
             logger.error(error.toString());
             // Any non-transient errors should be reported back to the
             // user via any Nodes they have requested.
+            doBackoff();
         }
 
         void onWSFinal(WebSocket socket) {
             logger.info("closed " + sockUrl);
             sock = null;
-            if (isStarted()) {
-                scheduleReconnect();
-            }
         }
     }
 
