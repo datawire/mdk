@@ -13,7 +13,7 @@ class TestState (object):
     def log(self, ctx, msg):
         ctx.tick();
     
-        text = "%s -- %s" % (ctx.key(), msg)
+        text = "%s:%s -- %s" % (ctx.nodeId, ctx.clock.key(), msg)
 
         marker = ' '
         wanted = None
@@ -28,13 +28,13 @@ class TestState (object):
         else:
             self.goldline += 1
 
-        print("%s %s" % (marker, text))
+        print("%s %s %s" % (marker, ctx.traceId, text))
 
         if wanted:
             print("W %s" % wanted)
 
     def enter(self, ctx, ctxName):
-        c2 = ctx.enter();
+        c2 = ctx.enter(ctxName);
         self.log(c2, "entered %s" % ctxName);
         return c2
 
@@ -52,11 +52,11 @@ Tests = [
             'done t1',
         ],
         [
-            'simple-t1:1 -- CREATED t1',
-            'simple-t1:2 -- step t1',
-            'simple-t1:3 -- step t1',
-            'simple-t1:4 -- step t1',
-            'simple-t1:5 -- done',
+            't1:1 -- CREATED t1',
+            't1:2 -- step t1',
+            't1:3 -- step t1',
+            't1:4 -- step t1',
+            't1:5 -- done',
         ]        
 
     ],
@@ -73,15 +73,15 @@ Tests = [
             'done t1',
         ],
         [
-            'linear-t1:1 -- CREATED t1',
-            'linear-t1:2 -- step t1',
-            'linear-t1:3,1 -- entered t2',
-            'linear-t1:3,2 -- step t2',
-            'linear-t1:3,3 -- leaving t2',
-            'linear-t1:4,1 -- entered t3',
-            'linear-t1:4,2 -- step t3',
-            'linear-t1:4,3 -- leaving t3',
-            'linear-t1:5 -- done',
+            't1:1 -- CREATED t1',
+            't1:2 -- step t1',
+            't2:3,1 -- entered t2',
+            't2:3,2 -- step t2',
+            't2:3,3 -- leaving t2',
+            't3:4,1 -- entered t3',
+            't3:4,2 -- step t3',
+            't3:4,3 -- leaving t3',
+            't1:5 -- done',
         ]
     ],
     [ "descend",
@@ -100,18 +100,18 @@ Tests = [
             'done t1',
         ],
         [
-            'descend-t1:1 -- CREATED t1',
-            'descend-t1:2 -- step t1',
-            'descend-t1:3,1 -- entered t2',
-            'descend-t1:3,2 -- step t2',
-            'descend-t1:3,3,1 -- entered t3',
-            'descend-t1:3,3,2 -- step t3',
-            'descend-t1:3,3,3,1 -- entered t4',
-            'descend-t1:3,3,3,2 -- step t4',
-            'descend-t1:3,3,3,3 -- leaving t4',
-            'descend-t1:3,3,4 -- leaving t3',
-            'descend-t1:3,4 -- leaving t2',
-            'descend-t1:4 -- done',
+            't1:1 -- CREATED t1',
+            't1:2 -- step t1',
+            't2:3,1 -- entered t2',
+            't2:3,2 -- step t2',
+            't3:3,3,1 -- entered t3',
+            't3:3,3,2 -- step t3',
+            't4:3,3,3,1 -- entered t4',
+            't4:3,3,3,2 -- step t4',
+            't4:3,3,3,3 -- leaving t4',
+            't3:3,3,4 -- leaving t3',
+            't2:3,4 -- leaving t2',
+            't1:4 -- done',
         ]
     ],
     [ "parallel",
@@ -133,21 +133,21 @@ Tests = [
             'done t1',
         ],
         [
-            'parallel-t1:1 -- CREATED t1',
-            'parallel-t1:2 -- step t1',
-            'parallel-t1:3,1 -- entered t2',
-            'parallel-t1:4,1 -- entered t3',
-            'parallel-t1:5,1 -- entered t4',
-            'parallel-t1:3,2 -- step t2',
-            'parallel-t1:4,2 -- step t3',
-            'parallel-t1:5,2 -- step t4',
-            'parallel-t1:3,3 -- step t2',
-            'parallel-t1:4,3 -- step t3',
-            'parallel-t1:5,3 -- step t4',
-            'parallel-t1:3,4 -- leaving t2',
-            'parallel-t1:4,4 -- leaving t3',
-            'parallel-t1:5,4 -- leaving t4',
-            'parallel-t1:6 -- done',
+            't1:1 -- CREATED t1',
+            't1:2 -- step t1',
+            't2:3,1 -- entered t2',
+            't3:4,1 -- entered t3',
+            't4:5,1 -- entered t4',
+            't2:3,2 -- step t2',
+            't3:4,2 -- step t3',
+            't4:5,2 -- step t4',
+            't2:3,3 -- step t2',
+            't3:4,3 -- step t3',
+            't4:5,3 -- step t4',
+            't2:3,4 -- leaving t2',
+            't3:4,4 -- leaving t3',
+            't4:5,4 -- leaving t4',
+            't1:6 -- done',
         ]
     ],
     [ "combined",
@@ -185,37 +185,37 @@ Tests = [
             'done t1',
         ],
         [
-            'combined-t1:1 -- CREATED t1',
-            'combined-t1:2 -- step t1',
-            'combined-t1:3,1 -- entered t2',
-            'combined-t1:4,1 -- entered t3',
-            'combined-t1:3,2 -- step t2',
-            'combined-t1:3,3 -- step t2',
-            'combined-t1:4,2 -- step t3',
-            'combined-t1:4,3 -- step t3',
-            'combined-t1:3,4,1 -- entered t2-1',
-            'combined-t1:3,4,2 -- step t2-1',
-            'combined-t1:3,5 -- step t2',
-            'combined-t1:4,4 -- step t3',
-            'combined-t1:3,4,3 -- step t2-1',
-            'combined-t1:4,5,1 -- entered t3-1',
-            'combined-t1:3,4,4,1 -- entered t2-1-1',
-            'combined-t1:3,4,4,2 -- step t2-1-1',
-            'combined-t1:4,6 -- step t3',
-            'combined-t1:3,4,4,3 -- step t2-1-1',
-            'combined-t1:3,4,4,4 -- leaving t2-1-1',
-            'combined-t1:4,7 -- step t3',
-            'combined-t1:3,4,5 -- leaving t2-1',
-            'combined-t1:4,8 -- step t3',
-            'combined-t1:4,9,1 -- entered t3-1',
-            'combined-t1:3,6 -- step t2',
-            'combined-t1:3,7 -- leaving t2',
-            'combined-t1:4,9,2 -- step t3-1',
-            'combined-t1:4,9,3 -- step t3-1',
-            'combined-t1:4,9,4 -- leaving t3-1',
-            'combined-t1:4,10 -- leaving t3',
-            'combined-t1:5 -- step t1',
-            'combined-t1:6 -- done',
+            't1:1 -- CREATED t1',
+            't1:2 -- step t1',
+            't2:3,1 -- entered t2',
+            't3:4,1 -- entered t3',
+            't2:3,2 -- step t2',
+            't2:3,3 -- step t2',
+            't3:4,2 -- step t3',
+            't3:4,3 -- step t3',
+            't2-1:3,4,1 -- entered t2-1',
+            't2-1:3,4,2 -- step t2-1',
+            't2:3,5 -- step t2',
+            't3:4,4 -- step t3',
+            't2-1:3,4,3 -- step t2-1',
+            't3-1:4,5,1 -- entered t3-1',
+            't2-1-1:3,4,4,1 -- entered t2-1-1',
+            't2-1-1:3,4,4,2 -- step t2-1-1',
+            't3:4,6 -- step t3',
+            't2-1-1:3,4,4,3 -- step t2-1-1',
+            't2-1-1:3,4,4,4 -- leaving t2-1-1',
+            't3:4,7 -- step t3',
+            't2-1:3,4,5 -- leaving t2-1',
+            't3:4,8 -- step t3',
+            't3-1:4,9,1 -- entered t3-1',
+            't2:3,6 -- step t2',
+            't2:3,7 -- leaving t2',
+            't3-1:4,9,2 -- step t3-1',
+            't3-1:4,9,3 -- step t3-1',
+            't3-1:4,9,4 -- leaving t3-1',
+            't3:4,10 -- leaving t3',
+            't1:5 -- step t1',
+            't1:6 -- done',
         ]
     ],
 ]
@@ -235,9 +235,8 @@ for name, vectors, gold in Tests:
 
         if cmd == 'create':
             ctxID = fields[0]
-            traceId = '%s-%s' % (name, ctxID)
 
-            contexts[ctxID] = SharedContext.withTraceId(traceId)
+            contexts[ctxID] = SharedContext().withNodeId(ctxID)
             state.log(contexts[ctxID], "CREATED %s" % ctxID)
         elif cmd == 'step':
             ctxID = fields[0]

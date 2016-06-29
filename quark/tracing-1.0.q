@@ -42,7 +42,6 @@ something like
 """)
 
 namespace tracing {
-
     class SharedContextInitializer extends TLSInitializer<SharedContext> {
         SharedContext getValue() {
             return new SharedContext();

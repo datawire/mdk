@@ -7,6 +7,14 @@ import quark.reflect;
 
 namespace mdk {
 namespace protocol {
+    macro String uuid4()
+        $py{str(__import__("uuid").uuid4()).upper()}
+        $js{'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);
+            return v.toString(16);
+        })}
+        $java{"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"}
+        $rb{"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"};
 
     class Discriminator {
         List<String> values;
@@ -189,7 +197,13 @@ namespace protocol {
              be created must use the same SharedContext, and its
              traceId will _never_ _change_.
         """)
-        String traceId;
+        String traceId = uuid4();
+
+        @doc("""
+             Every SharedContext holds the nodeID of the node for which it's storing
+             context.
+        """)
+        String nodeId;
 
         @doc("""
             To track causality, we use a Lamport clock.
@@ -204,17 +218,22 @@ namespace protocol {
 
         int _lastEntry = 0;
 
-        SharedContext() {}
+        SharedContext() {
+            self._lastEntry = self.clock.enter();           
+        }
+
+        SharedContext withNodeId(String nodeId) {
+            self.nodeId = nodeId;
+            return self;
+        }
 
         @doc("""
             Create a new SharedContext with the given traceId.
         """)
-        static SharedContext withTraceId(String traceId) {
-            SharedContext newContext = new SharedContext();
-            newContext.traceId = traceId;
-            newContext._lastEntry = newContext.clock.enter();
+        SharedContext withTraceId(String traceId) {
+            self.traceId = traceId;
 
-            return newContext;
+            return self;
         }
 
         // XXX this could work a lot nicer with a parameterized method
@@ -246,7 +265,7 @@ namespace protocol {
             NOTE WELL: THIS RETURNS A NEW SharedContext RATHER THAN MODIFYING THIS ONE. It is NOT SUPPORTED
             to modify the causality level of a SharedContext in place.
         """)
-        SharedContext enter() {
+        SharedContext enter(String nodeId) {
             // Tick first.
             self.tick();
             
@@ -254,6 +273,7 @@ namespace protocol {
             SharedContext newContext = SharedContext.decode(self.encode());
 
             // ...enter...
+            newContext.nodeId = nodeId;
             newContext._lastEntry = newContext.clock.enter();
 
             // ...and return the new context.
