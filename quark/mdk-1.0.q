@@ -63,10 +63,8 @@ namespace msdk {
 
         static Logger logger = new Logger("mdk");
 
-        Lock _mutex = new Lock();
         Discovery _disco = new Discovery();
         Tracer _tracer = new Tracer();
-        Node _me = null;
 
         List<Node> _resolved = [];
 
@@ -74,6 +72,7 @@ namespace msdk {
             _disco.url = _get("MDK_DISCOVERY_URL", "wss://discovery-beta.datawire.io");
             _disco.token = DatawireToken.getToken();
             _tracer.url = _get("MDK_TRACING_URL", "wss://philadelphia-test.datawire.io/ws");
+            _tracer.token = DatawireToken.getToken();
         }
 
         void start() {
@@ -81,19 +80,12 @@ namespace msdk {
         }
 
         void register(String service, String version, String address) {
-            _mutex.acquire();
-            if (_me != null) {
-                _mutex.release();
-                panic("already registered");
-            }
-
-            _me = new Node();
-            _me.service = service;
-            _me.version = version;
-            _me.address = address;
-            _me.properties = {};
-            _disco.register(_me);
-            _mutex.release();
+            Node node = new Node();
+            node.service = service;
+            node.version = version;
+            node.address = address;
+            node.properties = {};
+            _disco.register(node);
         }
 
         void stop() {
