@@ -72,6 +72,7 @@ namespace msdk {
             _disco.url = _get("MDK_DISCOVERY_URL", "wss://discovery-beta.datawire.io");
             _disco.token = DatawireToken.getToken();
             _tracer.url = _get("MDK_TRACING_URL", "wss://philadelphia-test.datawire.io/ws");
+            _tracer.token = DatawireToken.getToken();
         }
 
         void start() {
