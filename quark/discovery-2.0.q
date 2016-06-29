@@ -124,7 +124,7 @@ namespace discovery {
 
       while (idx < nodes.size()) {
         Node ep = nodes[idx];
-      
+
         if (ep.address == null || ep.address == node.address) {
           nodes.remove(idx);
           return;
@@ -382,17 +382,28 @@ namespace discovery {
     @doc("The returned Promise will end up with a Node as its value.")
     Promise resolve(String service) {
       PromiseFactory factory = new PromiseFactory();
-      self._lock();
 
-      if (services.contains(service)) {
-        factory.resolve(services[service].choose());
+      if (!services.contains(service)) {
+        self._lock();
+        services[service] = new Cluster();
+        self._release();
+      }
+
+      if (services[service].isEmpty()) {
+        self._lock();
+        services[service]._addPromise(factory);
+        self._release();
       }
       else {
-        services[service] = new Cluster();
-        services[service]._addPromise(factory);
+        self._lock();
+        Node result = services[service].choose();
+        self._release();
+        if (result == null) {
+          panic("We should have a result here, not null.");
+        }
+        factory.resolve(result);
       }
 
-      self._release();
       return factory.promise;
     }
 
