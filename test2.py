@@ -3,7 +3,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 import tracing
 
-tracer = tracing.Tracer()
+tracer = tracing.Tracer.withURLsAndToken("ws://localhost:52690/ws", None, "fakeToken")
 result = None
 
 def goodHandler(res):
