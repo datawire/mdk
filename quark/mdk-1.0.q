@@ -64,15 +64,15 @@ namespace msdk {
         static Logger logger = new Logger("mdk");
 
         Discovery _disco = new Discovery();
-        Tracer _tracer = new Tracer();
+        Tracer _tracer;
 
         List<Node> _resolved = [];
 
         MDKImpl() {
-            _disco.url = _get("MDK_DISCOVERY_URL", "wss://discovery-beta.datawire.io");
+            _disco.url = _get("MDK_DISCOVERY_URL", "wss://discovery-develop.datawire.io");
             _disco.token = DatawireToken.getToken();
-            _tracer.url = _get("MDK_TRACING_URL", "wss://philadelphia-test.datawire.io/ws");
-            _tracer.token = DatawireToken.getToken();
+            _tracer = Tracer.withURLsAndToken(_get("MDK_TRACING_URL", "wss://tracing-develop.datawire.io/ws"), "",
+                                              _disco.token);
         }
 
         void start() {
