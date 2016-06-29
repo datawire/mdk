@@ -167,7 +167,7 @@ namespace discovery {
 
   @doc("The Node class captures address and metadata information about a")
   @doc("server functioning as a service instance.")
-  class Node {
+  class Node extends Future {
     @doc("The service name.")
     String service;
     @doc("The service version (e.g. '1.2.3')")
@@ -359,6 +359,22 @@ namespace discovery {
       node.address = address;
       node.version = version;
       return self.register(node);
+    }
+
+    bool _resolvedNode(Node result, Node returned) {
+      returned.service = result.service;
+      returned.address = result.address;
+      returned.version = result.version;
+      returned.finish(null);
+      return true;
+    }
+
+    @doc("TEMPORARY BACKWARDS COMPAT, remove as soon as everything switches over.")
+    @doc("When you delete this also make Node not extend Future.")
+    Node resolveNode(String service) {
+      Node result = new Node();
+      resolve(service).andThen(bind(self, "_resolvedNode", [result]));
+      return result;
     }
 
     @doc("Resolve a service name into an available service node. You must")
