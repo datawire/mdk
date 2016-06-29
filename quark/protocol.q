@@ -210,11 +210,12 @@ namespace protocol {
             if (reconnectDelay > maxDelay) {
                 reconnectDelay = maxDelay;
             }
+            logger.info("backing off, reconnecting in " + reconnectDelay.toString() + " seconds");
         }
 
         void onClose(Close close) {
             logger.info("close: " + close.toString());
-            if (close.error != null) {
+            if (close.error == null) {
                 reconnectDelay = firstDelay;
             } else {
                 doBackoff();
