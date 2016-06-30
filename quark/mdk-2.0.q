@@ -18,8 +18,8 @@ import quark.concurrent;
 
 namespace mdk {
 
-    String _get(String var, String value) {
-        return os.Environment.ENV.get(var, value);
+    String _get(String name, String value) {
+        return os.Environment.ENV.get(name, value);
     }
 
     MDK init() {
