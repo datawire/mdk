@@ -1,22 +1,20 @@
 quark 1.0;
 
-package mdk_test 1.0.0;
+package datawire_mdk_test 1.0.0;
+
+use mdk-2.0.q;
 
 import quark.test;
+import quark.mock;
 
 void main(List<String> args) {
     test.run(args);
 }
 
-use mdk-1.0.q;
+import mdk_tracing;
+import mdk_tracing.protocol;
 
-import quark.test;
-
-import tracing;
-import tracing.protocol;
-import mock;
-
-class TracingTest extends ProtocolTest {
+class TracingTest extends MockRuntimeTest {
 
     /////////////////
     // Helpers
@@ -34,11 +32,11 @@ class TracingTest extends ProtocolTest {
     }
 
     Open expectOpen(SocketEvent evt) {
-        return ?expectTracingEvent(evt, "mdk.protocol.Open");
+        return ?expectTracingEvent(evt, "mdk_protocol.Open");
     }
 
     LogEvent expectLogEvent(SocketEvent evt) {
-        return ?expectTracingEvent(evt, "tracing.protocol.LogEvent");
+        return ?expectTracingEvent(evt, "mdk_tracing.protocol.LogEvent");
     }
 
     /////////////////
@@ -53,7 +51,7 @@ class TracingTest extends ProtocolTest {
     }
 
     void doTestLog(String url) {
-        tracing.Tracer tracer = new tracing.Tracer();
+        Tracer tracer = new Tracer();
         if (url != null) {
             tracer.url = url;
         } else {
@@ -82,10 +80,10 @@ class TracingTest extends ProtocolTest {
 
 }
 
-import discovery;
-import discovery.protocol;
+import mdk_discovery;
+import mdk_discovery.protocol;
 
-class DiscoveryTest extends ProtocolTest {
+class DiscoveryTest extends MockRuntimeTest {
 
     /////////////////
     // Helpers
@@ -103,11 +101,11 @@ class DiscoveryTest extends ProtocolTest {
     }
 
     Open expectOpen(SocketEvent evt) {
-        return ?expectDiscoveryEvent(evt, "mdk.protocol.Open");
+        return ?expectDiscoveryEvent(evt, "mdk_protocol.Open");
     }
 
     Active expectActive(SocketEvent evt) {
-        return ?expectDiscoveryEvent(evt, "discovery.protocol.Active");
+        return ?expectDiscoveryEvent(evt, "mdk_discovery.protocol.Active");
     }
 
     void checkEqualNodes(Node expected, Node actual) {
