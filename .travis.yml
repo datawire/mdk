@@ -1,6 +1,6 @@
 sudo: required
 dist: trusty
-rvm:
-  - 2.3
+install:
+  - rvm use 2.3 --install
 script:
   - .travis-test.sh
