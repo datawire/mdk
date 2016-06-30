@@ -12,6 +12,7 @@ import discovery;
 import tracing;
 import quark.concurrent;
 import datawire_introspection;
+import discovery_util;
 
 // Sketch of a more wholistic API. This is WIP.
 
@@ -33,7 +34,9 @@ namespace msdk {
 
         void register(String service, String version, String address);
 
-        Promise resolve(String service, String version);
+        Promise _resolve(String service, String version);
+
+        Node resolve_until(String service, String version, float timeout);
 
         void begin();
 
@@ -128,9 +131,14 @@ namespace msdk {
             return result;
         }
 
-        Promise resolve(String service, String version) {
+        Promise _resolve(String service, String version) {
             return _disco.resolve(service).
                 andThen(bind(self, "_resolvedCallback", []));
+        }
+
+        Node resolve_until(String service, String version, float timeout) {
+            return ?WaitForPromise.wait(self._resolve(service, version), timeout,
+                                        "service " + service + "(" + version + ")");
         }
 
         void begin() {

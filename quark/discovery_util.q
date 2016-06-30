@@ -3,6 +3,7 @@ quark 1.0;
 package datawire_discovery_util 2.0.0;
 
 import quark.os;
+import quark.concurrent;
 
 namespace discovery_util {
   @doc("A Supplier has a 'get' method that can return a value to anyone who needs it.")
@@ -53,6 +54,36 @@ namespace discovery_util {
       else {
         return alternative;
       }
+    }
+  }
+
+  // This should be moved into Quark at some point:
+  @doc("Utility to blockingly wait for a Promise to get a value.")
+  class WaitForPromise {
+    bool _finished(Object value, Condition done) {
+      done.acquire();
+      done.wakeup();
+      done.release();
+      return true;
+    }
+
+    static Object wait(Promise p, float timeout, String description) {
+      Condition done = new Condition();
+      WaitForPromise waiter = new WaitForPromise();
+      p.andThen(bind(waiter, "_finished", [done]));
+
+      // Wait until promise has result or we hit timeout:
+      // XXX do we need to do while loop that's in FutureWait?
+      long msTimeout = (timeout * 1000.0).round();
+      done.waitWakeup(msTimeout);
+
+      PromiseValue snapshot = p.value();
+      if (!snapshot.hasValue()) {
+        // XXX when we port this to Quark itself we should use a custom timeout
+        // exception class.
+        panic("Timeout waiting for " + description);
+      }
+      return snapshot.getValue();
     }
   }
 }

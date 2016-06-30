@@ -4,8 +4,7 @@ logging.basicConfig(level=logging.INFO)
 import msdk, requests, traceback
 
 def bizlogic(m):
-    n = m.resolve("asdf", "1.0")
-    n.await(10.0)
+    n = m.resolve_until("asdf", "1.0", 10.0)
     m.info("bizlogic", "Querying... %s" % n.address)
     requests.get(n.address)
 
