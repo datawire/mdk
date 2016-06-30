@@ -12,6 +12,7 @@ import discovery;
 import tracing;
 import quark.concurrent;
 import datawire_introspection;
+import discovery_util;
 
 // Sketch of a more wholistic API. This is WIP.
 
@@ -33,7 +34,11 @@ namespace msdk {
 
         void register(String service, String version, String address);
 
-        Node resolve(String service, String version);
+        Promise _resolve(String service, String version);
+
+        Object resolve(String service, String version);
+
+        Node resolve_until(String service, String version, float timeout);
 
         void begin();
 
@@ -73,6 +78,10 @@ namespace msdk {
             _disco.token = DatawireToken.getToken();
             _tracer = Tracer.withURLsAndToken(_get("MDK_TRACING_URL", "wss://tracing-develop.datawire.io/ws"), "",
                                               _disco.token);
+        }
+
+        float _timeout() {
+            return 10.0;
         }
 
         void start() {
@@ -123,10 +132,27 @@ namespace msdk {
             log("DEBUG", category, text);
         }
 
+        Node _resolvedCallback(Node result) {
+            _resolved.add(result);
+            return result;
+        }
+
+        Promise _resolve(String service, String version) {
+            return _disco._resolve(service).
+                andThen(bind(self, "_resolvedCallback", []));
+        }
+
+        Object resolve_async(String service, String version) {
+            return toNativePromise(_resolve(service, version));
+        }
+
         Node resolve(String service, String version) {
-            Node node = _disco.resolve(service);
-            _resolved.add(node);
-            return node;
+            return resolve_until(service, version, _timeout());
+        }
+
+        Node resolve_until(String service, String version, float timeout) {
+            return ?WaitForPromise.wait(self._resolve(service, version), timeout,
+                                        "service " + service + "(" + version + ")");
         }
 
         void begin() {

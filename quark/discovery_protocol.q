@@ -65,11 +65,7 @@ namespace discovery {
 
             void onActive(Active active) {
                 // Stick the node in the available set.
-
-                Node node = active.node;
-                node.finish(null);
-
-                disco.active(node);
+                disco._active(active.node);
             }
 
             void onExpire(Expire expire) {
@@ -80,7 +76,7 @@ namespace discovery {
 
                 Node node = expire.node;
 
-                disco.expire(node);
+                disco._expire(node);
             }
 
             void onClear(Clear reset) {

@@ -9,7 +9,7 @@ import quark.concurrent;
 import quark.reflect;
 
 import discovery.protocol;
-import discovery_util;  // bring in EnvironmentVariable
+import discovery_util;  // bring in EnvironmentVariable, WaitForPromise
 
 /*
   Context:
@@ -66,14 +66,15 @@ namespace discovery {
     @doc("a single service. Each service provider is represented by a Node.")
     class Cluster {
         List<Node> nodes = [];
-        int idx = 0;
+        List<PromiseFactory> _waiting = [];
+        int _counter = 0;
 
         @doc("Choose a single Node to talk to. At present this is a simple round")
         @doc("robin.")
         Node choose() {
             if (nodes.size() > 0) {
-                int choice = idx % nodes.size();
-                idx = idx + 1;
+                int choice = _counter % nodes.size();
+                _counter = _counter + 1;
                 return nodes[choice];
             }
             else {
@@ -85,13 +86,22 @@ namespace discovery {
         @doc("update its properties).  At present, this involves a linear search, so")
         @doc("very large Clusters are unlikely to perform well.")
         void add(Node node) {
+            // Resolve waiting promises:
+            if (self._waiting.size() > 0) {
+                List<PromiseFactory> waiting = self._waiting;
+                self._waiting = new List<PromiseFactory>();
+                int jdx = 0;
+                while (jdx < waiting.size()) {
+                    waiting[jdx].resolve(node);
+                    jdx = jdx + 1;
+                }
+            }
+            // Update stored values:
             int idx = 0;
 
             while (idx < nodes.size()) {
-                Node ep = nodes[idx];
-      
-                if (ep.address == null || ep.address == node.address) {
-                    ep.update(node);
+                if (nodes[idx].address == node.address) {
+                    nodes[idx] = node;
                     return;
                 }
 
@@ -99,6 +109,11 @@ namespace discovery {
             }
 
             nodes.add(node);
+        }
+
+        // Internal method, add PromiseFactory to fill in when a new Node is added.
+        void _addPromise(PromiseFactory factory) {
+            _waiting.add(factory);
         }
 
         @doc("Remove a Node from the cluster, if it's present. If it's not present, do")
@@ -109,7 +124,7 @@ namespace discovery {
 
             while (idx < nodes.size()) {
                 Node ep = nodes[idx];
-      
+
                 if (ep.address == null || ep.address == node.address) {
                     nodes.remove(idx);
                     return;
@@ -151,10 +166,7 @@ namespace discovery {
     }
 
     @doc("The Node class captures address and metadata information about a")
-    @doc("server functioning as a service instance. Node extends Future, since")
-    @doc("some operations involving Nodes can take awhile -- this means that")
-    @doc("you must be sure that a given Node has been finished before using")
-    @doc("its values. The Quark documentation for Future has more.")
+    @doc("server functioning as a service instance.")
     class Node extends Future {
         @doc("The service name.")
         String service;
@@ -164,15 +176,6 @@ namespace discovery {
         String address;
         @doc("Additional metadata associated with this service instance.")
         Map<String,Object> properties;
-
-        @doc("Copy properties from some other Node to this one, and finish this Node.")
-        void update(Node node) {
-            service = node.service;
-            version = node.version;
-            address = node.address;
-            properties = node.properties;
-            self.finish(null);
-        }
 
         @doc("Return a string representation of the Node.")
         String toString() {
@@ -358,26 +361,55 @@ namespace discovery {
             return self.register(node);
         }
 
+        bool _resolvedNode(Node result, Node returned) {
+            returned.service = result.service;
+            returned.address = result.address;
+            returned.version = result.version;
+            returned.finish(null);
+            return true;
+        }
+
+        @doc("TEMPORARY BACKWARDS COMPAT, remove as soon as everything switches over.")
+        @doc("When you delete this also make Node not extend Future.")
+        Node resolveNode(String service) {
+            Node result = new Node();
+            _resolve(service).andThen(bind(self, "_resolvedNode", [result]));
+            return result;
+        }
+
         @doc("Resolve a service name into an available service node. You must")
         @doc("usually start the uplink before this will do much; see start().")
-        @doc("")
-        Node resolve(String service) {
-            Node result;
-            self._lock();
+        @doc("The returned Promise will end up with a Node as its value.")
+        Promise _resolve(String service) {
+            PromiseFactory factory = new PromiseFactory();
 
-            if (services.contains(service)) {
-                result = services[service].choose();
+            if (!services.contains(service)) {
+                self._lock();
+                services[service] = new Cluster();
+                self._release();
+            }
+
+            if (services[service].isEmpty()) {
+                self._lock();
+                services[service]._addPromise(factory);
+                self._release();
             }
             else {
-                result = new Node();
-                result.service = service;
-                services[service] = new Cluster();
-                services[service].add(result);
-                client.resolve(result);
+                self._lock();
+                Node result = services[service].choose();
+                self._release();
+                if (result == null) {
+                    panic("We should have a result here, not null.");
+                }
+                factory.resolve(result);
             }
 
-            self._release();
-            return result;
+            return factory.promise;
+        }
+
+        @doc("Resolve a service; return a (Bluebird) Promise on Javascript. Does not work elsewhere.")
+        Object resolve(String service) {
+            return toNativePromise(_resolve(service));
         }
 
         // XXX blocking API, never call from Javascript or Quark code.
@@ -386,17 +418,12 @@ namespace discovery {
         @doc("supports it). This should only be used in blocking runtimes (e.g. ")
         @doc("you do not want to use this in Javascript).")
         Node resolve_until(String service, float timeout) {
-            Node result = self.resolve(service);
-            result.await(timeout);
-            if (result.address == null) {
-                panic("Timeout looking up service " + service);
-            }
-            return result;
+            return ?WaitForPromise.wait(self._resolve(service), timeout, "service " + service);
         }
 
         // XXX PRIVATE API -- needs to not be here.
         // @doc("Add a given node.")
-        void active(Node node) {
+        void _active(Node node) {
             self._lock();
 
             String service = node.service;
@@ -415,7 +442,7 @@ namespace discovery {
 
         // XXX PRIVATE API -- needs to not be here.
         // @doc("Expire a given node.")
-        void expire(Node node) {
+        void _expire(Node node) {
             self._lock();
 
             String service = node.service;
