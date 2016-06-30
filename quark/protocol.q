@@ -200,10 +200,9 @@ namespace protocol {
         String traceId = uuid4();
 
         @doc("""
-             Every SharedContext holds the nodeID of the node for which it's storing
-             context.
+             Every SharedContext holds the procUUID of the process it's attached to.
         """)
-        String nodeId;
+        String procUUID = uuid4();
 
         @doc("""
             To track causality, we use a Lamport clock.
@@ -222,17 +221,15 @@ namespace protocol {
             self._lastEntry = self.clock.enter();           
         }
 
-        SharedContext withNodeId(String nodeId) {
-            self.nodeId = nodeId;
+        @doc("""Set the procUUID for this SharedContext.""")
+        SharedContext withProcUUID(String procUUID) {
+            self.procUUID = procUUID;
             return self;
         }
 
-        @doc("""
-            Create a new SharedContext with the given traceId.
-        """)
+        @doc("""Set the traceId for this SharedContext.""")
         SharedContext withTraceId(String traceId) {
             self.traceId = traceId;
-
             return self;
         }
 
@@ -265,15 +262,14 @@ namespace protocol {
             NOTE WELL: THIS RETURNS A NEW SharedContext RATHER THAN MODIFYING THIS ONE. It is NOT SUPPORTED
             to modify the causality level of a SharedContext in place.
         """)
-        SharedContext enter(String nodeId) {
+        SharedContext startOperation() {
             // Tick first.
             self.tick();
             
             // Duplicate this object...
             SharedContext newContext = SharedContext.decode(self.encode());
 
-            // ...enter...
-            newContext.nodeId = nodeId;
+            // ...open a new span...
             newContext._lastEntry = newContext.clock.enter();
 
             // ...and return the new context.
@@ -287,7 +283,7 @@ namespace protocol {
             NOTE WELL: THIS RETURNS A NEW SharedContext RATHER THAN MODIFYING THIS ONE. It is NOT SUPPORTED
             to modify the causality level of a SharedContext in place.
         """)
-        SharedContext leave() {
+        SharedContext endOperation() {
             // Duplicate this object...
             SharedContext newContext = SharedContext.decode(self.encode());
 

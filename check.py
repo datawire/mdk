@@ -13,7 +13,7 @@ class TestState (object):
     def log(self, ctx, msg):
         ctx.tick();
     
-        text = "%s:%s -- %s" % (ctx.nodeId, ctx.clock.key(), msg)
+        text = "%s:%s -- %s" % (ctx.procUUID, ctx.clock.key(), msg)
 
         marker = ' '
         wanted = None
@@ -34,13 +34,13 @@ class TestState (object):
             print("W %s" % wanted)
 
     def enter(self, ctx, ctxName):
-        c2 = ctx.enter(ctxName);
+        c2 = ctx.startOperation().withProcUUID(ctxName);
         self.log(c2, "entered %s" % ctxName);
         return c2
 
     def leave(self, ctx, ctxName):
         self.log(ctx, "leaving %s" % ctxName);
-        return ctx.leave();
+        return ctx.endOperation();
 
 Tests = [
     [ "simple",
@@ -236,7 +236,7 @@ for name, vectors, gold in Tests:
         if cmd == 'create':
             ctxID = fields[0]
 
-            contexts[ctxID] = SharedContext().withNodeId(ctxID)
+            contexts[ctxID] = SharedContext().withProcUUID(ctxID)
             state.log(contexts[ctxID], "CREATED %s" % ctxID)
         elif cmd == 'step':
             ctxID = fields[0]
