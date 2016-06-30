@@ -36,6 +36,8 @@ namespace msdk {
 
         Promise _resolve(String service, String version);
 
+        Object resolve(String service, String version);
+
         Node resolve_until(String service, String version, float timeout);
 
         void begin();
@@ -134,6 +136,10 @@ namespace msdk {
         Promise _resolve(String service, String version) {
             return _disco.resolve(service).
                 andThen(bind(self, "_resolvedCallback", []));
+        }
+
+        Object resolve(String service) {
+            return toNativePromise(_resolve(service));
         }
 
         Node resolve_until(String service, String version, float timeout) {

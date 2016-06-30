@@ -373,14 +373,14 @@ namespace discovery {
     @doc("When you delete this also make Node not extend Future.")
     Node resolveNode(String service) {
       Node result = new Node();
-      resolve(service).andThen(bind(self, "_resolvedNode", [result]));
+      _resolve(service).andThen(bind(self, "_resolvedNode", [result]));
       return result;
     }
 
     @doc("Resolve a service name into an available service node. You must")
     @doc("usually start the uplink before this will do much; see start().")
     @doc("The returned Promise will end up with a Node as its value.")
-    Promise resolve(String service) {
+    Promise _resolve(String service) {
       PromiseFactory factory = new PromiseFactory();
 
       if (!services.contains(service)) {
@@ -407,13 +407,18 @@ namespace discovery {
       return factory.promise;
     }
 
+    @doc("Resolve a service; return a (Bluebird) Promise on Javascript. Does not work elsewhere.")
+    Object resolve(String service) {
+      return toNativePromise(_resolve(service));
+    }
+
     // XXX blocking API, never call from Javascript or Quark code.
     @doc("Wait for service name to resolve into an available service node, or fail")
     @doc("appropriately (typically by raising an exception if the language")
     @doc("supports it). This should only be used in blocking runtimes (e.g. ")
     @doc("you do not want to use this in Javascript).")
     Node resolve_until(String service, float timeout) {
-      return ?WaitForPromise.wait(self.resolve(service), timeout, "service " + service);
+      return ?WaitForPromise.wait(self._resolve(service), timeout, "service " + service);
     }
 
     // XXX PRIVATE API -- needs to not be here.

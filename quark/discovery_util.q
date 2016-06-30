@@ -1,5 +1,8 @@
 quark 1.0;
 
+use js bluebird 3.4.1;
+include mdk_promises.js;
+
 package datawire_discovery_util 2.0.0;
 
 import quark.os;
@@ -85,5 +88,19 @@ namespace discovery_util {
       }
       return snapshot.getValue();
     }
+  }
+
+  // This should be moved into quark at some point and cleaned up so it's less horrible:
+
+  macro bool _isJavascript() $java{false} $py{False} $rb{false} $js{true};
+
+  macro Object _jsresolve(Promise p) $js{require("../mdk_promises.js").quark_promise_to_bluebird($p)}
+                                     $java{null}; // without this it won't compile
+
+  Object toNativePromise(Promise p) {
+    if (!_isJavascript()) {
+      panic("This method only works on Javascript.");
+    }
+    return _jsresolve(p);
   }
 }

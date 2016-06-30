@@ -201,7 +201,7 @@ class DiscoveryTest extends ProtocolTest {
     void testResolvePreStart() {
         Discovery disco = new Discovery().connect();
 
-        Promise promise = disco.resolve("svc");
+        Promise promise = disco._resolve("svc");
         checkEqual(false, promise.value().hasValue());
 
         SocketEvent sev = startDisco(disco);
@@ -221,7 +221,7 @@ class DiscoveryTest extends ProtocolTest {
         Discovery disco = new Discovery().connect();
         SocketEvent sev = startDisco(disco);
 
-        Promise promise = disco.resolve("svc");
+        Promise promise = disco._resolve("svc");
         checkEqual(false, promise.value().hasValue());
 
         Active active = new Active();
@@ -245,7 +245,7 @@ class DiscoveryTest extends ProtocolTest {
         active.node.version = "1.2.3";
         sev.send(active.encode());
 
-        Promise promise = disco.resolve("svc");
+        Promise promise = disco._resolve("svc");
         checkEqualNodes(active.node, ?promise.value().getValue());
     }
 
@@ -254,8 +254,8 @@ class DiscoveryTest extends ProtocolTest {
     void testResolveBeforeAndBeforeNotification() {
         Discovery disco = new Discovery().connect();
         SocketEvent sev = startDisco(disco);
-        Promise promise = disco.resolve("svc");
-        Promise promise2 = disco.resolve("svc");
+        Promise promise = disco._resolve("svc");
+        Promise promise2 = disco._resolve("svc");
         checkEqual(false, promise.value().hasValue());
         checkEqual(false, promise2.value().hasValue());
 
@@ -273,7 +273,7 @@ class DiscoveryTest extends ProtocolTest {
     void testResolveBeforeAndAfterNotification() {
         Discovery disco = new Discovery().connect();
         SocketEvent sev = startDisco(disco);
-        Promise promise = disco.resolve("svc");
+        Promise promise = disco._resolve("svc");
 
         Active active = new Active();
         active.node = new Node();
@@ -282,7 +282,7 @@ class DiscoveryTest extends ProtocolTest {
         active.node.version = "1.2.3";
         sev.send(active.encode());
 
-        Promise promise2 = disco.resolve("svc");
+        Promise promise2 = disco._resolve("svc");
         checkEqualNodes(active.node, ?promise.value().getValue());
         checkEqualNodes(active.node, ?promise2.value().getValue());
     }
@@ -305,7 +305,7 @@ class DiscoveryTest extends ProtocolTest {
         active2.node.version = "1.2.3";
         sev.send(active2.encode());
 
-        Promise promise = disco.resolve("svc");
+        Promise promise = disco._resolve("svc");
         checkEqualNodes(active.node, ?promise.value().getValue());
     }
 
@@ -313,7 +313,7 @@ class DiscoveryTest extends ProtocolTest {
         Discovery disco = new Discovery().connect();
         SocketEvent sev = startDisco(disco);
 
-        Promise promise = disco.resolve("svc");
+        Promise promise = disco._resolve("svc");
         checkEqual(false, promise.value().hasValue());
 
         Active active = new Active();
@@ -331,7 +331,7 @@ class DiscoveryTest extends ProtocolTest {
 
         idx = 0;
         while (idx < count*10) {
-            Node node = ?disco.resolve("svc").value().getValue();
+            Node node = ?disco._resolve("svc").value().getValue();
             checkEqual("addr" + (idx % count).toString(), node.address);
             idx = idx + 1;
         }
