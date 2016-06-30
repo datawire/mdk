@@ -78,7 +78,9 @@ namespace discovery_util {
       // Wait until promise has result or we hit timeout:
       // XXX do we need to do while loop that's in FutureWait?
       long msTimeout = (timeout * 1000.0).round();
+      done.acquire();
       done.waitWakeup(msTimeout);
+      done.release();
 
       PromiseValue snapshot = p.value();
       if (!snapshot.hasValue()) {

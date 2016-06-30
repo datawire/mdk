@@ -8,8 +8,7 @@ void main(List<String> args) {
     test.run(args);
 }
 
-use discovery-2.0.q;
-use tracing-1.0.q;
+use mdk-1.0.q;
 
 // We can switch to quark.mock whenever we switch to Quark > 1.0.133.
 include mock.q;

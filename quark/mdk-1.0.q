@@ -69,15 +69,19 @@ namespace msdk {
         static Logger logger = new Logger("mdk");
 
         Discovery _disco = new Discovery();
-        Tracer _tracer = new Tracer();
+        Tracer _tracer;
 
         List<Node> _resolved = [];
 
         MDKImpl() {
-            _disco.url = _get("MDK_DISCOVERY_URL", "wss://discovery-beta.datawire.io");
+            _disco.url = _get("MDK_DISCOVERY_URL", "wss://discovery-develop.datawire.io");
             _disco.token = DatawireToken.getToken();
-            _tracer.url = _get("MDK_TRACING_URL", "wss://philadelphia-test.datawire.io/ws");
-            _tracer.token = DatawireToken.getToken();
+            _tracer = Tracer.withURLsAndToken(_get("MDK_TRACING_URL", "wss://tracing-develop.datawire.io/ws"), "",
+                                              _disco.token);
+        }
+
+        float _timeout() {
+            return 10.0;
         }
 
         void start() {
@@ -134,12 +138,16 @@ namespace msdk {
         }
 
         Promise _resolve(String service, String version) {
-            return _disco.resolve(service).
+            return _disco._resolve(service).
                 andThen(bind(self, "_resolvedCallback", []));
         }
 
-        Object resolve(String service) {
-            return toNativePromise(_resolve(service));
+        Object resolve_async(String service, String version) {
+            return toNativePromise(_resolve(service, version));
+        }
+
+        Node resolve(String service, String version) {
+            return resolve_until(service, version, _timeout());
         }
 
         Node resolve_until(String service, String version, float timeout) {
