@@ -262,7 +262,7 @@ namespace protocol {
             NOTE WELL: THIS RETURNS A NEW SharedContext RATHER THAN MODIFYING THIS ONE. It is NOT SUPPORTED
             to modify the causality level of a SharedContext in place.
         """)
-        SharedContext startOperation() {
+        SharedContext start_op() {
             // Tick first.
             self.tick();
             
@@ -283,7 +283,7 @@ namespace protocol {
             NOTE WELL: THIS RETURNS A NEW SharedContext RATHER THAN MODIFYING THIS ONE. It is NOT SUPPORTED
             to modify the causality level of a SharedContext in place.
         """)
-        SharedContext endOperation() {
+        SharedContext end_op() {
             // Duplicate this object...
             SharedContext newContext = SharedContext.decode(self.encode());
 

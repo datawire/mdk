@@ -34,13 +34,13 @@ class TestState (object):
             print("W %s" % wanted)
 
     def enter(self, ctx, ctxName):
-        c2 = ctx.startOperation().withProcUUID(ctxName);
+        c2 = ctx.start_op().withProcUUID(ctxName);
         self.log(c2, "entered %s" % ctxName);
         return c2
 
     def leave(self, ctx, ctxName):
         self.log(ctx, "leaving %s" % ctxName);
-        return ctx.endOperation();
+        return ctx.end_op();
 
 Tests = [
     [ "simple",
