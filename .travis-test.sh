@@ -1,4 +1,8 @@
 #!/bin/bash
+
+# Remove this when bug is fixed:
+export DATAWIRE_TOKEN=""
+
 set -e
 rvm use system
 echo "Git commit is:" $TRAVIS_COMMIT
