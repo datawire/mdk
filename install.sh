@@ -72,7 +72,7 @@ else
   # No Quark at all. Install.
   echo "== MDK needs the Quark compiler; installing it now."
 
-  curl -# -L https://raw.githubusercontent.com/datawire/quark/master/install.sh | bash -s -- -q 1.0.133
+  curl -# -L https://raw.githubusercontent.com/datawire/quark/master/install.sh | bash -s -- -q v1.0.282
 
   . $HOME/.quark/config.sh
 fi

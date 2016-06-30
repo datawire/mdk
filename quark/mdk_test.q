@@ -8,11 +8,7 @@ void main(List<String> args) {
     test.run(args);
 }
 
-use discovery-2.0.q;
-use tracing-1.0.q;
-
-// We can switch to quark.mock whenever we switch to Quark > 1.0.133.
-include mock.q;
+use mdk-1.0.q;
 
 import quark.test;
 
@@ -201,11 +197,8 @@ class DiscoveryTest extends ProtocolTest {
     void testResolvePreStart() {
         Discovery disco = new Discovery().connect();
 
-        Node node = disco.resolve("svc");
-        checkEqual("svc", node.service);
-        checkEqual(null, node.address);
-        checkEqual(null, node.version);
-        checkEqual(null, node.properties);
+        Promise promise = disco._resolve("svc");
+        checkEqual(false, promise.value().hasValue());
 
         SocketEvent sev = startDisco(disco);
         if (sev == null) { return; }
@@ -217,18 +210,15 @@ class DiscoveryTest extends ProtocolTest {
         active.node.version = "1.2.3";
         sev.send(active.encode());
 
-        checkEqualNodes(active.node, node);
+        checkEqualNodes(active.node, ?promise.value().getValue());
     }
 
     void testResolvePostStart() {
         Discovery disco = new Discovery().connect();
         SocketEvent sev = startDisco(disco);
 
-        Node node = disco.resolve("svc");
-        checkEqual("svc", node.service);
-        checkEqual(null, node.address);
-        checkEqual(null, node.version);
-        checkEqual(null, node.properties);
+        Promise promise = disco._resolve("svc");
+        checkEqual(false, promise.value().hasValue());
 
         Active active = new Active();
         active.node = new Node();
@@ -237,18 +227,90 @@ class DiscoveryTest extends ProtocolTest {
         active.node.version = "1.2.3";
         sev.send(active.encode());
 
-        checkEqualNodes(active.node, node);
+        checkEqualNodes(active.node, ?promise.value().getValue());
+    }
+
+    void testResolveAfterNotification() {
+        Discovery disco = new Discovery().connect();
+        SocketEvent sev = startDisco(disco);
+
+        Active active = new Active();
+        active.node = new Node();
+        active.node.service = "svc";
+        active.node.address = "addr";
+        active.node.version = "1.2.3";
+        sev.send(active.encode());
+
+        Promise promise = disco._resolve("svc");
+        checkEqualNodes(active.node, ?promise.value().getValue());
+    }
+
+    // This variant caught a bug in the code, so it's useful to have all of
+    // these even though they're seemingly similar.
+    void testResolveBeforeAndBeforeNotification() {
+        Discovery disco = new Discovery().connect();
+        SocketEvent sev = startDisco(disco);
+        Promise promise = disco._resolve("svc");
+        Promise promise2 = disco._resolve("svc");
+        checkEqual(false, promise.value().hasValue());
+        checkEqual(false, promise2.value().hasValue());
+
+        Active active = new Active();
+        active.node = new Node();
+        active.node.service = "svc";
+        active.node.address = "addr";
+        active.node.version = "1.2.3";
+        sev.send(active.encode());
+
+        checkEqualNodes(active.node, ?promise.value().getValue());
+        checkEqualNodes(active.node, ?promise2.value().getValue());
+    }
+
+    void testResolveBeforeAndAfterNotification() {
+        Discovery disco = new Discovery().connect();
+        SocketEvent sev = startDisco(disco);
+        Promise promise = disco._resolve("svc");
+
+        Active active = new Active();
+        active.node = new Node();
+        active.node.service = "svc";
+        active.node.address = "addr";
+        active.node.version = "1.2.3";
+        sev.send(active.encode());
+
+        Promise promise2 = disco._resolve("svc");
+        checkEqualNodes(active.node, ?promise.value().getValue());
+        checkEqualNodes(active.node, ?promise2.value().getValue());
+    }
+
+    void testResolveDifferentActive() {
+        Discovery disco = new Discovery().connect();
+        SocketEvent sev = startDisco(disco);
+
+        Active active = new Active();
+        active.node = new Node();
+        active.node.service = "svc";
+        active.node.address = "addr";
+        active.node.version = "1.2.3";
+        sev.send(active.encode());
+
+        Active active2 = new Active();
+        active2.node = new Node();
+        active2.node.service = "svc2";
+        active2.node.address = "addr";
+        active2.node.version = "1.2.3";
+        sev.send(active2.encode());
+
+        Promise promise = disco._resolve("svc");
+        checkEqualNodes(active.node, ?promise.value().getValue());
     }
 
     void testLoadBalancing() {
         Discovery disco = new Discovery().connect();
         SocketEvent sev = startDisco(disco);
 
-        Node node = disco.resolve("svc");
-        checkEqual("svc", node.service);
-        checkEqual(null, node.address);
-        checkEqual(null, node.version);
-        checkEqual(null, node.properties);
+        Promise promise = disco._resolve("svc");
+        checkEqual(false, promise.value().hasValue());
 
         Active active = new Active();
 
@@ -265,7 +327,7 @@ class DiscoveryTest extends ProtocolTest {
 
         idx = 0;
         while (idx < count*10) {
-            node = disco.resolve("svc");
+            Node node = ?disco._resolve("svc").value().getValue();
             checkEqual("addr" + (idx % count).toString(), node.address);
             idx = idx + 1;
         }
