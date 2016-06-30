@@ -1,4 +1,5 @@
 #!/bin/bash
+unset $(env | grep -Fe ~/.rvm | cut -d= -f1)
 export GIT_BRANCH=`git rev-parse --abbrev-ref HEAD`
 for CODE_LANG in --python --ruby --java --javascript ; do
     curl -# -L https://raw.githubusercontent.com/datawire/mdk/$GIT_BRANCH/install.sh | bash -s -- $CODE_LANG $GIT_BRANCH
