@@ -408,6 +408,8 @@ namespace tracing {
             Lock _mutex = new Lock();
 
             List<LogEvent> _buffered = [];
+            long _logged = 0L;
+            long _sent = 0L;
 
             TracingClient(Tracer tracer) {
                 _tracer = tracer;
@@ -438,11 +440,13 @@ namespace tracing {
                 while (_buffered.size() > 0) {
                     LogEvent evt = _buffered.remove(0);
                     self.sock.send(evt.encode());
+                    _sent = _sent + 1;
                 }
                 _mutex.release();
             }
 
             void log(LogEvent evt) {
+                _logged = _logged + 1;
                 _mutex.acquire();
                 _buffered.add(evt);
                 if (!_started) {
