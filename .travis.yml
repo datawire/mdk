@@ -8,4 +8,8 @@ install:
   - sudo update-alternatives --set ruby /usr/bin/ruby2.3
   - sudo update-alternatives --set gem /usr/bin/gem2.3
 script:
+  - ls
+  - ruby --version
+  - gem --version
+  - env
   - cd datawire/mdk && .travis-test.sh
