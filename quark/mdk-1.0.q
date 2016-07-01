@@ -28,9 +28,16 @@ namespace msdk {
 
     interface MDK {
 
+        @doc("""Start the uplink.""")
         void start();
 
+        @doc("""Stop the uplink.""")
         void stop();
+
+        @doc("""
+            Join a new context, likely because we received it over the wire.
+        """)
+        void join_context(SharedContext ctx);
 
         void register(String service, String version, String address);
 
@@ -40,13 +47,16 @@ namespace msdk {
 
         Node resolve_until(String service, String version, float timeout);
 
-        void begin();
-
+        @doc("Retrieve our existing context.")
         SharedContext context();
+
+        @doc("Start an interaction.")
+        void start_interaction();
 
         void fail(String message);
 
-        void end();
+        @doc("Finish an interaction.")
+        void finish_interaction();
 
         void protect(UnaryCallable callable);
 
@@ -72,12 +82,15 @@ namespace msdk {
         Tracer _tracer;
 
         List<Node> _resolved = [];
+        String procUUID = mdk.protocol.uuid4();
 
         MDKImpl() {
             _disco.url = _get("MDK_DISCOVERY_URL", "wss://discovery-develop.datawire.io");
             _disco.token = DatawireToken.getToken();
-            _tracer = Tracer.withURLsAndToken(_get("MDK_TRACING_URL", "wss://tracing-develop.datawire.io/ws"), "",
-                                              _disco.token);
+
+            String tracingURL = _get("MDK_TRACING_URL", "wss://tracing-develop.datawire.io/ws");
+
+            _tracer = Tracer.withURLsAndToken(tracingURL, "", _disco.token).withProcUUID(self.procUUID);
         }
 
         float _timeout() {

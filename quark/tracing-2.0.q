@@ -91,6 +91,11 @@ namespace mdk_tracing {
             return newTracer;           
         }
 
+        Tracer withProcUUID(String procUUID) {
+            self.getContext().withProcUUID(procUUID);
+            return self;
+        }
+
         void _openIfNeeded() {
             if (_client == null) {
                 _client = new protocol.TracingClient(self);
@@ -107,12 +112,20 @@ namespace mdk_tracing {
             }
         }
 
-        void setContext(SharedContext context) {
+        void joinContext(SharedContext context) {
             _context.setValue(context);
         }
 
         SharedContext getContext() {
             return _context.getValue();
+        }
+
+        void start_interaction() {
+            self.joinContext(self.getContext().start_interaction());
+        }
+
+        void finish_interaction() {
+            self.joinContext(self.getContext().finish_interaction());
         }
 
         void startRequest(String url) {
@@ -135,12 +148,15 @@ namespace mdk_tracing {
         }
 
         void logRecord(LogRecord record) {
+            self._openIfNeeded();
+
             LogEvent evt = new LogEvent();
-            evt.context = getContext();
+            SharedContext ctx = self.getContext();
+            ctx.tick();
+            logger.info("CTX " + ctx.toString());
+            evt.context = ctx;
             evt.timestamp = now();
             evt.record = record;
-
-            self._openIfNeeded();
 
             _client.log(evt);
         }
