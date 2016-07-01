@@ -239,20 +239,24 @@ namespace mdk_protocol {
             return ?Serializable.decodeClassName("mdk_protocol.SharedContext", encoded);
         }
 
-        String key() {
-            String clockStr = "";
+        String clockStr(String pfx) {
+            String cs = "";
 
             if (self.clock != null) {
-                clockStr = ":" + self.clock.key();
+                cs = pfx + self.clock.key();
             }
 
-            return self.traceId + clockStr;
+            return cs;
+        }
+
+        String key() {
+            return self.traceId + self.clockStr(":");
         }
 
         // XXX Not automagically mapped to str() or the like, even though
         // something should be.
         String toString() {
-            return "<SharedContext " + self.key() + ">";
+            return "<SCTX t:" + self.traceId + " p:" + procUUID + self.clockStr(" c:") + ">";
         }
 
         @doc("""

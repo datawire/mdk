@@ -338,7 +338,9 @@ namespace mdk_tracing {
             }
 
             String toString() {
-                return "LogEvent(" + context.toString() + ", " + timestamp.toString() + ", " + record.toString() + ")";
+                return "<LogEvent @" + timestamp.toString() +
+                       " " + context.toString() +
+                       ", " + record.toString() + ">";
             }
 
         }

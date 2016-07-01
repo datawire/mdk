@@ -13,7 +13,6 @@ def goodHandler(result):
 	# logging.info("Good!")
 
 	for record in result:
-		print(record.context.toString())
 		logging.info(record.toString())
 		
 def badHandler(result):
