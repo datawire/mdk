@@ -79,7 +79,7 @@ fi
 
 # Compile quark packages.
 echo "== Compiling the MDK"
-quark install $LANGUAGE https://raw.githubusercontent.com/datawire/mdk/${BRANCH}/quark/mdk-1.0.q
+quark install $LANGUAGE https://raw.githubusercontent.com/datawire/mdk/${BRANCH}/quark/mdk-2.0.q
 
 # All done.
 echo "== All done"
