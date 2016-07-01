@@ -34,10 +34,10 @@ namespace mdk {
         @doc("""Stop the uplink.""")
         void stop();
 
-        @doc("""
+        /*@doc("""
             Join a new context, likely because we received it over the wire.
         """)
-        void join_context(SharedContext ctx);
+        void join_context(SharedContext ctx);*/
 
         void register(String service, String version, String address);
 
@@ -58,7 +58,7 @@ namespace mdk {
         @doc("Finish an interaction.")
         void finish_interaction();
 
-        void protect(UnaryCallable callable);
+        void interact(UnaryCallable callable);
 
         void log(String level, String category, String text);
 
