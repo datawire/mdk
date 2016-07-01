@@ -6,8 +6,8 @@ import time
 
 import quark
 
-tracer = mdk_tracing.Tracer.withURLsAndToken("ws://localhost:52690/ws", None, None)
-# tracer = mdk_tracing.Tracer.withURLsAndToken("wss://tracing-develop.datawire.io/ws", None, None)
+# tracer = mdk_tracing.Tracer.withURLsAndToken("ws://localhost:52690/ws", None, None)
+tracer = mdk_tracing.Tracer.withURLsAndToken("wss://tracing-develop.datawire.io/ws", None, None)
 
 def goodHandler(result):
 	# logging.info("Good!")

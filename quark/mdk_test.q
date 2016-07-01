@@ -57,7 +57,8 @@ class TracingTest extends MockRuntimeTest {
         } else {
             url = tracer.url;
         }
-        tracer.log("DEBUG", "blah", "testing...");
+        tracer.initContext();
+        tracer.log("procUUID", "DEBUG", "blah", "testing...");
         self.pump();
         SocketEvent sev = self.expectSocket(url + "?token=" + tracer.token);
         if (sev == null) { return; }

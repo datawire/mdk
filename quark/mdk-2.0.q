@@ -34,11 +34,6 @@ namespace mdk {
         @doc("""Stop the uplink.""")
         void stop();
 
-        /*@doc("""
-            Join a new context, likely because we received it over the wire.
-        """)
-        void join_context(SharedContext ctx);*/
-
         void register(String service, String version, String address);
 
         Promise _resolve(String service, String version);
@@ -50,6 +45,10 @@ namespace mdk {
         @doc("Retrieve our existing context.")
         SharedContext context();
 
+        @doc("Join an existing context.")
+        void join_context(SharedContext context);
+        void join_encoded_context(String encodedContext);
+
         @doc("Start an interaction.")
         void start_interaction();
 
@@ -59,8 +58,6 @@ namespace mdk {
         void finish_interaction();
 
         void interact(UnaryCallable callable);
-
-        void log(String level, String category, String text);
 
         void critical(String category, String text);
 
@@ -90,7 +87,7 @@ namespace mdk {
 
             String tracingURL = _get("MDK_TRACING_URL", "wss://tracing-develop.datawire.io/ws");
 
-            _tracer = Tracer.withURLsAndToken(tracingURL, "", _disco.token).withProcUUID(self.procUUID);
+            _tracer = Tracer.withURLsAndToken(tracingURL, "", _disco.token);
         }
 
         float _timeout() {
@@ -115,34 +112,34 @@ namespace mdk {
             _tracer.stop();
         }
 
-        void log(String level, String category, String text) {
-            _tracer.log(level, category, text);
+        void _log(String level, String category, String text) {
+            _tracer.log(self.procUUID, level, category, text);
         }
 
         void critical(String category, String text) {
             // XXX: no critical
             logger.error(category + ": " + text);
-            log("CRITICAL", category, text);
+            _log("CRITICAL", category, text);
         }
 
         void error(String category, String text) {
             logger.error(category + ": " + text);
-            log("ERROR", category, text);
+            _log("ERROR", category, text);
         }
 
         void warn(String category, String text) {
             logger.warn(category + ": " + text);
-            log("WARN", category, text);
+            _log("WARN", category, text);
         }
 
         void info(String category, String text) {
             logger.info(category + ": " + text);
-            log("INFO", category, text);
+            _log("INFO", category, text);
         }
 
         void debug(String category, String text) {
             logger.debug(category + ": " + text);
-            log("DEBUG", category, text);
+            _log("DEBUG", category, text);
         }
 
         Node _resolvedCallback(Node result) {
@@ -169,11 +166,24 @@ namespace mdk {
         }
 
         void start_interaction() {
-            _tracer.start_interaction();
+            // _tracer.start_span();
         }
 
         SharedContext context() {
             return _tracer.getContext();
+        }
+
+        void init_context() {
+            _tracer.initContext();
+        }
+
+        @doc("Join an existing context.")
+        void join_context(SharedContext context) {
+            _tracer.joinContext(context);
+        }
+
+        void join_encoded_context(String encodedContext) {
+            _tracer.joinEncodedContext(encodedContext);
         }
 
         void fail(String message) {
@@ -207,7 +217,7 @@ namespace mdk {
                 idx = idx + 1;
             }
 
-            _tracer.finish_interaction();
+            // _tracer.finish_span();
         }
 
         void interact(UnaryCallable cmd) {
