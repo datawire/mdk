@@ -6,6 +6,9 @@ import mdk
 import uuid
 import time
 
+# hackery here
+import mdk_protocol
+
 EVENT_TIMES = {
     'RELEASE': 1468414800,      # 20160713T090000-0400
     'CHRISTMAS': 1482642000,    # 20161225T000000-0400
@@ -24,20 +27,19 @@ def service(callable):
     def callable_as_service(*args, **kwargs):
         print("calling as service (%s)" % svcProcUUID)
 
-        # hackery here
+        # hackery here -- we're pretending that we've just crossed into a different node
         encodedContext = m.context().encode()
+        savedProcUUID = m.procUUID
+        m.procUUID = svcProcUUID
+        m._tracer.start_span()
 
-        m.start_interaction()
-        time.sleep(1)
-        m.context().withProcUUID(svcProcUUID)
         result = callable(*args, **kwargs)
-        m.finish_interaction()
-        time.sleep(1)
 
         # hackery here
-        m.join_encoded_context(encodedContext)
-        m.context().tick()
-        
+        m._tracer._context.setValue(mdk_protocol.SharedContext.decode(encodedContext))
+        m.procUUID = savedProcUUID
+        m._tracer.getContext().tick()
+
         return result
 
     return callable_as_service
@@ -94,11 +96,12 @@ def delta_time(now, event):
 import mdk
 m = mdk.init()
 m.start()
+m.init_context()
 
-logAndSleep(m, "mainline", "get-times starting")
+# logAndSleep(m, "mainline", "get-times starting")
 
-m._tracer.startRequest("get-times")
-time.sleep(1)
+# m._tracer.startRequest("get-times")
+# time.sleep(1)
 
 logAndSleep(m, "mainline", "getting current time")
 
@@ -106,16 +109,25 @@ now = current_time()
 
 logAndSleep(m, "mainline", "current time %d" % now)
 
+logAndSleep(m, "mainline", "looking for time till release")
+
 delta = delta_time(now, 'RELEASE')
 
 logAndSleep(m, "mainline", "time till release: %ds" % delta)
+
+logAndSleep(m, "mainline", "looking for time till Christmas")
 
 delta = delta_time(now, 'CHRISTMAS')
 
 logAndSleep(m, "mainline", "time till Christmas: %ds" % delta)
 
+logAndSleep(m, "mainline", "looking for time till Olympics")
+
 delta = delta_time(now, 'OLYMPICS')
 
 logAndSleep(m, "mainline", "time till Olympics: %ds" % delta)
 
-m._tracer.endRequest()
+# m._tracer.endRequest()
+
+logAndSleep(m, "mainline", "finished!")
+

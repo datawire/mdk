@@ -45,7 +45,8 @@ namespace mdk_tracing {
 
     class SharedContextInitializer extends TLSInitializer<SharedContext> {
         SharedContext getValue() {
-            return new SharedContext();
+            return null;
+            // return new SharedContext();
         }
     }
 
@@ -57,9 +58,6 @@ namespace mdk_tracing {
 
         String token;
         long lastPoll = 0L;
-
-        // String url = 'wss://localhost:52690/ws';
-        // String queryURL = 'https://localhost:52690/api/logs';
 
         TLS<SharedContext> _context = new TLS<SharedContext>(new SharedContextInitializer());
         protocol.TracingClient _client;
@@ -107,25 +105,31 @@ namespace mdk_tracing {
             }
         }
 
+        void initContext() {
+            // Implicitly creates a span for you.
+            _context.setValue(new SharedContext());
+        }
+
         void joinContext(SharedContext context) {
-            _context.setValue(context);
+            _context.setValue(context.start_span());
+            // Always open a new span when joining a context.
         }
 
         void joinEncodedContext(String encodedContext) {
             SharedContext newContext = SharedContext.decode(encodedContext);
             self.joinContext(newContext);
         }
-        
+
         SharedContext getContext() {
             return _context.getValue();
         }
 
-        void start_interaction() {
-            self.joinContext(self.getContext().start_interaction());
+        void start_span() {
+            _context.setValue(self.getContext().start_span());
         }
 
-        void finish_interaction() {
-            self.joinContext(self.getContext().finish_interaction());
+        void finish_span() {
+            _context.setValue(self.getContext().finish_span());
         }
 
         void startRequest(String url) {

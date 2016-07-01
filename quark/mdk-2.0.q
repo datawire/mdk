@@ -168,11 +168,15 @@ namespace mdk {
         }
 
         void start_interaction() {
-            _tracer.start_interaction();
+            // _tracer.start_span();
         }
 
         SharedContext context() {
             return _tracer.getContext();
+        }
+
+        void init_context() {
+            _tracer.initContext();
         }
 
         @doc("Join an existing context.")
@@ -215,7 +219,7 @@ namespace mdk {
                 idx = idx + 1;
             }
 
-            _tracer.finish_interaction();
+            // _tracer.finish_span();
         }
 
         void interact(UnaryCallable cmd) {
