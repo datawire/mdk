@@ -59,8 +59,6 @@ namespace mdk {
 
         void interact(UnaryCallable callable);
 
-        void log(String level, String category, String text);
-
         void critical(String category, String text);
 
         void error(String category, String text);
