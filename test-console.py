@@ -1,18 +1,19 @@
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
-import tracing
+import mdk_tracing
 import time
 
 import quark
 
-# tracer = tracing.Tracer.withURLsAndToken("ws://localhost:52690/ws", None, "fakeToken")
-tracer = tracing.Tracer.withURLsAndToken("wss://tracing-develop.datawire.io/ws", None, None)
+tracer = mdk_tracing.Tracer.withURLsAndToken("ws://localhost:52690/ws", None, None)
+# tracer = mdk_tracing.Tracer.withURLsAndToken("wss://tracing-develop.datawire.io/ws", None, None)
 
 def goodHandler(result):
 	# logging.info("Good!")
 
 	for record in result:
+		print(record.context.toString())
 		logging.info(record.toString())
 		
 def badHandler(result):

@@ -42,7 +42,6 @@ something like
 """)
 
 namespace tracing {
-
     class SharedContextInitializer extends TLSInitializer<SharedContext> {
         SharedContext getValue() {
             return new SharedContext();
@@ -91,6 +90,11 @@ namespace tracing {
             return newTracer;           
         }
 
+        Tracer withProcUUID(String procUUID) {
+            self.getContext().withProcUUID(procUUID);
+            return self;
+        }
+
         void _openIfNeeded() {
             if (_client == null) {
                 _client = new protocol.TracingClient(self);
@@ -107,7 +111,7 @@ namespace tracing {
             }
         }
 
-        void setContext(SharedContext context) {
+        void joinContext(SharedContext context) {
             _context.setValue(context);
         }
 

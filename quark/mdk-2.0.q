@@ -18,8 +18,8 @@ import quark.concurrent;
 
 namespace mdk {
 
-    String _get(String key, String value) {
-        return os.Environment.ENV.get(key, value);
+    String _get(String name, String value) {
+        return os.Environment.ENV.get(name, value);
     }
 
     MDK init() {
@@ -28,9 +28,16 @@ namespace mdk {
 
     interface MDK {
 
+        @doc("""Start the uplink.""")
         void start();
 
+        @doc("""Stop the uplink.""")
         void stop();
+
+        @doc("""
+            Join a new context, likely because we received it over the wire.
+        """)
+        void join_context(SharedContext ctx);
 
         void register(String service, String version, String address);
 
@@ -40,13 +47,16 @@ namespace mdk {
 
         Node resolve_until(String service, String version, float timeout);
 
-        void begin();
-
+        @doc("Retrieve our existing context.")
         SharedContext context();
+
+        @doc("Start an interaction.")
+        void start_interaction();
 
         void fail(String message);
 
-        void end();
+        @doc("Finish an interaction.")
+        void finish_interaction();
 
         void protect(UnaryCallable callable);
 
@@ -72,12 +82,15 @@ namespace mdk {
         Tracer _tracer;
 
         List<Node> _resolved = [];
+        String procUUID = mdk_protocol.uuid4();
 
         MDKImpl() {
             _disco.url = _get("MDK_DISCOVERY_URL", "wss://discovery-develop.datawire.io");
             _disco.token = DatawireToken.getToken();
-            _tracer = Tracer.withURLsAndToken(_get("MDK_TRACING_URL", "wss://tracing-develop.datawire.io/ws"), "",
-                                              _disco.token);
+
+            String tracingURL = _get("MDK_TRACING_URL", "wss://tracing-develop.datawire.io/ws");
+
+            _tracer = Tracer.withURLsAndToken(tracingURL, "", _disco.token).withProcUUID(self.procUUID);
         }
 
         float _timeout() {
@@ -155,8 +168,8 @@ namespace mdk {
                                         "service " + service + "(" + version + ")");
         }
 
-        void begin() {
-            // XXX: pushes a level on the stack
+        void start_interaction() {
+            _tracer.start_interaction();
         }
 
         SharedContext context() {
@@ -181,7 +194,7 @@ namespace mdk {
             self.error("integration", text);
         }
 
-        void end() {
+        void finish_interaction() {
             // XXX: pops a level off the stack
             List<Node> nodes = _resolved;
             _resolved = [];
@@ -193,12 +206,14 @@ namespace mdk {
                 // activate circuit breaker logic
                 idx = idx + 1;
             }
+
+            _tracer.finish_interaction();
         }
 
-        void protect(UnaryCallable cmd) {
-            begin();
+        void interact(UnaryCallable cmd) {
+            start_interaction();
             cmd.__call__(self);
-            end();
+            finish_interaction();
         }
 
     }
