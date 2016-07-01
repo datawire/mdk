@@ -167,7 +167,10 @@ namespace mdk_tracing {
         }
 
         Promise poll() {
+            // XXX: this shouldn't really be necessary
             self._openIfNeeded();
+
+            logger.info("Polling for logs...");
 
             long rightNow = now();
             Promise result = query(lastPoll, rightNow);
@@ -176,6 +179,7 @@ namespace mdk_tracing {
         }
 
         List<LogEvent> deresultify(api.GetLogEventsResult result) {
+            logger.info("got " + result.result.size().toString() + " log events");
             return result.result;
         }
 
