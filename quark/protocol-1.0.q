@@ -101,7 +101,7 @@ namespace mdk_protocol {
         // XXX this could work a lot nicer with a parameterized method
         // in Serialize and a static class reference
         static LamportClock decode(String encoded) {
-            return ?Serializable.decodeClassName("mdk.protocol.LamportClock", encoded);
+            return ?Serializable.decodeClassName("mdk_protocol.LamportClock", encoded);
         }       
 
         @doc("""
@@ -236,11 +236,17 @@ namespace mdk_protocol {
         // XXX this could work a lot nicer with a parameterized method
         // in Serialize and a static class reference
         static SharedContext decode(String encoded) {
-            return ?Serializable.decodeClassName("mdk.protocol.SharedContext", encoded);
+            return ?Serializable.decodeClassName("mdk_protocol.SharedContext", encoded);
         }
 
         String key() {
-            return self.traceId + ":" + self.clock.key();
+            String clockStr = "";
+
+            if (self.clock != null) {
+                clockStr = ":" + self.clock.key();
+            }
+
+            return self.traceId + clockStr;
         }
 
         // XXX Not automagically mapped to str() or the like, even though
@@ -283,7 +289,7 @@ namespace mdk_protocol {
             NOTE WELL: THIS RETURNS A NEW SharedContext RATHER THAN MODIFYING THIS ONE. It is NOT SUPPORTED
             to modify the causality level of a SharedContext in place.
         """)
-        SharedContext end_op() {
+        SharedContext finish_op() {
             // Duplicate this object...
             SharedContext newContext = SharedContext.decode(self.encode());
 
@@ -311,7 +317,7 @@ namespace mdk_protocol {
 
     class Open extends ProtocolEvent {
 
-        static Discriminator _discriminator = anyof(["open", "mdk.protocol.Open", "discovery.protocol.Open"]);
+        static Discriminator _discriminator = anyof(["open", "mdk_protocol.Open", "discovery.protocol.Open"]);
 
         String version = "2.0.0";
 
@@ -339,7 +345,7 @@ namespace mdk_protocol {
     @doc("Close the event stream.")
     class Close extends ProtocolEvent {
 
-        static Discriminator _discriminator = anyof(["close", "mdk.protocol.Close", "discovery.protocol.Close"]);
+        static Discriminator _discriminator = anyof(["close", "mdk_protocol.Close", "discovery.protocol.Close"]);
 
         ProtocolError error;
 

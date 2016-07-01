@@ -112,12 +112,20 @@ namespace mdk_tracing {
             }
         }
 
-        void setContext(SharedContext context) {
+        void joinContext(SharedContext context) {
             _context.setValue(context);
         }
 
         SharedContext getContext() {
             return _context.getValue();
+        }
+
+        void start_op() {
+            self.joinContext(self.getContext().start_op());
+        }
+
+        void finish_op() {
+            self.joinContext(self.getContext().finish_op());
         }
 
         void startRequest(String url) {
@@ -140,12 +148,15 @@ namespace mdk_tracing {
         }
 
         void logRecord(LogRecord record) {
+            self._openIfNeeded();
+
             LogEvent evt = new LogEvent();
-            evt.context = getContext();
+            SharedContext ctx = self.getContext();
+            ctx.tick();
+            logger.info("CTX " + ctx.toString());
+            evt.context = ctx;
             evt.timestamp = now();
             evt.record = record;
-
-            self._openIfNeeded();
 
             _client.log(evt);
         }

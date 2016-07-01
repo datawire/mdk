@@ -111,7 +111,7 @@ namespace tracing {
             }
         }
 
-        void setContext(SharedContext context) {
+        void joinContext(SharedContext context) {
             _context.setValue(context);
         }
 

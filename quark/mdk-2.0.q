@@ -168,8 +168,8 @@ namespace mdk {
                                         "service " + service + "(" + version + ")");
         }
 
-        void begin() {
-            // XXX: pushes a level on the stack
+        void start_op() {
+            _tracer.start_op();
         }
 
         SharedContext context() {
@@ -194,7 +194,7 @@ namespace mdk {
             self.error("integration", text);
         }
 
-        void end() {
+        void finish_op() {
             // XXX: pops a level off the stack
             List<Node> nodes = _resolved;
             _resolved = [];
@@ -206,12 +206,14 @@ namespace mdk {
                 // activate circuit breaker logic
                 idx = idx + 1;
             }
+
+            _tracer.finish_op();
         }
 
         void protect(UnaryCallable cmd) {
-            begin();
+            start_op();
             cmd.__call__(self);
-            end();
+            finish_op();
         }
 
     }
