@@ -114,34 +114,34 @@ namespace mdk {
             _tracer.stop();
         }
 
-        void log(String level, String category, String text) {
+        void _log(String level, String category, String text) {
             _tracer.log(level, category, text);
         }
 
         void critical(String category, String text) {
             // XXX: no critical
             logger.error(category + ": " + text);
-            log("CRITICAL", category, text);
+            _log("CRITICAL", category, text);
         }
 
         void error(String category, String text) {
             logger.error(category + ": " + text);
-            log("ERROR", category, text);
+            _log("ERROR", category, text);
         }
 
         void warn(String category, String text) {
             logger.warn(category + ": " + text);
-            log("WARN", category, text);
+            _log("WARN", category, text);
         }
 
         void info(String category, String text) {
             logger.info(category + ": " + text);
-            log("INFO", category, text);
+            _log("INFO", category, text);
         }
 
         void debug(String category, String text) {
             logger.debug(category + ": " + text);
-            log("DEBUG", category, text);
+            _log("DEBUG", category, text);
         }
 
         Node _resolvedCallback(Node result) {
