@@ -91,11 +91,6 @@ namespace mdk_tracing {
             return newTracer;           
         }
 
-        Tracer withProcUUID(String procUUID) {
-            self.getContext().withProcUUID(procUUID);
-            return self;
-        }
-
         void _openIfNeeded() {
             if (_client == null) {
                 _client = new protocol.TracingClient(self);
@@ -144,8 +139,9 @@ namespace mdk_tracing {
             logRecord(end);
         }
 
-        void log(String level, String category, String text) {
+        void log(String procUUID, String level, String category, String text) {
             LogMessage msg = new LogMessage();
+            msg.node = procUUID;
             msg.level = level;
             msg.category = category;
             msg.text = text;

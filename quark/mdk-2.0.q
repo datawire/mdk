@@ -89,7 +89,7 @@ namespace mdk {
 
             String tracingURL = _get("MDK_TRACING_URL", "wss://tracing-develop.datawire.io/ws");
 
-            _tracer = Tracer.withURLsAndToken(tracingURL, "", _disco.token).withProcUUID(self.procUUID);
+            _tracer = Tracer.withURLsAndToken(tracingURL, "", _disco.token);
         }
 
         float _timeout() {
@@ -115,7 +115,7 @@ namespace mdk {
         }
 
         void _log(String level, String category, String text) {
-            _tracer.log(level, category, text);
+            _tracer.log(self.procUUID, level, category, text);
         }
 
         void critical(String category, String text) {

@@ -200,11 +200,6 @@ namespace mdk_protocol {
         String traceId = uuid4();
 
         @doc("""
-             Every SharedContext holds the procUUID of the process it's attached to.
-        """)
-        String procUUID = uuid4();
-
-        @doc("""
             To track causality, we use a Lamport clock.
         """)
         LamportClock clock = new LamportClock();
@@ -219,12 +214,6 @@ namespace mdk_protocol {
 
         SharedContext() {
             self._lastEntry = self.clock.enter();           
-        }
-
-        @doc("""Set the procUUID for this SharedContext.""")
-        SharedContext withProcUUID(String procUUID) {
-            self.procUUID = procUUID;
-            return self;
         }
 
         @doc("""Set the traceId for this SharedContext.""")
@@ -256,7 +245,7 @@ namespace mdk_protocol {
         // XXX Not automagically mapped to str() or the like, even though
         // something should be.
         String toString() {
-            return "<SCTX t:" + self.traceId + " p:" + procUUID + self.clockStr(" c:") + ">";
+            return "<SCTX t:" + self.traceId + self.clockStr(" c:") + ">";
         }
 
         @doc("""
