@@ -116,6 +116,11 @@ namespace mdk_tracing {
             _context.setValue(context);
         }
 
+        void joinEncodedContext(String encodedContext) {
+            SharedContext newContext = SharedContext.decode(encodedContext);
+            self.joinContext(newContext);
+        }
+        
         SharedContext getContext() {
             return _context.getValue();
         }

@@ -34,11 +34,6 @@ namespace mdk {
         @doc("""Stop the uplink.""")
         void stop();
 
-        /*@doc("""
-            Join a new context, likely because we received it over the wire.
-        """)
-        void join_context(SharedContext ctx);*/
-
         void register(String service, String version, String address);
 
         Promise _resolve(String service, String version);
@@ -49,6 +44,10 @@ namespace mdk {
 
         @doc("Retrieve our existing context.")
         SharedContext context();
+
+        @doc("Join an existing context.")
+        void join_context(SharedContext context);
+        void join_encoded_context(String encodedContext);
 
         @doc("Start an interaction.")
         void start_interaction();
@@ -174,6 +173,15 @@ namespace mdk {
 
         SharedContext context() {
             return _tracer.getContext();
+        }
+
+        @doc("Join an existing context.")
+        void join_context(SharedContext context) {
+            _tracer.joinContext(context);
+        }
+
+        void join_encoded_context(String encodedContext) {
+            _tracer.joinEncodedContext(encodedContext);
         }
 
         void fail(String message) {

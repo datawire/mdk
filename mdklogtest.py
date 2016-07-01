@@ -25,16 +25,19 @@ def service(callable):
         print("calling as service (%s)" % svcProcUUID)
 
         # hackery here
-        savedProcUUID = m.context().procUUID
+        encodedContext = m.context().encode()
 
         m.start_interaction()
+        time.sleep(1)
         m.context().withProcUUID(svcProcUUID)
         result = callable(*args, **kwargs)
         m.finish_interaction()
+        time.sleep(1)
 
         # hackery here
-        m.context().withProcUUID(savedProcUUID)
-
+        m.join_encoded_context(encodedContext)
+        m.context().tick()
+        
         return result
 
     return callable_as_service
@@ -95,6 +98,7 @@ m.start()
 logAndSleep(m, "mainline", "get-times starting")
 
 m._tracer.startRequest("get-times")
+time.sleep(1)
 
 logAndSleep(m, "mainline", "getting current time")
 
