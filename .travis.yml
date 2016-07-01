@@ -1,0 +1,16 @@
+sudo: required
+dist: trusty
+install:
+  - sudo apt-get -y install software-properties-common
+  - sudo add-apt-repository -y ppa:brightbox/ruby-ng
+  - sudo apt-get -y update
+  - sudo apt-get -y install ruby2.3 ruby2.3-dev
+  - sudo update-alternatives --set ruby /usr/bin/ruby2.3
+  - sudo update-alternatives --set gem /usr/bin/gem2.3
+  - rvm use system
+script:
+  - ls -a
+  - ruby --version
+  - gem --version
+  - env
+  - ./.travis-test.sh

@@ -373,3 +373,11 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
 }
+
+
+class MDKHighLevelAPITest {
+    // It's possible to call the MDK init().
+    void testInit() {
+        mdk.init();
+    }
+}
