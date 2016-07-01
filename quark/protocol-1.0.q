@@ -317,7 +317,8 @@ namespace mdk_protocol {
 
     class Open extends ProtocolEvent {
 
-        static Discriminator _discriminator = anyof(["open", "mdk_protocol.Open", "discovery.protocol.Open"]);
+        // Allow the old "mdk.protocol.Open" to work here.
+        static Discriminator _discriminator = anyof(["open", "mdk.protocol.Open", "discovery.protocol.Open"]);
 
         String version = "2.0.0";
 
@@ -345,7 +346,8 @@ namespace mdk_protocol {
     @doc("Close the event stream.")
     class Close extends ProtocolEvent {
 
-        static Discriminator _discriminator = anyof(["close", "mdk_protocol.Close", "discovery.protocol.Close"]);
+        // Allow the old "mdk.protocol.Close" to work here.
+        static Discriminator _discriminator = anyof(["close", "mdk.protocol.Close", "discovery.protocol.Close"]);
 
         ProtocolError error;
 
