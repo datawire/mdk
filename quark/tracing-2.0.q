@@ -120,12 +120,12 @@ namespace mdk_tracing {
             return _context.getValue();
         }
 
-        void start_op() {
-            self.joinContext(self.getContext().start_op());
+        void start_interaction() {
+            self.joinContext(self.getContext().start_interaction());
         }
 
-        void finish_op() {
-            self.joinContext(self.getContext().finish_op());
+        void finish_interaction() {
+            self.joinContext(self.getContext().finish_interaction());
         }
 
         void startRequest(String url) {

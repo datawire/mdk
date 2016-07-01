@@ -50,13 +50,13 @@ namespace msdk {
         @doc("Retrieve our existing context.")
         SharedContext context();
 
-        @doc("Start an 'operation'.")
-        void start_op();
+        @doc("Start an interaction.")
+        void start_interaction();
 
         void fail(String message);
 
-        @doc("Finish an 'operation'.")
-        void finish_op();
+        @doc("Finish an interaction.")
+        void finish_interaction();
 
         void protect(UnaryCallable callable);
 

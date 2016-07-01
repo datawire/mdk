@@ -50,13 +50,13 @@ namespace mdk {
         @doc("Retrieve our existing context.")
         SharedContext context();
 
-        @doc("Start an 'operation'.")
-        void start_op();
+        @doc("Start an interaction.")
+        void start_interaction();
 
         void fail(String message);
 
-        @doc("Finish an 'operation'.")
-        void finish_op();
+        @doc("Finish an interaction.")
+        void finish_interaction();
 
         void protect(UnaryCallable callable);
 
@@ -168,8 +168,8 @@ namespace mdk {
                                         "service " + service + "(" + version + ")");
         }
 
-        void start_op() {
-            _tracer.start_op();
+        void start_interaction() {
+            _tracer.start_interaction();
         }
 
         SharedContext context() {
@@ -194,7 +194,7 @@ namespace mdk {
             self.error("integration", text);
         }
 
-        void finish_op() {
+        void finish_interaction() {
             // XXX: pops a level off the stack
             List<Node> nodes = _resolved;
             _resolved = [];
@@ -207,13 +207,13 @@ namespace mdk {
                 idx = idx + 1;
             }
 
-            _tracer.finish_op();
+            _tracer.finish_interaction();
         }
 
-        void protect(UnaryCallable cmd) {
-            start_op();
+        void interact(UnaryCallable cmd) {
+            start_interaction();
             cmd.__call__(self);
-            finish_op();
+            finish_interaction();
         }
 
     }

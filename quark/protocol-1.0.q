@@ -268,7 +268,7 @@ namespace mdk_protocol {
             NOTE WELL: THIS RETURNS A NEW SharedContext RATHER THAN MODIFYING THIS ONE. It is NOT SUPPORTED
             to modify the causality level of a SharedContext in place.
         """)
-        SharedContext start_op() {
+        SharedContext start_interaction() {
             // Tick first.
             self.tick();
             
@@ -289,7 +289,7 @@ namespace mdk_protocol {
             NOTE WELL: THIS RETURNS A NEW SharedContext RATHER THAN MODIFYING THIS ONE. It is NOT SUPPORTED
             to modify the causality level of a SharedContext in place.
         """)
-        SharedContext finish_op() {
+        SharedContext finish_interaction() {
             // Duplicate this object...
             SharedContext newContext = SharedContext.decode(self.encode());
 
