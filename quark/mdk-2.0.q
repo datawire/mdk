@@ -42,6 +42,8 @@ namespace mdk {
 
         Node resolve_until(String service, String version, float timeout);
 
+        void init_context();
+
         @doc("Retrieve our existing context.")
         SharedContext context();
 
@@ -88,6 +90,7 @@ namespace mdk {
             String tracingURL = _get("MDK_TRACING_URL", "wss://tracing-develop.datawire.io/ws");
 
             _tracer = Tracer.withURLsAndToken(tracingURL, "", _disco.token);
+            _tracer.initContext();
         }
 
         float _timeout() {
