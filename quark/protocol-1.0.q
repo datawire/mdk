@@ -466,15 +466,15 @@ namespace mdk_protocol {
         }
 
         void open(String url) {
+            sockUrl = url;
             String tok = token();
             if (tok != null) {
                 url = url + "?token=" + tok;
             }
 
-            logger.info("opening " + url);
+            logger.info("opening " + sockUrl);
 
             Context.runtime().open(url, self);
-            sockUrl = url;
         }
 
         void startup() {}

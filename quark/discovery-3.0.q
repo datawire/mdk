@@ -244,11 +244,8 @@ namespace mdk_discovery {
         void _lock() {
             mutex.acquire();
 
-            logger.info("locked");
-
             if (client == null) {
                 client = new DiscoClient(self);
-                logger.info("client ho!");
             }
         }
 
@@ -256,7 +253,6 @@ namespace mdk_discovery {
         // @doc("Release the lock")
         void _release() {
             mutex.release();
-            logger.info("released");
         }
 
         @doc("Connect to a specific discovery server. Most callers will just want")
