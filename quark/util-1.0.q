@@ -107,4 +107,40 @@ namespace mdk_util {
         return _jsresolve(p);
     }
 
+    void extend(List<String> list, String value, int size) {
+        while (list.size() < size) {
+            list.add(value);
+        }
+    }
+
+    bool versionMatch(String requested, String actual) {
+        // null means unspecified
+        if (requested == null) {
+            return true;
+        }
+
+        List<String> reqparts = requested.split(".");
+        List<String> actparts = actual.split(".");
+        extend(reqparts, "0", 3);
+        extend(actparts, "0", 3);
+
+        // major must be equal
+        if (reqparts[0] != actparts[0]) {
+            return false;
+        }
+
+        // if minor is greater than we want that's ok
+        if (actparts[1] > reqparts[1]) {
+            return true;
+        }
+
+        // if minor is less than we want, that's not ok
+        if (actparts[1] < reqparts[1]) {
+            return false;
+        }
+
+        // when minor is equal, we check the bug fix
+        return actparts[2] >= reqparts[2];
+    }
+
 }
