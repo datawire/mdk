@@ -151,7 +151,7 @@ namespace mdk {
         }
 
         Promise _resolve(String service, String version) {
-            return _disco._resolve(service).
+            return _disco._resolve(service, version).
                 andThen(bind(self, "_resolvedCallback", []));
         }
 

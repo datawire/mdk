@@ -62,24 +62,49 @@ import mdk_util;  // bring in EnvironmentVariable, WaitForPromise
 */
 
 namespace mdk_discovery {
+
+    class _Request {
+
+        String version;
+        PromiseFactory factory;
+
+        _Request(String version, PromiseFactory factory) {
+            self.version = version;
+            self.factory = factory;
+        }
+
+    }
+
     @doc("A Cluster is a group of providers of (possibly different versions of)")
     @doc("a single service. Each service provider is represented by a Node.")
     class Cluster {
         List<Node> nodes = [];
-        List<PromiseFactory> _waiting = [];
+        List<_Request> _waiting = [];
         int _counter = 0;
 
         @doc("Choose a single Node to talk to. At present this is a simple round")
         @doc("robin.")
         Node choose() {
-            if (nodes.size() > 0) {
-                int choice = _counter % nodes.size();
-                _counter = _counter + 1;
-                return nodes[choice];
+            return chooseVersion(null);
+        }
+
+        @doc("Choose a compatible version of a service to talk to.")
+        Node chooseVersion(String version) {
+            if (nodes.size() == 0) { return null; }
+
+            int start = _counter % nodes.size();
+            _counter = _counter + 1;
+            int count = 0;
+            while (count < nodes.size()) {
+                int choice = (start + count) % nodes.size();
+                Node candidate = nodes[choice];
+                if (versionMatch(version, candidate.version)) {
+                    return candidate;
+                }
+                count = count + 1;
             }
-            else {
-                return null;
-            }
+
+            return null;
         }
 
         @doc("Add a Node to the cluster (or, if it's already present in the cluster,")
@@ -88,14 +113,20 @@ namespace mdk_discovery {
         void add(Node node) {
             // Resolve waiting promises:
             if (self._waiting.size() > 0) {
-                List<PromiseFactory> waiting = self._waiting;
-                self._waiting = new List<PromiseFactory>();
+                List<_Request> waiting = self._waiting;
+                self._waiting = [];
                 int jdx = 0;
                 while (jdx < waiting.size()) {
-                    waiting[jdx].resolve(node);
+                    _Request req = waiting[jdx];
+                    if (versionMatch(req.version, node.version)) {
+                        req.factory.resolve(node);
+                    } else {
+                        self._waiting.add(req);
+                    }
                     jdx = jdx + 1;
                 }
             }
+
             // Update stored values:
             int idx = 0;
 
@@ -112,8 +143,8 @@ namespace mdk_discovery {
         }
 
         // Internal method, add PromiseFactory to fill in when a new Node is added.
-        void _addPromise(PromiseFactory factory) {
-            _waiting.add(factory);
+        void _addRequest(String version, PromiseFactory factory) {
+            _waiting.add(new _Request(version, factory));
         }
 
         @doc("Remove a Node from the cluster, if it's present. If it's not present, do")
@@ -167,7 +198,7 @@ namespace mdk_discovery {
 
     @doc("The Node class captures address and metadata information about a")
     @doc("server functioning as a service instance.")
-    class Node extends Future {
+    class Node {
         @doc("The service name.")
         String service;
         @doc("The service version (e.g. '1.2.3')")
@@ -357,46 +388,24 @@ namespace mdk_discovery {
             return self.register(node);
         }
 
-        bool _resolvedNode(Node result, Node returned) {
-            returned.service = result.service;
-            returned.address = result.address;
-            returned.version = result.version;
-            returned.finish(null);
-            return true;
-        }
-
-        @doc("TEMPORARY BACKWARDS COMPAT, remove as soon as everything switches over.")
-        @doc("When you delete this also make Node not extend Future.")
-        Node resolveNode(String service) {
-            Node result = new Node();
-            _resolve(service).andThen(bind(self, "_resolvedNode", [result]));
-            return result;
-        }
-
         @doc("Resolve a service name into an available service node. You must")
         @doc("usually start the uplink before this will do much; see start().")
         @doc("The returned Promise will end up with a Node as its value.")
-        Promise _resolve(String service) {
+        Promise _resolve(String service, String version) {
             PromiseFactory factory = new PromiseFactory();
 
+            self._lock();
+
             if (!services.contains(service)) {
-                self._lock();
                 services[service] = new Cluster();
-                self._release();
             }
 
-            if (services[service].isEmpty()) {
-                self._lock();
-                services[service]._addPromise(factory);
+            Node result = services[service].chooseVersion(version);
+            if (result == null) {
+                services[service]._addRequest(version, factory);
                 self._release();
-            }
-            else {
-                self._lock();
-                Node result = services[service].choose();
+            } else {
                 self._release();
-                if (result == null) {
-                    panic("We should have a result here, not null.");
-                }
                 factory.resolve(result);
             }
 
@@ -404,8 +413,8 @@ namespace mdk_discovery {
         }
 
         @doc("Resolve a service; return a (Bluebird) Promise on Javascript. Does not work elsewhere.")
-        Object resolve(String service) {
-            return toNativePromise(_resolve(service));
+        Object resolve(String service, String version) {
+            return toNativePromise(_resolve(service, version));
         }
 
         // XXX blocking API, never call from Javascript or Quark code.
@@ -413,8 +422,8 @@ namespace mdk_discovery {
         @doc("appropriately (typically by raising an exception if the language")
         @doc("supports it). This should only be used in blocking runtimes (e.g. ")
         @doc("you do not want to use this in Javascript).")
-        Node resolve_until(String service, float timeout) {
-            return ?WaitForPromise.wait(self._resolve(service), timeout, "service " + service);
+        Node resolve_until(String service, String version, float timeout) {
+            return ?WaitForPromise.wait(self._resolve(service, version), timeout, "service " + service);
         }
 
         // XXX PRIVATE API -- needs to not be here.
@@ -459,4 +468,5 @@ namespace mdk_discovery {
             self._release();
         }
     }
+    
 }

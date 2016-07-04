@@ -193,55 +193,50 @@ class DiscoveryTest extends MockRuntimeTest {
         checkEqualNodes(node, active.node);
     }
 
+    Node doActive(SocketEvent sev, String svc, String addr, String version) {
+        Active active = new Active();
+        active.node = new Node();
+        active.node.service = svc;
+        active.node.address = addr;
+        active.node.version = version;
+        sev.send(active.encode());
+        return active.node;
+    }
+
     void testResolvePreStart() {
         Discovery disco = new Discovery().connect();
 
-        Promise promise = disco._resolve("svc");
+        Promise promise = disco._resolve("svc", "1.0");
         checkEqual(false, promise.value().hasValue());
 
         SocketEvent sev = startDisco(disco);
         if (sev == null) { return; }
 
-        Active active = new Active();
-        active.node = new Node();
-        active.node.service = "svc";
-        active.node.address = "addr";
-        active.node.version = "1.2.3";
-        sev.send(active.encode());
+        Node node = doActive(sev, "svc", "addr", "1.2.3");
 
-        checkEqualNodes(active.node, ?promise.value().getValue());
+        checkEqualNodes(node, ?promise.value().getValue());
     }
 
     void testResolvePostStart() {
         Discovery disco = new Discovery().connect();
         SocketEvent sev = startDisco(disco);
 
-        Promise promise = disco._resolve("svc");
+        Promise promise = disco._resolve("svc", "1.0");
         checkEqual(false, promise.value().hasValue());
 
-        Active active = new Active();
-        active.node = new Node();
-        active.node.service = "svc";
-        active.node.address = "addr";
-        active.node.version = "1.2.3";
-        sev.send(active.encode());
+        Node node = doActive(sev, "svc", "addr", "1.2.3");
 
-        checkEqualNodes(active.node, ?promise.value().getValue());
+        checkEqualNodes(node, ?promise.value().getValue());
     }
 
     void testResolveAfterNotification() {
         Discovery disco = new Discovery().connect();
         SocketEvent sev = startDisco(disco);
 
-        Active active = new Active();
-        active.node = new Node();
-        active.node.service = "svc";
-        active.node.address = "addr";
-        active.node.version = "1.2.3";
-        sev.send(active.encode());
+        Node node = doActive(sev, "svc", "addr", "1.2.3");
 
-        Promise promise = disco._resolve("svc");
-        checkEqualNodes(active.node, ?promise.value().getValue());
+        Promise promise = disco._resolve("svc", "1.0");
+        checkEqualNodes(node, ?promise.value().getValue());
     }
 
     // This variant caught a bug in the code, so it's useful to have all of
@@ -249,66 +244,72 @@ class DiscoveryTest extends MockRuntimeTest {
     void testResolveBeforeAndBeforeNotification() {
         Discovery disco = new Discovery().connect();
         SocketEvent sev = startDisco(disco);
-        Promise promise = disco._resolve("svc");
-        Promise promise2 = disco._resolve("svc");
+        Promise promise = disco._resolve("svc", "1.0");
+        Promise promise2 = disco._resolve("svc", "1.0");
         checkEqual(false, promise.value().hasValue());
         checkEqual(false, promise2.value().hasValue());
 
-        Active active = new Active();
-        active.node = new Node();
-        active.node.service = "svc";
-        active.node.address = "addr";
-        active.node.version = "1.2.3";
-        sev.send(active.encode());
+        Node node = doActive(sev, "svc", "addr", "1.2.3");
 
-        checkEqualNodes(active.node, ?promise.value().getValue());
-        checkEqualNodes(active.node, ?promise2.value().getValue());
+        checkEqualNodes(node, ?promise.value().getValue());
+        checkEqualNodes(node, ?promise2.value().getValue());
     }
 
     void testResolveBeforeAndAfterNotification() {
         Discovery disco = new Discovery().connect();
         SocketEvent sev = startDisco(disco);
-        Promise promise = disco._resolve("svc");
+        Promise promise = disco._resolve("svc", "1.0");
 
-        Active active = new Active();
-        active.node = new Node();
-        active.node.service = "svc";
-        active.node.address = "addr";
-        active.node.version = "1.2.3";
-        sev.send(active.encode());
+        Node node = doActive(sev, "svc", "addr", "1.2.3");
 
-        Promise promise2 = disco._resolve("svc");
-        checkEqualNodes(active.node, ?promise.value().getValue());
-        checkEqualNodes(active.node, ?promise2.value().getValue());
+        Promise promise2 = disco._resolve("svc", "1.0");
+        checkEqualNodes(node, ?promise.value().getValue());
+        checkEqualNodes(node, ?promise2.value().getValue());
     }
 
     void testResolveDifferentActive() {
         Discovery disco = new Discovery().connect();
         SocketEvent sev = startDisco(disco);
 
-        Active active = new Active();
-        active.node = new Node();
-        active.node.service = "svc";
-        active.node.address = "addr";
-        active.node.version = "1.2.3";
-        sev.send(active.encode());
+        Node node = doActive(sev, "svc", "addr", "1.2.3");
+        doActive(sev, "svc2", "addr", "1.2.3");
 
-        Active active2 = new Active();
-        active2.node = new Node();
-        active2.node.service = "svc2";
-        active2.node.address = "addr";
-        active2.node.version = "1.2.3";
-        sev.send(active2.encode());
+        Promise promise = disco._resolve("svc", "1.0");
+        checkEqualNodes(node, ?promise.value().getValue());
+    }
 
-        Promise promise = disco._resolve("svc");
-        checkEqualNodes(active.node, ?promise.value().getValue());
+    void testResolveVersionAfterActive() {
+        Discovery disco = new Discovery().connect();
+        SocketEvent sev = startDisco(disco);
+
+        Node n1 = doActive(sev, "svc", "addr1.0", "1.0.0");
+        Node n2 = doActive(sev, "svc", "addr1.2.3", "1.2.3");
+
+        Promise promise = disco._resolve("svc", "1.0");
+        checkEqualNodes(n1, ?promise.value().getValue());
+        promise = disco._resolve("svc", "1.1");
+        checkEqualNodes(n2, ?promise.value().getValue());
+    }
+
+    void testResolveVersionBeforeActive() {
+        Discovery disco = new Discovery().connect();
+        SocketEvent sev = startDisco(disco);
+
+        Promise p1 = disco._resolve("svc", "1.0");
+        Promise p2 = disco._resolve("svc", "1.1");
+
+        Node n1 = doActive(sev, "svc", "addr1.0", "1.0.0");
+        Node n2 = doActive(sev, "svc", "addr1.2.3", "1.2.3");
+
+        checkEqualNodes(n1, ?p1.value().getValue());
+        checkEqualNodes(n2, ?p2.value().getValue());
     }
 
     void testLoadBalancing() {
         Discovery disco = new Discovery().connect();
         SocketEvent sev = startDisco(disco);
 
-        Promise promise = disco._resolve("svc");
+        Promise promise = disco._resolve("svc", "1.0");
         checkEqual(false, promise.value().hasValue());
 
         Active active = new Active();
@@ -326,7 +327,7 @@ class DiscoveryTest extends MockRuntimeTest {
 
         idx = 0;
         while (idx < count*10) {
-            Node node = ?disco._resolve("svc").value().getValue();
+            Node node = ?disco._resolve("svc", "1.0").value().getValue();
             checkEqual("addr" + (idx % count).toString(), node.address);
             idx = idx + 1;
         }
@@ -399,6 +400,7 @@ class UtilTest {
 
         checkEqual(false, versionMatch("1.2", "1.1.0"));
         checkEqual(false, versionMatch("2.0", "1.1.0"));
+        checkEqual(false, versionMatch("1.3", "1.2"));
     }
 
 }
