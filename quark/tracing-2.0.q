@@ -16,12 +16,8 @@ Tracing is the log collector for the MDK.
 
 A brief event overview:
 
-- RequestStart and RequestEnd are meant to bracket the whole request, which
-  will almost certainly comprise multiple records, so that:
-  - we needn’t repeat the args and such all the time, and
-  - it's a bit easier to do whole-request analysis later.
-- LogRecord carries log messages. Again, there will likely be many of these
-  for a given request.
+- LogEvent carries log messages. Again, there will likely be many of
+  these for a given request.
 
 So e.g. if a service named grue-locator gets a request for which it has to
 call another service named grue-creator, then you get an event sequence
@@ -132,37 +128,21 @@ namespace mdk_tracing {
             _context.setValue(self.getContext().finish_span());
         }
 
-        void startRequest(String url) {
-            RequestStart start = new RequestStart();
-            start.url = url;
-            logRecord(start);
-        }
-
-        void endRequest() {
-            RequestEnd end = new RequestEnd();
-            logRecord(end);
-        }
-
         void log(String procUUID, String level, String category, String text) {
-            LogMessage msg = new LogMessage();
-            msg.node = procUUID;
-            msg.level = level;
-            msg.category = category;
-            msg.text = text;
-            logRecord(msg);
-        }
-
-        void logRecord(LogRecord record) {
             self._openIfNeeded();
 
-            LogEvent evt = new LogEvent();
             SharedContext ctx = self.getContext();
             ctx.tick();
             logger.info("CTX " + ctx.toString());
+
+            LogEvent evt = new LogEvent();
             evt.context = ctx;
             evt.timestamp = now();
-            evt.record = record;
-
+            evt.node = procUUID;
+            evt.level = level;
+            evt.category = category;
+            evt.type = "text/plain";
+            evt.text = text;
             _client.log(evt);
         }
 
@@ -331,12 +311,28 @@ namespace mdk_tracing {
 
             @doc("""Shared context""")
             SharedContext context;
+
             @doc("""
-                 When did this happen? This is stored as milliseconds
-                 since the Unix epoch, and is filled in by the client.
-            """)
+                 The timestamp When did this happen? This is stored as
+                 milliseconds since the Unix epoch, and is filled in
+                 by the client.
+                 """)
             long timestamp;
-            LogRecord record;
+
+            @doc("A string identifying the node from which this message originates.")
+            String node;
+
+            @doc("Log level")
+            String level;
+
+            @doc("Log category")
+            String category;
+
+            @doc("Describes the type of content contained in the text field. This is a mime type.")
+            String type;
+
+            @doc("The content of the log message.")
+            String text;
 
             void dispatch(ProtocolHandler handler) {
                 dispatchTracingEvent(?handler);
@@ -347,85 +343,10 @@ namespace mdk_tracing {
             }
 
             String toString() {
-                return "<LogEvent @" + timestamp.toString() +
-                       " " + context.toString() +
-                       ", " + record.toString() + ">";
+                return "<LogEvent @" + timestamp.toString() + " " + context.toString() +
+                    ", " + node + ", " + level + ", " + category + ", " + type + ", " + text + ">";
             }
 
-        }
-
-        interface RecordHandler {
-            void onRequestStart(RequestStart start);
-            void onLogMessage(LogMessage msg);
-            void onRequestEnd(RequestEnd end);
-        }
-
-        @doc("""A event that contains information solely about tracing.""")
-        class LogRecord {
-
-            @doc("The node at which we're tracing this record.")
-            String node;
-
-            void dispatch(RecordHandler handler);
-        }
-
-        @doc("""
-             Log an event for later viewing. This is the most common event.
-        """)
-        class LogMessage extends LogRecord {
-            @doc("Log category")
-            String category;
-            @doc("Log level")
-            String level;
-            @doc("The actual log message")
-            String text;
-
-            void dispatch(RecordHandler handler) {
-                handler.onLogMessage(self);
-            }
-
-            // XXX Not automagically mapped to str() or the like, even though
-            // something should be.
-            String toString() {
-                return "<LogMessage " + self.node.toString() + " (" + self.category + " " + self.level + ": " + self.text + ">";
-            }
-        }
-
-        @doc("""
-             Note that a request is starting. This is the only place
-             the parameters to the request appear, and it's also the
-             event that assigns the reqctx for this request.
-        """)
-        class RequestStart extends LogRecord {
-            String url;
-            @doc("Parameters of the new request, if any.")
-            Map<String, String> params;
-            @doc("Headers of the new request, if any.")
-            List<String> headers;
-
-            void dispatch(RecordHandler handler) {
-                handler.onRequestStart(self);
-            }
-
-            // XXX Not automagically mapped to str() or the like, even though
-            // something should be.
-            String toString() {
-                return "<ReqStart " + self.node.toString() + ">";
-            }
-        }
-
-        @doc("Note that a request has ended.")
-        class RequestEnd extends LogRecord {
-
-            void dispatch(RecordHandler handler) {
-                handler.onRequestEnd(self);
-            }
-
-            // XXX Not automagically mapped to str() or the like, even though
-            // something should be.
-            String toString() {
-                return "<ReqEnd " + self.node.toString() + ">";
-            }
         }
 
         class TracingClient extends WSClient {

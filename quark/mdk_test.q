@@ -69,14 +69,9 @@ class TracingTest extends MockRuntimeTest {
         self.pump();
         LogEvent evt = expectLogEvent(sev);
         if (evt == null) { return; }
-        LogMessage msg = ?evt.record;
-        if (msg == null) {
-            fail("expected a message");
-            return;
-        }
-        checkEqual("DEBUG", msg.level);
-        checkEqual("blah", msg.category);
-        checkEqual("testing...", msg.text);
+        checkEqual("DEBUG", evt.level);
+        checkEqual("blah", evt.category);
+        checkEqual("testing...", evt.text);
     }
 
 }
