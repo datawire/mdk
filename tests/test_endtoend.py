@@ -3,7 +3,7 @@
 import os
 from signal import SIGTERM
 from random import random
-from subprocess import Popen, check_output
+from subprocess import Popen, check_output, STDOUT
 from unittest import TestCase
 
 CODE_PATH = os.path.abspath(
@@ -11,11 +11,11 @@ CODE_PATH = os.path.abspath(
 
 DISCOVERY_URL = "wss://discovery-develop.datawire.io/"
 
-os.setenv("MDK_DISCOVERY_URL", DISCOVERY_URL)
+os.putenv("MDK_DISCOVERY_URL", DISCOVERY_URL)
 
 
 def random_string():
-    return "random_" + str(random())
+    return "random_" + str(random())[2:]
 
 
 class PythonTests(TestCase):
@@ -26,7 +26,7 @@ class PythonTests(TestCase):
         service = random_string()
         address = random_string()
         p = Popen(["python", os.path.join(CODE_PATH, "register.py"), service, address])
-        self.addCleanup(lambda: os.kill(SIGTERM, p.pid))
+        self.addCleanup(lambda: os.kill(p.pid, SIGTERM))
         resolved_address = check_output(
             ["python", os.path.join(CODE_PATH, "resolve.py"), service])
         self.assertEqual(address, resolved_address)

@@ -2,6 +2,8 @@
 
 import time
 import sys
+import logging
+logging.basicConfig(level=logging.INFO)
 
 from mdk import init
 
@@ -11,9 +13,10 @@ def main():
     MDK.start()
     try:
         MDK.register(sys.argv[1], "1.0.0", sys.argv[2])
+        time.sleep(30)
     finally:
         MDK.stop()
-    time.sleep(30)
+
 
 if __name__ == '__main__':
     main()
