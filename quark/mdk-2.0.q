@@ -96,7 +96,7 @@ namespace mdk {
         String procUUID = mdk_protocol.uuid4();
 
         MDKImpl() {
-            _disco.url = _get("MDK_DISCOVERY_URL", "wss://discovery-develop.datawire.io");
+            _disco.url = _get("MDK_DISCOVERY_URL", "wss://discovery-develop.datawire.io/");
             _disco.token = DatawireToken.getToken();
 
             String tracingURL = _get("MDK_TRACING_URL", "wss://tracing-develop.datawire.io/ws");
