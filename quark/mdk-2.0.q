@@ -168,8 +168,10 @@ namespace mdk {
                                         "service " + service + "(" + version + ")");
         }
 
+        // XXX: this is not thread safe, maybe create an "excursion"
+        // instance of the MDK to store thread/context specific state?
         void start_interaction() {
-            // _tracer.start_span();
+            _resolved = [];
         }
 
         SharedContext context() {
@@ -199,8 +201,7 @@ namespace mdk {
                 Node node = suspects[idx];
                 idx = idx + 1;
                 involved.add(node.toString());
-                // XXX: want to call node.failure() here in order to
-                // activate circuit breaker logic
+                node.failure();
             }
 
             String text = "involved: " + ", ".join(involved) + "\n\n" + message;
@@ -215,12 +216,9 @@ namespace mdk {
             int idx = 0;
             while (idx < nodes.size()) {
                 Node node = nodes[idx];
-                // XXX: want to call node.success() here in order to
-                // activate circuit breaker logic
+                node.success();
                 idx = idx + 1;
             }
-
-            // _tracer.finish_span();
         }
 
         void interact(UnaryCallable cmd) {

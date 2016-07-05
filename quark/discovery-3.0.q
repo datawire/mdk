@@ -75,12 +75,81 @@ namespace mdk_discovery {
 
     }
 
+    interface FailurePolicy {
+
+        void success();
+
+        void failure();
+
+        bool available();
+
+    }
+
+    class CircuitBreaker extends FailurePolicy {
+        static Logger _log = new Logger("mdk.breaker");
+
+        Node _node;
+        int _threshold;
+        long _delay;
+
+        Lock _mutex = new Lock();
+        bool _failed = false;
+        int _failures = 0;
+        long _lastFailure = 0L;
+
+
+        CircuitBreaker(Node node, int threshold, float retestDelay) {
+            _node = node;
+            _threshold = threshold;
+            _delay = (retestDelay*1000.0).round();
+        }
+
+        void success() {
+            _mutex.acquire();
+            _failed = false;
+            _failures = 0;
+            _lastFailure = 0;
+            _mutex.release();
+        }
+
+        void failure() {
+            _mutex.acquire();
+            _failures = _failures + 1;
+            _lastFailure = now();
+            if (_threshold != 0 && _failures >= _threshold) {
+                _log.info("BREAKER TRIPPED: " + _node.toString());
+                _failed = true;
+            }
+            _mutex.release();
+        }
+
+        bool available() {
+            if (_failed) {
+                _mutex.acquire();
+                bool result = now() - _lastFailure > _delay;
+                _mutex.release();
+                if (result) {
+                    _log.info("BREAKER RETEST: " + _node.toString());
+                }
+                return result;
+            } else {
+                return true;
+            }
+        }
+
+    }
+
     @doc("A Cluster is a group of providers of (possibly different versions of)")
     @doc("a single service. Each service provider is represented by a Node.")
     class Cluster {
         List<Node> nodes = [];
         List<_Request> _waiting = [];
         int _counter = 0;
+        Discovery _disco;
+
+        Cluster(Discovery _disco) {
+            self._disco = _disco;
+        }
 
         @doc("Choose a single Node to talk to. At present this is a simple round")
         @doc("robin.")
@@ -98,7 +167,7 @@ namespace mdk_discovery {
             while (count < nodes.size()) {
                 int choice = (start + count) % nodes.size();
                 Node candidate = nodes[choice];
-                if (versionMatch(version, candidate.version)) {
+                if (versionMatch(version, candidate.version) && candidate.available()) {
                     return candidate;
                 }
                 count = count + 1;
@@ -111,6 +180,8 @@ namespace mdk_discovery {
         @doc("update its properties).  At present, this involves a linear search, so")
         @doc("very large Clusters are unlikely to perform well.")
         void add(Node node) {
+            node._policy = new CircuitBreaker(node, _disco.threshold, _disco.retestDelay);
+
             // Resolve waiting promises:
             if (self._waiting.size() > 0) {
                 List<_Request> waiting = self._waiting;
@@ -132,7 +203,7 @@ namespace mdk_discovery {
 
             while (idx < nodes.size()) {
                 if (nodes[idx].address == node.address) {
-                    nodes[idx] = node;
+                    nodes[idx].update(node);
                     return;
                 }
 
@@ -199,6 +270,7 @@ namespace mdk_discovery {
     @doc("The Node class captures address and metadata information about a")
     @doc("server functioning as a service instance.")
     class Node {
+
         @doc("The service name.")
         String service;
         @doc("The service version (e.g. '1.2.3')")
@@ -207,6 +279,25 @@ namespace mdk_discovery {
         String address;
         @doc("Additional metadata associated with this service instance.")
         Map<String,Object> properties;
+
+        FailurePolicy _policy = null;
+
+        void success() {
+            _policy.success();
+        }
+
+        void failure() {
+            _policy.failure();
+        }
+
+        bool available() {
+            return _policy.available();
+        }
+
+        void update(Node node) {
+            self.version = node.version;
+            self.properties = node.properties;
+        }
 
         @doc("Return a string representation of the Node.")
         String toString() {
@@ -250,6 +341,8 @@ namespace mdk_discovery {
     class Discovery {
         String url;
         String token;
+        int threshold = 3;
+        float retestDelay = 30.0;
 
         static Logger logger = new Logger("discovery");
 
@@ -368,7 +461,7 @@ namespace mdk_discovery {
             String service = node.service;
 
             if (!registered.contains(service)) {
-                registered[service] = new Cluster();
+                registered[service] = new Cluster(self);
             }
 
             registered[service].add(node);
@@ -397,7 +490,7 @@ namespace mdk_discovery {
             self._lock();
 
             if (!services.contains(service)) {
-                services[service] = new Cluster();
+                services[service] = new Cluster(self);
             }
 
             Node result = services[service].chooseVersion(version);
@@ -436,7 +529,7 @@ namespace mdk_discovery {
             logger.info("adding " + node.toString());
 
             if (!services.contains(service)) {
-                services[service] = new Cluster();
+                services[service] = new Cluster(self);
             }
 
             Cluster cluster = services[service];

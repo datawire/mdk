@@ -305,6 +305,31 @@ class DiscoveryTest extends MockRuntimeTest {
         checkEqualNodes(n2, ?p2.value().getValue());
     }
 
+    void testResolveBreaker() {
+        Discovery disco = new Discovery().connect();
+        SocketEvent sev = startDisco(disco);
+
+        Node n1 = doActive(sev, "svc", "addr1", "1.0.0");
+        Node n2 = doActive(sev, "svc", "addr2", "1.0.0");
+
+        Promise p = disco._resolve("svc", "1.0");
+        checkEqualNodes(n1, ?p.value().getValue());
+        p = disco._resolve("svc", "1.0");
+        checkEqualNodes(n2, ?p.value().getValue());
+
+        Node failed = ?p.value().getValue();
+        int idx = 0;
+        while (idx < disco.threshold) {
+            failed.failure();
+            idx = idx + 1;
+        }
+
+        p = disco._resolve("svc", "1.0");
+        checkEqualNodes(n1, ?p.value().getValue());
+        p = disco._resolve("svc", "1.0");
+        checkEqualNodes(n1, ?p.value().getValue());
+    }
+
     void testLoadBalancing() {
         Discovery disco = new Discovery().connect();
         SocketEvent sev = startDisco(disco);
@@ -401,6 +426,22 @@ class UtilTest {
         checkEqual(false, versionMatch("1.2", "1.1.0"));
         checkEqual(false, versionMatch("2.0", "1.1.0"));
         checkEqual(false, versionMatch("1.3", "1.2"));
+    }
+
+}
+
+class CircuitBreakerTest {
+
+    void testBreakerTrips() {
+        Node node = new Node();
+        node._policy = new CircuitBreaker(node, 3, 1.0);
+        checkEqual(true, node.available());
+        node.failure();
+        checkEqual(true, node.available());
+        node.failure();
+        checkEqual(true, node.available());
+        node.failure();
+        checkEqual(false, node.available());
     }
 
 }
