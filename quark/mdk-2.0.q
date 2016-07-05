@@ -26,6 +26,7 @@ namespace mdk {
         return new MDKImpl();
     }
 
+    @doc("Microservices Developers' Kit")
     interface MDK {
 
         @doc("""Start the uplink.""")
@@ -34,14 +35,18 @@ namespace mdk {
         @doc("""Stop the uplink.""")
         void stop();
 
+        @doc("Make our service known to discovery.")
         void register(String service, String version, String address);
 
         Promise _resolve(String service, String version);
 
+        @doc("Look up a service name with a specific version via discovery.")
         Object resolve(String service, String version);
 
+        @doc("Look up a service name with a specific version via discovery, with timeout.")
         Node resolve_until(String service, String version, float timeout);
 
+        @doc("Initialize our context.")
         void init_context();
 
         @doc("Retrieve our existing context.")
@@ -54,21 +59,28 @@ namespace mdk {
         @doc("Start an interaction.")
         void start_interaction();
 
+        @doc("Record an interaction failure.")
         void fail(String message);
 
         @doc("Finish an interaction.")
         void finish_interaction();
 
+        @doc("start_interaction(); callable(mdk); finish_interaction();")
         void interact(UnaryCallable callable);
 
+        @doc("Record a log entry at the CRITICAL logging level.")
         void critical(String category, String text);
 
+        @doc("Record a log entry at the ERROR logging level.")
         void error(String category, String text);
 
+        @doc("Record a log entry at the WARN logging level.")
         void warn(String category, String text);
 
+        @doc("Record a log entry at the INFO logging level.")
         void info(String category, String text);
 
+        @doc("Record a log entry at the DEBUG logging level.")
         void debug(String category, String text);
 
     }
