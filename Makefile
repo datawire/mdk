@@ -4,4 +4,12 @@ default:
 
 
 .PHONY: quark_test
-	xxx
+quark_test:
+	quark run --java quark/mdk_test.q
+	quark run --javascript quark/mdk_test.q
+	quark run --python quark/mdk_test.q
+	quark run --ruby quark/mdk_test.q
+
+.PHONY: native_test
+native_test:
+	python -m unittest discover tests
