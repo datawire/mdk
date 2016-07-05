@@ -3,10 +3,16 @@
 import time
 import sys
 import logging
+import signal
+
 logging.basicConfig(level=logging.INFO)
 
 from mdk import init
 
+
+def exit(*args):
+    raise SystemExit
+signal.signal(signal.SIGTERM, exit)
 
 def main():
     MDK = init()
@@ -15,6 +21,7 @@ def main():
         MDK.register(sys.argv[1], "1.0.0", sys.argv[2])
         time.sleep(30)
     finally:
+        print("Shutting down...")
         MDK.stop()
 
 

@@ -11,10 +11,12 @@ def main():
     MDK = init()
     MDK.start()
     try:
-        sys.stdout.write(MDK.resolve_until(sys.argv[1], "1.0.0", 10.0).address)
-        sys.stdout.flush()
-    finally:
-        MDK.stop()
+        address = MDK.resolve_until(sys.argv[1], "1.0.0", 10.0).address
+    except:
+        address = "not found"
+    sys.stdout.write(address)
+    sys.stdout.flush()
+    MDK.stop()
 
 
 if __name__ == '__main__':
