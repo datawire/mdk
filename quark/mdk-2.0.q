@@ -16,17 +16,19 @@ import mdk_util;
 
 import quark.concurrent;
 
+@doc("Microservices Development Kit -- obtain a reference using MDK.init()")
 namespace mdk {
 
     String _get(String name, String value) {
         return os.Environment.ENV.get(name, value);
     }
 
+    @doc("Initialize the MDK")
     MDK init() {
         return new MDKImpl();
     }
 
-    @doc("Microservices Developers' Kit")
+    @doc("Microservices Development Kit")
     interface MDK {
 
         @doc("""Start the uplink.""")
