@@ -141,7 +141,7 @@ namespace mdk_tracing {
             evt.node = procUUID;
             evt.level = level;
             evt.category = category;
-            evt.type = "text/plain";
+            evt.contentType = "text/plain";
             evt.text = text;
             _client.log(evt);
         }
@@ -329,7 +329,7 @@ namespace mdk_tracing {
             String category;
 
             @doc("Describes the type of content contained in the text field. This is a mime type.")
-            String type;
+            String contentType;
 
             @doc("The content of the log message.")
             String text;
@@ -344,7 +344,7 @@ namespace mdk_tracing {
 
             String toString() {
                 return "<LogEvent @" + timestamp.toString() + " " + context.toString() +
-                    ", " + node + ", " + level + ", " + category + ", " + type + ", " + text + ">";
+                    ", " + node + ", " + level + ", " + category + ", " + contentType + ", " + text + ">";
             }
 
         }
