@@ -12,5 +12,5 @@ script:
   - ls -a
   - ruby --version
   - gem --version
-  - env
+  - env | grep -v DATAWIRE_TOKEN
   - ./.travis-test.sh

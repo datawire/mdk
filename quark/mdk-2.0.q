@@ -16,6 +16,7 @@ import mdk_util;
 
 import quark.concurrent;
 
+@doc("Microservices Development Kit -- obtain a reference using MDK.init()")
 namespace mdk {
 
     String _get(String name, String value) {
