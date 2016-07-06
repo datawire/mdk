@@ -120,6 +120,10 @@ namespace mdk_tracing {
             return _context.getValue();
         }
 
+        void setContext(SharedContext ctx) {
+            _context.setValue(ctx);
+        }
+
         void start_span() {
             _context.setValue(self.getContext().start_span());
         }

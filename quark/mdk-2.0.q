@@ -22,12 +22,32 @@ namespace mdk {
         return os.Environment.ENV.get(name, value);
     }
 
+    @doc("Create an MDK instance.")
     MDK init() {
         return new MDKImpl();
     }
 
-    @doc("Microservices Developers' Kit")
+    @doc("Return a started MDK.")
+    MDK start() {
+        MDK m = new MDKImpl();
+        m.start();
+        return m;
+    }
+
+    @doc("""
+         The MDK API consists of two interfaces: MDK and Session. The
+         MDK interface holds globally scoped APIs and state associated
+         with the microservice. The Session interface holds locally
+         scoped APIs and state. A Session must be used sequentially.
+
+         There will typically be one MDK instance for the entire
+         process, and one instance of the Session object per
+         thread/channel/request depending on how the MDK is integrated
+         and used within the application framework of choice.
+         """)
     interface MDK {
+
+        static String CONTEXT_HEADER = "X-MDK-Context";
 
         @doc("""Start the uplink.""")
         void start();
@@ -38,35 +58,18 @@ namespace mdk {
         @doc("Make our service known to discovery.")
         void register(String service, String version, String address);
 
-        Promise _resolve(String service, String version);
+        @doc("Create a new Session.")
+        Session session();
 
-        @doc("Look up a service name with a specific version via discovery.")
-        Object resolve(String service, String version);
+        @doc("Create a new Session and join it to a distributed trace.")
+        Session join(String encodedContext);
 
-        @doc("Look up a service name with a specific version via discovery, with timeout.")
-        Node resolve_until(String service, String version, float timeout);
+    }
 
-        @doc("Initialize our context.")
-        void init_context();
+    interface Session {
 
-        @doc("Retrieve our existing context.")
-        SharedContext context();
-
-        @doc("Join an existing context.")
-        void join_context(SharedContext context);
-        void join_encoded_context(String encodedContext);
-
-        @doc("Start an interaction.")
-        void start_interaction();
-
-        @doc("Record an interaction failure.")
-        void fail(String message);
-
-        @doc("Finish an interaction.")
-        void finish_interaction();
-
-        @doc("start_interaction(); callable(mdk); finish_interaction();")
-        void interact(UnaryCallable callable);
+        @doc("Grabs the encoded context.")
+        String inject();
 
         @doc("Record a log entry at the CRITICAL logging level.")
         void critical(String category, String text);
@@ -83,6 +86,27 @@ namespace mdk {
         @doc("Record a log entry at the DEBUG logging level.")
         void debug(String category, String text);
 
+        @doc("Look up a service name with a specific version via discovery.")
+        Node resolve(String service, String version);
+
+        @doc("Look up a service name with a specific version via discovery, with timeout.")
+        Node resolve_until(String service, String version, float timeout);
+
+        @doc("Asynchronously look up a service name/version via discovery. The result is returned as a promise.")
+        Object resolve_async(String service, String version);
+
+        @doc("Start an interaction.")
+        void start_interaction();
+
+        @doc("Record an interaction failure.")
+        void fail(String message);
+
+        @doc("Finish an interaction.")
+        void finish_interaction();
+
+        @doc("start_interaction(); callable(mdk); finish_interaction();")
+        void interact(UnaryCallable callable);
+
     }
 
     class MDKImpl extends MDK {
@@ -91,8 +115,6 @@ namespace mdk {
 
         Discovery _disco = new Discovery();
         Tracer _tracer;
-
-        List<Node> _resolved = [];
         String procUUID = mdk_protocol.uuid4();
 
         MDKImpl() {
@@ -113,6 +135,11 @@ namespace mdk {
             _disco.start();
         }
 
+        void stop() {
+            _disco.stop();
+            _tracer.stop();
+        }
+
         void register(String service, String version, String address) {
             Node node = new Node();
             node.service = service;
@@ -122,48 +149,65 @@ namespace mdk {
             _disco.register(node);
         }
 
-        void stop() {
-            _disco.stop();
-            _tracer.stop();
+        SessionImpl session() {
+            return new SessionImpl(self, null);
+        }
+
+        SessionImpl join(String encodedContext) {
+            return new SessionImpl(self, encodedContext);
+        }
+
+    }
+
+    class SessionImpl extends Session {
+
+        MDKImpl _mdk;
+        List<Node> _resolved = [];
+        SharedContext _context;
+
+        SessionImpl(MDKImpl mdk, String encodedContext) {
+            _mdk = mdk;
+            if (encodedContext == null || encodedContext == "") {
+                _context = new SharedContext();
+            } else {
+                SharedContext ctx = SharedContext.decode(encodedContext);
+                _context = ctx.start_span();
+            }
         }
 
         void _log(String level, String category, String text) {
-            _tracer.log(self.procUUID, level, category, text);
+            _mdk._tracer.setContext(_context);
+            _mdk._tracer.log(_mdk.procUUID, level, category, text);
         }
 
         void critical(String category, String text) {
             // XXX: no critical
-            logger.error(category + ": " + text);
+            _mdk.logger.error(category + ": " + text);
             _log("CRITICAL", category, text);
         }
 
         void error(String category, String text) {
-            logger.error(category + ": " + text);
+            _mdk.logger.error(category + ": " + text);
             _log("ERROR", category, text);
         }
 
         void warn(String category, String text) {
-            logger.warn(category + ": " + text);
+            _mdk.logger.warn(category + ": " + text);
             _log("WARN", category, text);
         }
 
         void info(String category, String text) {
-            logger.info(category + ": " + text);
+            _mdk.logger.info(category + ": " + text);
             _log("INFO", category, text);
         }
 
         void debug(String category, String text) {
-            logger.debug(category + ": " + text);
+            _mdk.logger.debug(category + ": " + text);
             _log("DEBUG", category, text);
         }
 
-        Node _resolvedCallback(Node result) {
-            _resolved.add(result);
-            return result;
-        }
-
         Promise _resolve(String service, String version) {
-            return _disco._resolve(service, version).
+            return _mdk._disco._resolve(service, version).
                 andThen(bind(self, "_resolvedCallback", []));
         }
 
@@ -172,7 +216,7 @@ namespace mdk {
         }
 
         Node resolve(String service, String version) {
-            return resolve_until(service, version, _timeout());
+            return resolve_until(service, version, _mdk._timeout());
         }
 
         Node resolve_until(String service, String version, float timeout) {
@@ -180,27 +224,17 @@ namespace mdk {
                                         "service " + service + "(" + version + ")");
         }
 
-        // XXX: this is not thread safe, maybe create an "excursion"
-        // instance of the MDK to store thread/context specific state?
+        Node _resolvedCallback(Node result) {
+            _resolved.add(result);
+            return result;
+        }
+
         void start_interaction() {
             _resolved = [];
         }
 
-        SharedContext context() {
-            return _tracer.getContext();
-        }
-
-        void init_context() {
-            _tracer.initContext();
-        }
-
-        @doc("Join an existing context.")
-        void join_context(SharedContext context) {
-            _tracer.joinContext(context);
-        }
-
-        void join_encoded_context(String encodedContext) {
-            _tracer.joinEncodedContext(encodedContext);
+        String inject() {
+            return _context.encode();
         }
 
         void fail(String message) {
