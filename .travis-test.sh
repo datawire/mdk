@@ -1,9 +1,6 @@
 #!/bin/bash
 set -e
 
-# Remove this when bug is fixed:
-export DATAWIRE_TOKEN=""
-
 # Setup local Gem install instead of system install:
 rvm use system
 echo "install: --user-install" > ~/.gemrc
