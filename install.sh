@@ -1,8 +1,19 @@
 #!/bin/bash
 
+# Usage: install.sh --python|--ruby [<branch>]
+#
+# Branch is "master" if unspecified.
+
 set -e
 
-echo "= Installing the Datawire MDK"
+LANGUAGE=$1
+BRANCH=${2:-master}
+
+fromStr=
+
+if [ -n "$1" ]; then fromStr=" from $BRANCH"; fi
+
+echo "= Installing the Datawire MDK${fromStr}"
 
 PYVER=$(python -c "import platform ; print(platform.python_version())" 2>/dev/null || true)
 
@@ -37,7 +48,7 @@ fi
 
 QVER=$(quark --version 2>/dev/null || true)
 
-if [ -n "$QVER" -a -f $HOME/.quark/config.sh ]; then
+if [ -z "$QVER" -a -f $HOME/.quark/config.sh ]; then
   # Pull in this version of Quark and try again.
   . $HOME/.quark/config.sh
 
@@ -61,24 +72,14 @@ else
   # No Quark at all. Install.
   echo "== MDK needs the Quark compiler; installing it now."
 
-  curl -# -L https://raw.githubusercontent.com/datawire/quark/master/install.sh | bash -s -- -q 1.0.133
+  curl -# -L https://raw.githubusercontent.com/datawire/quark/master/install.sh | bash -s -- -q v1.0.282
 
   . $HOME/.quark/config.sh
 fi
 
 # Compile quark packages.
 echo "== Compiling the MDK"
-quark install --python https://raw.githubusercontent.com/datawire/mdk/master/quark/mdk-1.0.q
-
-# Get Python set up.
-echo "== Setting up Flask and Requests"
-
-# check if we are in a virtualenv or not
-python -c 'import sys; print sys.real_prefix' > /dev/null 2>&1 && PIPARGS="" || PIPARGS="--user"
-
-echo pip install $PIPARGS requests flask
-pip install $PIPARGS requests flask
-
+quark install $LANGUAGE https://raw.githubusercontent.com/datawire/mdk/${BRANCH}/quark/mdk-2.0.q
 
 # All done.
 echo "== All done"
