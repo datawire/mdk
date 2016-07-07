@@ -31,34 +31,6 @@ import mdk_util;  // bring in EnvironmentVariable, WaitForPromise
   dns, with the one difference being that the server process is
   creating the dns record directly rather than a system
   administrator.
-
-  API usage sketch:
-
-  Server:
-
-  from discovery import Discovery, Node
-  disco = Discovery.get("https://disco.datawire.io")
-  ... bind to port
-  disco.register(Node("service", "address", "version"))
-  ... serve stuff
-
-  Client:
-
-  from discovery import Discovery, Node
-  disco = Discovery.get("https://disco.datawire.io")
-  node = disco.resolve("servicefoo")
-
-  ... create a connection to node.address
-  ... use connection
-*/
-
-/*
-  TODO:
-  - disco.lookup -> Cluster (renamed)
-  - disco.resolve -> is convenience for disco.lookup("<service>").choose()
-  - disco.register -> Cluster (renamed), use to communicate error info on registry.
-  - make Cluster (renamed) be the mutable, asynchronously updated thing
-  - maybe make Node immutable?
 */
 
 namespace mdk_discovery {
@@ -397,15 +369,15 @@ namespace mdk_discovery {
             return self;
         }
 
-        @doc("Connect to the default discovery server. If DATAWIRE_DISCOVERY_URL")
+        @doc("Connect to the default discovery server. If MDK_DISCOVERY_URL")
         @doc("is in the environment, it specifies the default; if not, we'll talk to")
         @doc("")
-        @doc("wss://discovery-beta.datawire.io/")
+        @doc("wss://discovery.datawire.io/")
         @doc("")
         @doc("After connecting, you must start the uplink with the start() method.")
         Discovery connect() {
-            EnvironmentVariable ddu = EnvironmentVariable("DATAWIRE_DISCOVERY_URL");
-            String url = ddu.orElseGet("wss://discovery-beta.datawire.io");
+            EnvironmentVariable ddu = EnvironmentVariable("MDK_DISCOVERY_URL");
+            String url = ddu.orElseGet("wss://discovery.datawire.io/");
 
             return self.connectTo(url);
         }
