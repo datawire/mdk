@@ -50,7 +50,7 @@ namespace mdk_tracing {
         static Logger logger = new Logger("MDK Tracer");
 
         String url = "";
-            String queryURL = "";
+        String queryURL = "";
 
         String token;
         long lastPoll = 0L;
