@@ -27,10 +27,14 @@ def got_logs(log_events):
         print("Got unexpected result: " + repr(results))
         os._exit(1)
 
+def got_error(error):
+    print("ERROR: " + error.toString())
+    os._exit(1)
+
 def main():
     tracer = mdk._tracer
     now = int(time.time() * 1000)
-    tracer.query(now - 10000, now + 10000).andFinally(got_logs)
+    tracer.query(now - 10000, now + 10000).andEither(got_logs, got_error)
 
 
 if __name__ == '__main__':
