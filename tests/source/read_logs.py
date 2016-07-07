@@ -34,7 +34,7 @@ def got_error(error):
 def main():
     tracer = mdk._tracer
     now = int(time.time() * 1000)
-    tracer.query(now - 10000, now + 10000).andEither(got_logs, got_error)
+    tracer.query(now - 60000, now + 60000).andEither(got_logs, got_error)
 
 
 if __name__ == '__main__':
