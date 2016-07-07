@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_protocol 1.0.0;
+package datawire_mdk_protocol 1.1.0;
 
 import quark.concurrent;
 import quark.reflect;
@@ -314,6 +314,7 @@ namespace mdk_protocol {
         static Discriminator _discriminator = anyof(["open", "mdk.protocol.Open", "discovery.protocol.Open"]);
 
         String version = "2.0.0";
+        Map<String,String> properties = {};
 
         void dispatch(ProtocolHandler handler) {
             handler.onOpen(self);
