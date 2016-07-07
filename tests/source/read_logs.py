@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import sys
 import time
+import os
 
 from mdk import init
 mdk = init()
@@ -20,10 +21,11 @@ def got_logs(log_events):
                    for level in ["critical", "error", "warn", "info", "debug"])
     if expected == results:
         print("Got expected messages!")
-        sys.exit(0)
+        # XXX working around Quark/MDK issue where Python runtime isn't exiting:
+        os._exit(0)
     else:
         print("Got unexpected result: " + repr(results))
-        sys.exit(1)
+        os._exit(1)
 
 def main():
     tracer = mdk._tracer

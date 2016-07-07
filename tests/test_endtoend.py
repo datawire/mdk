@@ -3,7 +3,7 @@
 import os
 import time
 from random import random
-from subprocess import Popen, check_output, check_exit
+from subprocess import Popen, check_output, check_call
 from unittest import TestCase
 
 CODE_PATH = os.path.abspath(
@@ -12,6 +12,8 @@ CODE_PATH = os.path.abspath(
 DISCOVERY_URL = "wss://discovery-develop.datawire.io/"
 
 os.putenv("MDK_DISCOVERY_URL", DISCOVERY_URL)
+os.putenv("MDK_TRACING_URL", "wss://tracing-develop.datawire.io/ws");
+os.putenv("MDK_TRACING_API_URL", "wss://tracing-develop.datawire.io/api/logs")
 
 
 def random_string():
@@ -43,7 +45,7 @@ class PythonTests(TestCase):
         """Minimal logging end-to-end test."""
         # Write some logs
         service = random_string()
-        check_exit(["python", os.path.join(CODE_PATH, "write_logs.py"), service])
+        check_call(["python", os.path.join(CODE_PATH, "write_logs.py"), service])
 
         # Assert they can be read back:
-        check_exit(["python", os.path.join(CODE_PATH, "read_logs.py"), service])
+        check_call(["python", os.path.join(CODE_PATH, "read_logs.py"), service])
