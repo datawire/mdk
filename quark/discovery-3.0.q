@@ -523,11 +523,9 @@ namespace mdk_discovery {
                 logger.info("removing " + node.toString() + " from cluster");
 
                 cluster.remove(node);
-
-                if (cluster.isEmpty()) {
-                    logger.info("removing empty cluster for " + node.toString());
-                    services.remove(service);
-                }
+                // We don't check for or remove clusters with no nodes
+                // because they might have unresolved promises in
+                // _waiting.
             }
 
             self._release();
