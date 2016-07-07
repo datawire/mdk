@@ -3,7 +3,7 @@
 import os
 import time
 from random import random
-from subprocess import Popen, check_output
+from subprocess import Popen, check_output, check_exit
 from unittest import TestCase
 
 CODE_PATH = os.path.abspath(
@@ -39,4 +39,11 @@ class PythonTests(TestCase):
             ["python", os.path.join(CODE_PATH, "resolve.py"), service])
         self.assertEqual("not found", resolved_address)
 
-    # Test logging.
+    def test_logging(self):
+        """Minimal logging end-to-end test."""
+        # Write some logs
+        service = random_string()
+        check_exit(["python", os.path.join(CODE_PATH, "write_logs.py"), service])
+
+        # Assert they can be read back:
+        check_exit(["python", os.path.join(CODE_PATH, "read_logs.py"), service])
