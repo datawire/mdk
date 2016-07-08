@@ -15,6 +15,7 @@ def got_logs(log_events):
     category = sys.argv[1]
     results = set()
     for event in log_events.result:
+        print(event.category, event.text)
         if event.category == category:
             results.add((event.text, event.level))
     expected = set(("hello {} {}".format(category, level), level.upper())
