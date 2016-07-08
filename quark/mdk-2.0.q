@@ -234,8 +234,8 @@ namespace mdk {
             _disco.token = DatawireToken.getToken();
 
             String tracingURL = _get("MDK_TRACING_URL", "wss://tracing.datawire.io/ws");
-
-            _tracer = Tracer.withURLsAndToken(tracingURL, "", _disco.token);
+            String tracingQueryURL = _get("MDK_TRACING_API_URL", "https://tracing.datawire.io/api/logs");
+            _tracer = Tracer.withURLsAndToken(tracingURL, tracingQueryURL, _disco.token);
             _tracer.initContext();
         }
 

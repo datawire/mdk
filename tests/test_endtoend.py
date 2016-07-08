@@ -3,15 +3,15 @@
 import os
 import time
 from random import random
-from subprocess import Popen, check_output
+from subprocess import Popen, check_output, check_call
 from unittest import TestCase
 
 CODE_PATH = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "source"))
 
-DISCOVERY_URL = "wss://discovery-develop.datawire.io/"
-
-os.putenv("MDK_DISCOVERY_URL", DISCOVERY_URL)
+os.putenv("MDK_DISCOVERY_URL", "wss://discovery-develop.datawire.io/")
+os.putenv("MDK_TRACING_URL", "wss://tracing-develop.datawire.io/ws");
+os.putenv("MDK_TRACING_API_URL", "https://tracing-develop.datawire.io/api/logs")
 
 
 def random_string():
@@ -39,4 +39,8 @@ class PythonTests(TestCase):
             ["python", os.path.join(CODE_PATH, "resolve.py"), service])
         self.assertEqual("not found", resolved_address)
 
-    # Test logging.
+    def test_logging(self):
+        """Minimal logging end-to-end test."""
+        # Write some logs, waiting for them to arrive:
+        service = random_string()
+        check_call(["python", os.path.join(CODE_PATH, "write_logs.py"), service])
