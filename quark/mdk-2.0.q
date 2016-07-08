@@ -23,12 +23,15 @@ namespace mdk {
         return os.Environment.ENV.get(name, value);
     }
 
-    @doc("Create an MDK instance.")
+    @doc("Create an unstarted instance of the MDK.")
     MDK init() {
         return new MDKImpl();
     }
 
-    @doc("Return a started MDK.")
+    @doc("""
+         Create a started instance of the MDK. This is equivalent to
+         callint init() followed by start() on the resulting instance.
+         """)
     MDK start() {
         MDK m = new MDKImpl();
         m.start();
@@ -41,6 +44,9 @@ namespace mdk {
          with the microservice. The Session interface holds locally
          scoped APIs and state. A Session must be used sequentially.
 
+         The MDK instance is responsible for communicating with
+         foundational services like discovery and tracing.
+
          There will typically be one MDK instance for the entire
          process, and one instance of the Session object per
          thread/channel/request depending on how the MDK is integrated
@@ -48,25 +54,93 @@ namespace mdk {
          """)
     interface MDK {
 
+        @doc("This header is used to propogate shared context for distributed traces.")
         static String CONTEXT_HEADER = "X-MDK-Context";
 
-        @doc("""Start the uplink.""")
+        @doc("""
+             Start the MDK. An MDK instance will not communicate with
+             foundational services unless it is started.
+             """)
         void start();
 
-        @doc("""Stop the uplink.""")
+        @doc("""
+             Stop the MDK. When the MDK stops unregisters any service
+             endpoints from the discovery system. This should always
+             be done prior to process exit in order to propogate node
+             shutdowns in realtime rather than waiting for heartbeats
+             to detect node departures.
+             """)
         void stop();
 
-        @doc("Make our service known to discovery.")
+        @doc("""
+             Registers a service endpoint with the discovery
+             system. This can be called at any point, however
+             registered endpoints will not be advertised to the
+             discovery system until the MDK is started.
+             """)
         void register(String service, String version, String address);
 
-        @doc("Create a new Session.")
+        @doc("""
+             Creates a new Session. A Session created in this way will
+             result in a new distributed trace. This should therefore
+             be used primarily by edge services. Intermediary and
+             foundational services should make use of
+             join(encodedContext) in order to preserve distributed
+             traces.
+             """)
         Session session();
 
-        @doc("Create a new Session and join it to a distributed trace.")
+        @doc("""
+             Create a new Session and join it to a distributed trace.
+             """)
         Session join(String encodedContext);
 
     }
 
+    @doc("""
+         A session provides a lightweight sequential context that a
+         microservice can use in the context of any application
+         framework in order to manage its interactions with other
+         microservices. It provides simple APIs for service
+         resolution, distributed tracing, and circuit breakers.
+
+         A microservices architecture enables small self contained
+         units of business logic to be implemented by separate teams
+         working on isolated services based on the languages and
+         frameworks best suited for their problem domain.
+
+         Any given microservice will contain sequential business logic
+         implemented in a variety of ways depending on the application
+         framework chosen. For example it may be a long running
+         thread, a simple blocking request handler, or a chained
+         series of reactive handlers in an async environment.
+
+         For the most part this business logic can be implemented
+         exactly as prescribed by the application framework of choice,
+         however in a microservices architecture, some special care
+         needs to be taken when this business logic interacts with
+         other microservices.
+
+         Because microservices are updated with much higher frequency
+         than normal web applications, the interactions between them
+         form key points that require extra care beyond normal web
+         interactions in order to avoid creating a system that is both
+         extremely fragile, unreliable, and opaque.
+
+         Realtime service resolution, distributed tracing, and
+         resilience heuristics such as circuit breakers provide the
+         foundational behavior required at these interaction
+         points. These capabilites must be combined with the defensive
+         coding practice of intelligent fallback behavior when remote
+         services are unavailable or misbehaving, in order to build a
+         robust microservice application.
+
+         Because of this, a session is expected to be created and made
+         available to all business logic within a given microservice,
+         e.g. on a per request basis, as a thread local, part of a
+         context object, etc depending on the application framework of
+         choice.
+         """)
     interface Session {
 
         @doc("Grabs the encoded context.")
@@ -87,25 +161,62 @@ namespace mdk {
         @doc("Record a log entry at the DEBUG logging level.")
         void debug(String category, String text);
 
-        @doc("Look up a service name with a specific version via discovery.")
+        @doc("""
+             Locate a compatible service instance.
+             """)
         Node resolve(String service, String version);
 
-        @doc("Look up a service name with a specific version via discovery, with timeout.")
+        @doc("""
+             Locate a compatible service instance with a non-default timeout.
+             """)
         Node resolve_until(String service, String version, float timeout);
 
-        @doc("Asynchronously look up a service name/version via discovery. The result is returned as a promise.")
+        @doc("""
+             Locate a compatible service instance asynchronously. The result is returned as a promise.
+             """)
         Object resolve_async(String service, String version);
 
-        @doc("Start an interaction.")
+        @doc("""
+             Start an interaction with a remote service.
+
+             The session tracks any nodes resolved during an
+             interactin with a remote service.
+
+             The service resolution API permits a compatible instance
+             of the service to be located. In addition, it tracks
+             which exact instances are in use during any
+             interaction. Should the interaction fail, circuit breaker
+             state is updated for those nodes, and all involved
+             instances involved are reported to the tracing services.
+
+             This permits realtime reporting of integration issues
+             when services are updated, and also allows circuit
+             breakers to mitigate the impact of any such issues.
+             """)
         void start_interaction();
 
-        @doc("Record an interaction failure.")
-        void fail(String message);
+        @doc("""
+             Record an interaction as failed.
 
-        @doc("Finish an interaction.")
+             This will update circuit breaker state for the remote
+             nodes, as well as reporting all nodes involved to the
+             tracing system.
+             """)
+        void fail_interaction(String message);
+
+        @doc("""
+             Finish an interaction.
+
+             This marks an interaction as completed.
+             """)
         void finish_interaction();
 
-        @doc("start_interaction(); callable(mdk); finish_interaction();")
+        @doc("""
+             This is a convenience API that will perform
+             start_interaction() followed by callable(ssn) followed by
+             finish_interaction().
+
+             """)
         void interact(UnaryCallable callable);
 
     }
@@ -238,7 +349,7 @@ namespace mdk {
             return _context.encode();
         }
 
-        void fail(String message) {
+        void fail_interaction(String message) {
             List<Node> suspects = _resolved;
             _resolved = [];
 
@@ -252,7 +363,7 @@ namespace mdk {
             }
 
             String text = "involved: " + ", ".join(involved) + "\n\n" + message;
-            self.error("integration", text);
+            self.error("interaction failure", text);
         }
 
         void finish_interaction() {
