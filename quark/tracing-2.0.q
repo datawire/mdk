@@ -78,11 +78,13 @@ namespace mdk_tracing {
                 parsedURL.path = "/api/logs";
 
                 newTracer.queryURL = parsedURL.toString();
+            } else {
+                newTracer.queryURL = queryURL;
             }
 
             newTracer.token = token;
 
-            return newTracer;           
+            return newTracer;
         }
 
         void _openIfNeeded() {
