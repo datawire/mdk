@@ -40,7 +40,20 @@ class PythonTests(TestCase):
         self.assertEqual("not found", resolved_address)
 
     def test_logging(self):
-        """Minimal logging end-to-end test."""
+        """Minimal logging end-to-end test.
+
+        Logs are written, and then same logs should be read back.
+        """
         # Write some logs, waiting for them to arrive:
         service = random_string()
         check_call(["python", os.path.join(CODE_PATH, "write_logs.py"), service])
+
+    def test_tracing(self):
+        """Minimal tracing end-to-end test.
+
+        One process can start a session context and a second one can join it,
+        and they both get logged together.
+        """
+        context_id = check_output(
+            ["python", os.path.join(CODE_PATH, "start_trace.py")])
+        check_call(["python", os.path.join(CODE_PATH, "continue_trace.py"), context_id])
