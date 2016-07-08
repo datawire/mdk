@@ -41,9 +41,6 @@ class PythonTests(TestCase):
 
     def test_logging(self):
         """Minimal logging end-to-end test."""
-        # Write some logs
+        # Write some logs, waiting for them to arrive:
         service = random_string()
         check_call(["python", os.path.join(CODE_PATH, "write_logs.py"), service])
-
-        # Assert they can be read back:
-        check_call(["python", os.path.join(CODE_PATH, "read_logs.py"), service])
