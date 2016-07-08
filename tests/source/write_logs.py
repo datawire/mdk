@@ -37,6 +37,8 @@ def read_logs():
         print("Took more than 60 seconds, giving up.")
         os._exit(1)
     tracer = mdk._tracer
+    print(tracer.url)
+    print(tracer.queryURL)
     now = int(start * 1000)
     tracer.query(now - 60000, now + 120000).andEither(got_logs, got_error)
 
