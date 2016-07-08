@@ -422,6 +422,7 @@ class DiscoveryTest extends MockRuntimeTest {
 
         disco.stop();
         // Might take some cleanup to stop everything:
+        self.mock.advanceClock(15000);
         self.mock.pump();
         self.mock.pump();
         self.mock.pump();
