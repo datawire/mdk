@@ -230,7 +230,7 @@ namespace mdk {
         String procUUID = Context.runtime().uuid();
 
         MDKImpl() {
-            _disco.url = _get("MDK_DISCOVERY_URL", "wss://discovery.datawire.io/");
+            _disco.url = _get("MDK_DISCOVERY_URL", "wss://discovery.datawire.io/ws/v1");
             _disco.token = DatawireToken.getToken();
 
             String tracingURL = _get("MDK_TRACING_URL", "wss://tracing.datawire.io/ws");

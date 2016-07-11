@@ -372,12 +372,12 @@ namespace mdk_discovery {
         @doc("Connect to the default discovery server. If MDK_DISCOVERY_URL")
         @doc("is in the environment, it specifies the default; if not, we'll talk to")
         @doc("")
-        @doc("wss://discovery.datawire.io/")
+        @doc("wss://discovery.datawire.io/ws/v1")
         @doc("")
         @doc("After connecting, you must start the uplink with the start() method.")
         Discovery connect() {
             EnvironmentVariable ddu = EnvironmentVariable("MDK_DISCOVERY_URL");
-            String url = ddu.orElseGet("wss://discovery.datawire.io/");
+            String url = ddu.orElseGet("wss://discovery.datawire.io/ws/v1");
 
             return self.connectTo(url);
         }
