@@ -354,7 +354,7 @@ namespace mdk_tracing {
             @doc("Sequence number of the log message, used for acknowledgements.")
             long sequence;
 
-            @doc("Should the server send an acknowledgement for soon?")
+            @doc("Should the server send an acknowledgement?")
             int sync;
 
             void dispatch(ProtocolHandler handler) {
