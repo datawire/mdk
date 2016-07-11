@@ -227,7 +227,7 @@ namespace mdk {
 
         Discovery _disco = new Discovery();
         Tracer _tracer;
-        String procUUID = mdk_protocol.uuid4();
+        String procUUID = Context.runtime().uuid();
 
         MDKImpl() {
             _disco.url = _get("MDK_DISCOVERY_URL", "wss://discovery.datawire.io/");

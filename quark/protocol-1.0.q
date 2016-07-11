@@ -7,15 +7,6 @@ import quark.reflect;
 
 namespace mdk_protocol {
 
-    macro String uuid4()
-        $py{str(__import__("uuid").uuid4()).upper()}
-        $js{'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);
-            return v.toString(16);
-        })}
-        $java{"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"}
-        $rb{"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"};
-
     class Discriminator {
         List<String> values;
 
@@ -197,7 +188,7 @@ namespace mdk_protocol {
              be created must use the same SharedContext, and its
              traceId will _never_ _change_.
         """)
-        String traceId = uuid4();
+        String traceId = Context.runtime().uuid();
 
         @doc("""
             To track causality, we use a Lamport clock.
