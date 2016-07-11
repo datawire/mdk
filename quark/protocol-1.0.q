@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_protocol 1.1.0;
+package datawire_mdk_protocol 1.1.1;
 
 import quark.concurrent;
 import quark.reflect;
@@ -31,7 +31,10 @@ namespace mdk_protocol {
     }
 
     class Serializable {
-
+        @doc("""
+        The given class must have a construct() static method that takes the JSON-encoded type,
+        or a constructor that takes no arguments.
+        """)
         static Serializable decodeClass(Class clazz, String encoded) {
             JSONObject json = encoded.parseJSON();
             String type = json["type"];
@@ -40,7 +43,8 @@ namespace mdk_protocol {
             if (meth != null) {
                 obj = ?meth.invoke(null, [type]);
                 if (obj == null) {
-                    panic(clazz.getName() + "." + meth.getName() + " could not understand this json: " + encoded);
+                    WSClient.logger.warn(clazz.getName() + "." + meth.getName() + " could not understand this json: " + encoded);
+                    return null;
                 }
                 clazz = obj.getClass();
             } else {
