@@ -499,6 +499,11 @@ namespace mdk_tracing {
             void onWSMessage(WebSocket socket, String message) {
                 // Decode and dispatch incoming messages.
                 ProtocolEvent event = TracingClientEvent.decode(message);
+                if (event == null) {
+                    // Unknown message, drop it on the floor. The decoding will
+                    // already have logged it.
+                    return;
+                }
                 event.dispatch(self);
             }
 
