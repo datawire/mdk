@@ -533,10 +533,6 @@ namespace mdk_tracing {
                 _mutex.release();
             }
 
-            void onWSMessage(WebSocket socket, String message) {
-                // Currently we do nothing with messages we receive.
-                return;
-            }
         }
 
     }
