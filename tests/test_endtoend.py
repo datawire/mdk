@@ -39,6 +39,16 @@ class PythonTests(TestCase):
             ["python", os.path.join(CODE_PATH, "resolve.py"), service])
         self.assertEqual("not found", resolved_address)
 
+    def test_discovery_js(self):
+        """Minimal discovery end-to-end test with a Javascript client."""
+        service = random_string()
+        address = random_string()
+        p = Popen(["python", os.path.join(CODE_PATH, "register.py"), service, address])
+        self.addCleanup(lambda: p.terminate())
+        resolved_address = check_output(
+            ["node", os.path.join(CODE_PATH, "resolve.js"), service])
+        self.assertEqual(address, resolved_address)
+
     def test_logging(self):
         """Minimal logging end-to-end test.
 
