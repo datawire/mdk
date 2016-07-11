@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_tracing 2.0.0;
+package datawire_mdk_tracing 2.0.1;
 
 use protocol-1.0.q;
 use introspection-1.0.q;
@@ -151,9 +151,9 @@ namespace mdk_tracing {
             // Perhaps a better workaround would be to send just the
             // relevant data from the context object. An actual
             // solution would involve having sensible definitions/APIs
-            // for the contxt object and its clock.
-            evt.context = SharedContext.decode(ctx.encode());  // FIXME see above
+            // for the context object and its clock.
 
+            evt.context = ctx.copy();
             evt.timestamp = now();
             evt.node = procUUID;
             evt.level = level;
@@ -533,6 +533,10 @@ namespace mdk_tracing {
                 _mutex.release();
             }
 
+            void onWSMessage(WebSocket socket, String message) {
+                // Currently we do nothing with messages we receive.
+                return;
+            }
         }
 
     }

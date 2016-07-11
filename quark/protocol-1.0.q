@@ -1,20 +1,11 @@
 quark 1.0;
 
-package datawire_mdk_protocol 1.1.0;
+package datawire_mdk_protocol 1.2.0;
 
 import quark.concurrent;
 import quark.reflect;
 
 namespace mdk_protocol {
-
-    macro String uuid4()
-        $py{str(__import__("uuid").uuid4()).upper()}
-        $js{'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);
-            return v.toString(16);
-        })}
-        $java{"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"}
-        $rb{"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"};
 
     class Discriminator {
         List<String> values;
@@ -40,7 +31,10 @@ namespace mdk_protocol {
     }
 
     class Serializable {
-
+        @doc("""
+        The given class must have a construct() static method that takes the JSON-encoded type,
+        or a constructor that takes no arguments.
+        """)
         static Serializable decodeClass(Class clazz, String encoded) {
             JSONObject json = encoded.parseJSON();
             String type = json["type"];
@@ -49,7 +43,8 @@ namespace mdk_protocol {
             if (meth != null) {
                 obj = ?meth.invoke(null, [type]);
                 if (obj == null) {
-                    panic(clazz.getName() + "." + meth.getName() + " could not understand this json: " + encoded);
+                    WSClient.logger.warn(clazz.getName() + "." + meth.getName() + " could not understand this json: " + encoded);
+                    return null;
                 }
                 clazz = obj.getClass();
             } else {
@@ -197,7 +192,7 @@ namespace mdk_protocol {
              be created must use the same SharedContext, and its
              traceId will _never_ _change_.
         """)
-        String traceId = uuid4();
+        String traceId = Context.runtime().uuid();
 
         @doc("""
             To track causality, we use a Lamport clock.
@@ -291,6 +286,11 @@ namespace mdk_protocol {
 
             // ...and return the new context.
             return newContext;
+        }
+
+        @doc("Return a copy of a SharedContext.")
+        SharedContext copy() {
+            return SharedContext.decode(self.encode());
         }
     }
 

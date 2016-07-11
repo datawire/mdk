@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_introspection 1.0.0;
+package datawire_mdk_introspection 1.0.1;
 
 /* 
  * Copyright 2016 Datawire. All rights reserved.
@@ -38,7 +38,7 @@ namespace mdk_introspection
         String token = EnvironmentVariable(TOKEN_VARIABLE_NAME).get();
         if (token == null)
         {
-            concurrent.Context.runtime().fail("Environment variable 'DATAWIRE_TOKEN' is not set.");
+            panic("Environment variable 'DATAWIRE_TOKEN' is not set. The MDK needs a token to access Datawire cloud services. Please visit https://app.datawire.io/#/signup to create a free account and get a token.");
         }
 
         return token;

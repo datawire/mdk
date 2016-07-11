@@ -227,7 +227,7 @@ namespace mdk {
 
         Discovery _disco = new Discovery();
         Tracer _tracer;
-        String procUUID = mdk_protocol.uuid4();
+        String procUUID = Context.runtime().uuid();
 
         MDKImpl() {
             _disco.url = _get("MDK_DISCOVERY_URL", "wss://discovery.datawire.io/");
@@ -271,6 +271,8 @@ namespace mdk {
 
     }
 
+    macro Object sanitize(Object obj) $js{_qrt.sanitize_undefined($obj)}$py{$obj}$rb{$obj}$java{$obj};
+
     class SessionImpl extends Session {
 
         MDKImpl _mdk;
@@ -279,6 +281,7 @@ namespace mdk {
 
         SessionImpl(MDKImpl mdk, String encodedContext) {
             _mdk = mdk;
+            encodedContext = ?sanitize(encodedContext);
             if (encodedContext == null || encodedContext == "") {
                 _context = new SharedContext();
             } else {
