@@ -354,6 +354,9 @@ namespace mdk_tracing {
             @doc("Sequence number of the log message, used for acknowledgements.")
             long sequence;
 
+            @doc("Should the server send an acknowledgement for soon?")
+            int sync;
+
             void dispatch(ProtocolHandler handler) {
                 dispatchTracingEvent(?handler);
             }
@@ -418,15 +421,18 @@ namespace mdk_tracing {
             bool _started = false;
             Lock _mutex = new Lock();
 
+            long _syncRequestPeriod = 5000L;  // how often (in ms) sync requests should be sent
+            int  _syncInFlightMax = 50;       // max size of the in-flight buffer before sending a sync request
+
             List<LogEvent> _buffered = [];  // log events that are ready to be sent
             List<LogEvent> _inFlight = [];  // log events that have been sent but not yet acknowledged
-            long _logged = 0L;              // Count of logged messages; log event sequence number
-            long _sent = 0L;                // Count of events sent over the socket
-            long _failedSends = 0L;         // Count of events that were sent but not acknowledged
-            long _recorded = 0L;            // Count of events that were acknowledged by the server
+            long _logged = 0L;              // count of logged messages; log event sequence number
+            long _sent = 0L;                // count of events sent over the socket
+            long _failedSends = 0L;         // count of events that were sent but not acknowledged
+            long _recorded = 0L;            // count of events that were acknowledged by the server
+            long _lastSyncTime = 0L;        // when the last sync request was sent
 
             Logger _myLog = new Logger("TracingClient");
-
             void _debug(String message) {
                 String s = "[" + _buffered.size().toString() + " buf, " + _inFlight.size().toString() + " inf] ";
                 _myLog.debug(s + message);
@@ -471,12 +477,21 @@ namespace mdk_tracing {
             void pump() {
                 _mutex.acquire();
                 // Send buffered messages and move them to the in-flight queue
+                // Set the sync flag as appropriate
                 while (_buffered.size() > 0) {
+                    String debugSuffix = "";
                     LogEvent evt = _buffered.remove(0);
                     _inFlight.add(evt);
+                    if ((evt.timestamp > _lastSyncTime + _syncRequestPeriod) ||
+                        (_inFlight.size() == _syncInFlightMax)) {
+                        evt.sync = 1;
+                        _lastSyncTime = evt.timestamp;
+                        debugSuffix = " with sync set";
+                    }
                     self.sock.send(evt.encode());
+                    evt.sync = 0;
                     _sent = _sent + 1;
-                    _debug("sent #" + evt.sequence.toString());
+                    _debug("sent #" + evt.sequence.toString() + debugSuffix);
                 }
                 _mutex.release();
             }
@@ -494,7 +509,7 @@ namespace mdk_tracing {
                     if (_inFlight[0].sequence <= ack.sequence) {
                         LogEvent evt = _inFlight.remove(0);
                         _recorded = _recorded + 1;
-                        _debug("ack for #" + evt.sequence.toString());
+                        _debug("ack #" + ack.sequence.toString() + ", discarding #" + evt.sequence.toString());
                     } else {
                         // Subsequent events are too new
                         break;
@@ -507,6 +522,7 @@ namespace mdk_tracing {
                 _mutex.acquire();
                 // Add log event to the outgoing buffer and make sure it has the newest sequence number.
                 evt.sequence = _logged;
+                evt.sync = 0;
                 _logged = _logged + 1;
                 _buffered.add(evt);
                 _debug("logged #" + evt.sequence.toString());
