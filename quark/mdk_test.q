@@ -6,6 +6,7 @@ use mdk-2.0.q;
 
 import quark.test;
 import quark.mock;
+import quark.reflect;
 
 void main(List<String> args) {
     test.run(args);
@@ -50,6 +51,20 @@ class TracingTest extends MockRuntimeTest {
         doTestLog("custom");
     }
 
+    SocketEvent startTracer(Tracer tracer) {
+        tracer.initContext();
+        tracer.log("procUUID", "DEBUG", "blah", "testing...");
+        self.pump();
+        SocketEvent sev = self.expectSocket(tracer.url + "?token=" + tracer.token);
+        if (sev == null) { return null; }
+        sev.accept();
+        self.pump();
+        Open open = expectOpen(sev);
+        if (open == null) { return null; }
+        self.pump();
+        return sev;
+    }
+
     void doTestLog(String url) {
         Tracer tracer = new Tracer();
         if (url != null) {
@@ -57,16 +72,7 @@ class TracingTest extends MockRuntimeTest {
         } else {
             url = tracer.url;
         }
-        tracer.initContext();
-        tracer.log("procUUID", "DEBUG", "blah", "testing...");
-        self.pump();
-        SocketEvent sev = self.expectSocket(url + "?token=" + tracer.token);
-        if (sev == null) { return; }
-        sev.accept();
-        self.pump();
-        Open open = expectOpen(sev);
-        if (open == null) { return; }
-        self.pump();
+        SocketEvent sev = startTracer(tracer);
         LogEvent evt = expectLogEvent(sev);
         if (evt == null) { return; }
         checkEqual("DEBUG", evt.level);
@@ -74,10 +80,35 @@ class TracingTest extends MockRuntimeTest {
         checkEqual("testing...", evt.text);
     }
 
+    // Unexpected messages are ignored.
+    void testUnexpectedMessage() {
+        Tracer tracer = new Tracer();
+        SocketEvent sev = startTracer(tracer);
+        sev.send("{\"type\": \"UnknownMessage\"}");
+        self.pump();
+        checkEqual(false, sev.sock.closed);
+    }
+
 }
 
 import mdk_discovery;
 import mdk_discovery.protocol;
+
+
+class UnSerializable extends Serializable {
+    static UnSerializable construct() {
+        return null;
+    }
+}
+
+class SerializableTest {
+    // Unexpected messages result in a null, not in a panic
+    void testUnexpected() {
+        Object result = Serializable.decodeClass(Class.get("datawire_mdk_test.UnSerializable"),
+                                                 "{\"type\": \"UnSerializable\"}");
+        checkEqual(null, result);
+    }
+}
 
 class DiscoveryTest extends MockRuntimeTest {
 
@@ -365,6 +396,15 @@ class DiscoveryTest extends MockRuntimeTest {
         // ...
     }
 
+    // Unexpected messages are ignored.
+    void testUnexpectedMessage() {
+        Discovery disco = new Discovery().connect();
+        SocketEvent sev = startDisco(disco);
+        sev.send("{\"type\": \"UnknownMessage\"}");
+        self.pump();
+        checkEqual(false, sev.sock.closed);
+    }
+
     void testStop() {
         Discovery disco = new Discovery().connect();
         SocketEvent sev = startDisco(disco);
@@ -382,6 +422,7 @@ class DiscoveryTest extends MockRuntimeTest {
 
         disco.stop();
         // Might take some cleanup to stop everything:
+        self.mock.advanceClock(15000);
         self.mock.pump();
         self.mock.pump();
         self.mock.pump();

@@ -15,13 +15,13 @@ versions.
 Quick Start
 --------
 
-Visit http://app.datawire.io for step-by-step instructions.
+Visit https://app.datawire.io to create a free Datawire account, and see step-by-step instructions.
 
 Slow Start (for developers)
 --------
 
 See
-https://datawire.github.io/mdk-docs/latest/main/getting-started/index.html on how to install the MDK from the command line.
+https://datawire.github.io/mdk-docs/latest/main/getting-started/index.html on how to install the MDK from the command line. Currently, there is an implementation dependency on the Datawire cloud services for service discovery. We plan to remove this requirement in the near future. 
 
 Architecture
 ------------

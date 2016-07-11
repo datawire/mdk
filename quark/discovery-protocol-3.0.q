@@ -118,6 +118,12 @@ namespace mdk_discovery {
             void onWSMessage(WebSocket socket, String message) {
                 // Decode and dispatch incoming messages.
                 ProtocolEvent event = DiscoveryEvent.decode(message);
+                if (event == null) {
+                    // Unknown message, drop it on the floor. The decoding will
+                    // already have logged it.
+                    return;
+                }
+
                 // disco.mutex.acquire();
                 event.dispatch(self);
                 // disco.mutex.release();
