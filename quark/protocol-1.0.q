@@ -1,20 +1,11 @@
 quark 1.0;
 
-package datawire_mdk_protocol 1.0.0;
+package datawire_mdk_protocol 1.1.0;
 
 import quark.concurrent;
 import quark.reflect;
 
 namespace mdk_protocol {
-
-    macro String uuid4()
-        $py{str(__import__("uuid").uuid4()).upper()}
-        $js{'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);
-            return v.toString(16);
-        })}
-        $java{"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"}
-        $rb{"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"};
 
     class Discriminator {
         List<String> values;
@@ -102,7 +93,7 @@ namespace mdk_protocol {
         // in Serialize and a static class reference
         static LamportClock decode(String encoded) {
             return ?Serializable.decodeClassName("mdk_protocol.LamportClock", encoded);
-        }       
+        }
 
         @doc("""
             Return a neatly-formatted list of all of our clock elements (e.g. 1,2,4,1) for use as a name or
@@ -197,7 +188,7 @@ namespace mdk_protocol {
              be created must use the same SharedContext, and its
              traceId will _never_ _change_.
         """)
-        String traceId = uuid4();
+        String traceId = Context.runtime().uuid();
 
         @doc("""
             To track causality, we use a Lamport clock.
@@ -213,7 +204,7 @@ namespace mdk_protocol {
         int _lastEntry = 0;
 
         SharedContext() {
-            self._lastEntry = self.clock.enter();           
+            self._lastEntry = self.clock.enter();
         }
 
         @doc("""Set the traceId for this SharedContext.""")
@@ -264,7 +255,7 @@ namespace mdk_protocol {
         SharedContext start_span() {
             // Tick first.
             self.tick();
-            
+
             // Duplicate this object...
             SharedContext newContext = SharedContext.decode(self.encode());
 
@@ -314,6 +305,7 @@ namespace mdk_protocol {
         static Discriminator _discriminator = anyof(["open", "mdk.protocol.Open", "discovery.protocol.Open"]);
 
         String version = "2.0.0";
+        Map<String,String> properties = {};
 
         void dispatch(ProtocolHandler handler) {
             handler.onOpen(self);
@@ -351,6 +343,55 @@ namespace mdk_protocol {
 
     @doc("Common protocol machinery for web socket based protocol clients.")
     class WSClient extends ProtocolHandler, WSHandler, Task {
+
+        /*
+
+          # WSClient state machine
+
+          ## External entity calls subclass.start()
+
+          - subclass.start() or something else arranges for subclass.isStarted() to return true
+          - WSClient.start() schedules .onExecute()
+          - the Runtime calls .onExecute()
+          - .onExecute() notices not .isConnected() and subclass.isStarted() so eventually calls .doOpen(),
+            then schedules itself for execution again
+          - .doOpen() calls .open() using subclass.url() and manages retries/backoff
+          - .open() calls subclass.token() and constructs a real URL, then calls Runtime.open()
+          - the Runtime calls .onWSConnected()
+          - .onWSConnected() saves the socket for .isConnected() to check,
+            then sends an Open protocol oevent, calls subclass.startup(), calls subclass.pump()
+          - the Runtime calls .onExecute()
+          - .onExecute() notices .isConnected() and subclass.isStarted() so
+            calls subclass.pump() and maybe .doHeartbeat()
+            then schedules itself for execution again
+          - .doHeartbeat() calls subclass.heartbeat() and tracks heartbeat timing
+
+          ## ELB or something kills the connection randomly
+
+          - the Runtime maybe calls .onWSError()
+          - .onWSError() logs and calls .doBackoff()
+          - .doBackoff() computes backoff timing stuff
+          - the Runtime maybe calls .onWSClosed(), which does nothing
+          - the Runtime calls .onWSFinal()
+          - .onWSFinal() nulls out the saved socket so .isConnected() will return false
+          - the Runtime calls .onExecute()
+          - .onExecute() notices not .isConnected() and subclass.isStarted() so eventually calls .doOpen(),
+            then schedules itself for execution again -- see above
+
+          Note that subclass.shutdown() is not called in this case, but subclass.startup() is called.
+
+          ## Something arranges for subclass.isStarted() to return false
+
+          - the Runtime calls .onExecute()
+          - onExecute() notices .isConnected() and not .isStarted() so
+            it calls subclass.shutdown(), closes the socket, and
+            nulls out the saved socket so .isConnected() will return false
+            then does not schedule itself for execution again
+
+          Must override: .isStarted(), .url(), .token()
+          May Override: .startup(), .pump(), .heartbeat(), .onWSMessage(), .onWSBinary()
+
+        */
 
         static Logger logger = new Logger("protocol");
 
@@ -418,13 +459,13 @@ namespace mdk_protocol {
               the desired state held by disco against our actual
               state and taking any measures necessary to address the
               difference:
-          
-          
+
+
               - isStarted() holds the desired connectedness
               state. The isConnected() accessor holds the actual
               connectedness state. If these differ then do what is
               necessry to make the desired state actual.
-          
+
               - If we haven't sent a heartbeat recently enough, then
               do that.
             */

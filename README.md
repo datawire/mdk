@@ -20,7 +20,8 @@ Visit http://app.datawire.io for step-by-step instructions.
 Slow Start (for developers)
 --------
 
-You can also install the MDK from the command line. 
+See
+https://datawire.github.io/mdk-docs/latest/main/getting-started/index.html on how to install the MDK from the command line.
 
 Architecture
 ------------
