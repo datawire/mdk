@@ -427,6 +427,11 @@ namespace mdk_tracing {
 
             Logger _myLog = new Logger("TracingClient");
 
+            void _debug(String message) {
+                String s = "[" + _buffered.size().toString() + " buf, " + _inFlight.size().toString() + " inf] ";
+                _myLog.debug(s + message);
+            }
+
             TracingClient(Tracer tracer) {
                 _tracer = tracer;
             }
@@ -458,7 +463,7 @@ namespace mdk_tracing {
                     LogEvent evt = _inFlight.remove(_inFlight.size() - 1);
                     _buffered.insert(0, evt);
                     _failedSends = _failedSends + 1;
-                    _myLog.debug("no ack for #" + evt.sequence.toString());
+                    _debug("no ack for #" + evt.sequence.toString());
                 }
                 _mutex.release();
             }
@@ -471,7 +476,7 @@ namespace mdk_tracing {
                     _inFlight.add(evt);
                     self.sock.send(evt.encode());
                     _sent = _sent + 1;
-                    _myLog.debug("sent #" + evt.sequence.toString());
+                    _debug("sent #" + evt.sequence.toString());
                 }
                 _mutex.release();
             }
@@ -489,7 +494,7 @@ namespace mdk_tracing {
                     if (_inFlight[0].sequence <= ack.sequence) {
                         LogEvent evt = _inFlight.remove(0);
                         _recorded = _recorded + 1;
-                        _myLog.debug("ack for #" + evt.sequence.toString());
+                        _debug("ack for #" + evt.sequence.toString());
                     } else {
                         // Subsequent events are too new
                         break;
@@ -504,7 +509,7 @@ namespace mdk_tracing {
                 evt.sequence = _logged;
                 _logged = _logged + 1;
                 _buffered.add(evt);
-                _myLog.debug("logged #" + evt.sequence.toString());
+                _debug("logged #" + evt.sequence.toString());
                 if (!_started) {
                     self.start();
                     _started = true;
