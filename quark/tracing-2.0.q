@@ -142,6 +142,17 @@ namespace mdk_tracing {
             logger.info("CTX " + ctx.toString());
 
             LogEvent evt = new LogEvent();
+
+            // Copy context so multiple events don't have the same
+            // context object, which is getting mutated over time,
+            // e.g., the ctx.tick() call above. This potentially
+            // duplicates a large amount of baggage (ctx.properties),
+            // but hopefully that baggage is empty/unused right now.
+            // Perhaps a better workaround would be to send just the
+            // relevant data from the context object. An actual
+            // solution would involve having sensible definitions/APIs
+            // for the context object and its clock.
+
             evt.context = ctx.copy();
             evt.timestamp = now();
             evt.node = procUUID;
@@ -231,7 +242,7 @@ namespace mdk_tracing {
                 logger.info("OH NO! " + error);
 
                 return new HTTPError(error);
-            } 
+            }
         }
     }
 
@@ -340,6 +351,12 @@ namespace mdk_tracing {
             @doc("The content of the log message.")
             String text;
 
+            @doc("Sequence number of the log message, used for acknowledgements.")
+            long sequence;
+
+            @doc("Should the server send an acknowledgement?")
+            int sync;
+
             void dispatch(ProtocolHandler handler) {
                 dispatchTracingEvent(?handler);
             }
@@ -349,21 +366,77 @@ namespace mdk_tracing {
             }
 
             String toString() {
-                return "<LogEvent @" + timestamp.toString() + " " + context.toString() +
+                return "<LogEvent " + sequence.toString() + " @" + timestamp.toString() + " " + context.toString() +
                     ", " + node + ", " + level + ", " + category + ", " + contentType + ", " + text + ">";
             }
 
         }
 
-        class TracingClient extends WSClient {
+        interface TracingClientHandler extends ProtocolHandler {
+            void onLogAck(LogAckEvent ack);
+        }
+
+        @doc("""A single event in the stream that a Tracing client has to manage.""")
+        class TracingClientEvent extends ProtocolEvent {
+
+            static ProtocolEvent construct(String type) {
+                ProtocolEvent result = ProtocolEvent.construct(type);
+                if (result != null) { return result; }
+                if (LogAckEvent._discriminator.matches(type)) { return new LogAckEvent(); }
+                return null;
+            }
+
+            static ProtocolEvent decode(String encoded) {
+                return ?Serializable.decodeClassName("mdk_tracing.protocol.LogAckEvent", encoded);
+            }
+
+            void dispatchTracingClientEvent(TracingClientHandler handler);
+
+        }
+
+        class LogAckEvent extends TracingClientEvent {
+
+            static Discriminator _discriminator = anyof(["logack", "mdk_tracing.protocol.LogAckEvent"]);
+
+            @doc("Sequence number of the last log message being acknowledged.")
+            long sequence;
+
+            void dispatch(ProtocolHandler handler) {
+                dispatchTracingClientEvent(?handler);
+            }
+
+            void dispatchTracingClientEvent(TracingClientHandler handler) {
+                handler.onLogAck(self);
+            }
+
+            String toString() {
+                return "<LogAckEvent " + sequence.toString() + ">";
+            }
+
+        }
+
+        class TracingClient extends WSClient, TracingClientHandler {
 
             Tracer _tracer;
             bool _started = false;
             Lock _mutex = new Lock();
 
-            List<LogEvent> _buffered = [];
-            long _logged = 0L;
-            long _sent = 0L;
+            long _syncRequestPeriod = 5000L;  // how often (in ms) sync requests should be sent
+            int  _syncInFlightMax = 50;       // max size of the in-flight buffer before sending a sync request
+
+            List<LogEvent> _buffered = [];  // log events that are ready to be sent
+            List<LogEvent> _inFlight = [];  // log events that have been sent but not yet acknowledged
+            long _logged = 0L;              // count of logged messages; log event sequence number
+            long _sent = 0L;                // count of events sent over the socket
+            long _failedSends = 0L;         // count of events that were sent but not acknowledged
+            long _recorded = 0L;            // count of events that were acknowledged by the server
+            long _lastSyncTime = 0L;        // when the last sync request was sent
+
+            Logger _myLog = new Logger("TracingClient");
+            void _debug(String message) {
+                String s = "[" + _buffered.size().toString() + " buf, " + _inFlight.size().toString() + " inf] ";
+                _myLog.debug(s + message);
+            }
 
             TracingClient(Tracer tracer) {
                 _tracer = tracer;
@@ -389,20 +462,75 @@ namespace mdk_tracing {
                 super.stop();
             }
 
+            void startup() {
+                _mutex.acquire();
+                // Move in-flight messages back into the outgoing buffer to retry later
+                while (_inFlight.size() > 0) {
+                    LogEvent evt = _inFlight.remove(_inFlight.size() - 1);
+                    _buffered.insert(0, evt);
+                    _failedSends = _failedSends + 1;
+                    _debug("no ack for #" + evt.sequence.toString());
+                }
+                _mutex.release();
+            }
+
             void pump() {
                 _mutex.acquire();
+                // Send buffered messages and move them to the in-flight queue
+                // Set the sync flag as appropriate
                 while (_buffered.size() > 0) {
+                    String debugSuffix = "";
                     LogEvent evt = _buffered.remove(0);
+                    _inFlight.add(evt);
+                    if ((evt.timestamp > _lastSyncTime + _syncRequestPeriod) ||
+                        (_inFlight.size() == _syncInFlightMax)) {
+                        evt.sync = 1;
+                        _lastSyncTime = evt.timestamp;
+                        debugSuffix = " with sync set";
+                    }
                     self.sock.send(evt.encode());
+                    evt.sync = 0;
                     _sent = _sent + 1;
+                    _debug("sent #" + evt.sequence.toString() + debugSuffix);
+                }
+                _mutex.release();
+            }
+
+            void onWSMessage(WebSocket socket, String message) {
+                // Decode and dispatch incoming messages.
+                ProtocolEvent event = TracingClientEvent.decode(message);
+                if (event == null) {
+                    // Unknown message, drop it on the floor. The decoding will
+                    // already have logged it.
+                    return;
+                }
+                event.dispatch(self);
+            }
+
+            void onLogAck(LogAckEvent ack) {
+                _mutex.acquire();
+                // Discard in-flight messages older than the acked sequence number; they have been logged.
+                while (_inFlight.size() > 0) {
+                    if (_inFlight[0].sequence <= ack.sequence) {
+                        LogEvent evt = _inFlight.remove(0);
+                        _recorded = _recorded + 1;
+                        _debug("ack #" + ack.sequence.toString() + ", discarding #" + evt.sequence.toString());
+                    } else {
+                        // Subsequent events are too new
+                        break;
+                    }
                 }
                 _mutex.release();
             }
 
             void log(LogEvent evt) {
-                _logged = _logged + 1;
                 _mutex.acquire();
+                // Add log event to the outgoing buffer and make sure it has the newest sequence number.
+                evt.sequence = _logged;
+                evt.sync = 0;
+                _logged = _logged + 1;
                 _buffered.add(evt);
+                _debug("logged #" + evt.sequence.toString());
                 if (!_started) {
                     self.start();
                     _started = true;
@@ -410,10 +538,6 @@ namespace mdk_tracing {
                 _mutex.release();
             }
 
-            void onWSMessage(WebSocket socket, String message) {
-                // Currently we do nothing with messages we receive.
-                return;
-            }
         }
 
     }
