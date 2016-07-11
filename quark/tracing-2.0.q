@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_tracing 2.0.0;
+package datawire_mdk_tracing 2.0.1;
 
 use protocol-1.0.q;
 use introspection-1.0.q;
@@ -142,7 +142,7 @@ namespace mdk_tracing {
             logger.info("CTX " + ctx.toString());
 
             LogEvent evt = new LogEvent();
-            evt.context = ctx;
+            evt.context = ctx.copy();
             evt.timestamp = now();
             evt.node = procUUID;
             evt.level = level;

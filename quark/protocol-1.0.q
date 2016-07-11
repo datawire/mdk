@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_protocol 1.1.1;
+package datawire_mdk_protocol 1.2.0;
 
 import quark.concurrent;
 import quark.reflect;
@@ -286,6 +286,11 @@ namespace mdk_protocol {
 
             // ...and return the new context.
             return newContext;
+        }
+
+        @doc("Return a copy of a SharedContext.")
+        SharedContext copy() {
+            return SharedContext.decode(self.encode());
         }
     }
 
