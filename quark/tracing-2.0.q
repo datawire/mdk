@@ -75,7 +75,7 @@ namespace mdk_tracing {
                     parsedURL.scheme = "https";
                 }
 
-                parsedURL.path = "/api/logs";
+                parsedURL.path = "/api/v1/logs";
 
                 newTracer.queryURL = parsedURL.toString();
             } else {
