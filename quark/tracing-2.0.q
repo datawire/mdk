@@ -49,8 +49,8 @@ namespace mdk_tracing {
     class Tracer {
         static Logger logger = new Logger("MDK Tracer");
 
-        String url = "wss://tracing.datawire.io/ws";
-        String queryURL = "https://tracing.datawire.io/api/logs";
+        String url = "wss://tracing.datawire.io/ws/v1";
+        String queryURL = "https://tracing.datawire.io/api/v1/logs";
 
         String token;
         long lastPoll = 0L;
