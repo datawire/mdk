@@ -139,7 +139,7 @@ namespace mdk_tracing {
 
             SharedContext ctx = self.getContext();
             ctx.tick();
-            logger.info("CTX " + ctx.toString());
+            logger.trace("CTX " + ctx.toString());
 
             LogEvent evt = new LogEvent();
 
@@ -167,7 +167,7 @@ namespace mdk_tracing {
             // XXX: this shouldn't really be necessary
             self._openIfNeeded();
 
-            logger.info("Polling for logs...");
+            logger.trace("Polling for logs...");
 
             long rightNow = now();
             Promise result = query(lastPoll, rightNow);
@@ -176,7 +176,7 @@ namespace mdk_tracing {
         }
 
         List<LogEvent> deresultify(api.GetLogEventsResult result) {
-            logger.info("got " + result.result.size().toString() + " log events");
+            logger.trace("got " + result.result.size().toString() + " log events");
             return result.result;
         }
 
@@ -239,7 +239,7 @@ namespace mdk_tracing {
                     error = "HTTP response " + code.toString();
                 }
 
-                logger.info("OH NO! " + error);
+                logger.error("query failure: " + error);
 
                 return new HTTPError(error);
             }
