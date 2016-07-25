@@ -1,3 +1,5 @@
+quark 1.0;
+
 import stdlib;
 
 namespace actors {
@@ -11,14 +13,14 @@ namespace actors {
     @doc("A store of some state. Emits events and handles events.")
     interface Actor {
 	@doc("Called on incoming one-way message from another actor sent via tell().")
-	void onMessage(ActorRef origin, Message message);
+	void onMessage(ActorRef selfRef, ActorRef origin, Message message);
 
 	@doc("""\
         Called on incoming ask() request from another actor that requires a response.
 
         Return either a Message or a Promise that resolves to a Message.
         """)
-	Object onAsk(ActorRef origin, Message message);
+	Object onAsk(ActorRef selfRef, ActorRef origin, Message message);
     }
 
     @doc("Start an actor, returning the ActorRef for communicating with it.")
@@ -39,29 +41,33 @@ namespace actors {
 	    self._actor = actor;
 	}
 
+	Actor getActor() {
+	    return self._actor;
+	}
+
 	MessageDispatcher getDispatcher() {
 	    return self._dispatcher;
 	}
 
 	@doc("Deliver a message to the actor.")
 	void tell(ActorRef origin, Message msg) {
-	    self._dispatcher.tell(origin, msg, self._actor, false);
+	    self._dispatcher.tell(origin, msg, self, false);
 	}
 
 	@doc("Deliver a request to the actor, get back Promise of a response.")
 	Promise ask(ActorRef origin, Message msg) {
-	    return self._dispatcher.tell(origin, msg, self._actor, true);
+	    return self._dispatcher.tell(origin, msg, self, true);
 	}
     }
 
     class _InFlightMessage {
 	ActorRef origin;
 	Message msg;
-	Actor destination;
+	ActorRef destination;
 	bool responseExpected;
 	PromiseFactory response;
 
-	_InFlightMessage(ActorRef origin, Message msg, Actor destination, bool responseExpected) {
+	_InFlightMessage(ActorRef origin, Message msg, ActorRef destination, bool responseExpected) {
 	    self.origin = origin;
 	    self.msg = msg;
 	    self.destination = destination;
@@ -74,15 +80,16 @@ namespace actors {
 	}
 
 	void deliver() {
+	    Actor underlyingDestination = self.destination.getActor();
 	    if (self.responseExpected) {
-		Object result = self.destination.onAsk(self.origin, self.msg);
+		Object result = underlyingDestination.onAsk(self.destination, self.origin, self.msg);
 		// XXX not sure if PromiseFactory.resolve() with a Promise DTRT,
 		// so do workaround in case it doesn't:
 		self.response.promise.andThen(bind(self, "_addResult", [result]))
 		self.response.resolve(true);
 		return;
 	    }
-	    self.destination.onMessage(self.origin, self.msg);
+	    underlyingDestination.onMessage(self.destination.self.origin, self.msg);
 	}
     }
 
@@ -103,7 +110,7 @@ namespace actors {
 	}
 
 	@doc("Queue a message from origin to destination, and trigger delivery if necessary.")
-	Promise tell(ActorRef origin, Message message, Actor destination, bool responseExpected) {
+	Promise tell(ActorRef origin, Message message, ActorRef destination, bool responseExpected) {
 	    self._lock.acquire();
 	    _MessageInFlight inFlight = new _MessageInFlight(origin, event, destination, responseExpected);
 	    Promise result = inFlight.response.promise;
@@ -134,13 +141,16 @@ namespace actors {
 	    self.destinations = destinations;
 	}
 
-	Object onMesssage(ActorRef origin, Message message) {
+	Object onAsk(ActorRef selfRef, ActorRef origin, Message message) {
+	    return new Unhandled();
+	}
+
+	void onMessage(ActorRef selfRef, ActorRef origin, Message message) {
 	    long idx = 0;
 	    while (idx < destinations.size()) {
 		destinations[idx].tell(origin, message);
 		idx = idx + 1l;
 	    }
-	    return NoResponse;
 	}
     }
 }
