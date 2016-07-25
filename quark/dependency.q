@@ -15,8 +15,8 @@ Actors:
 namespace dependency {
     @doc("Trivial dependency injection setup.")
     class Dependencies {
-	Map<String,ActorRef> _actors;
-	Map<String,Object> _services;
+	Map<String,ActorRef> _actors = {};
+	Map<String,Object> _services = {};
 
 	@doc("Register a service object.")
 	void registerService(String name, Object service) {
