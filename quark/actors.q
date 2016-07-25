@@ -11,13 +11,15 @@ namespace actors {
 
     @doc("A store of some state. Emits events and handles events.")
     interface Actor {
-	@doc("""\
-        Called on incoming message from another actor.
+	@doc("Called on incoming one-way message from another actor sent via tell().")
+	void onMessage(ActorRef origin, Message message);
 
-        Can return an answer the event, by returning an event or a Promise of an
-        event. If no answer is needed it should return NoResponse.
+	@doc("""\
+        Called on incoming ask() request from another actor that requires a response.
+
+        Return either a Message or a Promise that resolves to a Message.
         """)
-	Object onMessage(ActorRef origin, Event event);
+	Object onAsk(ActorRef origin, Message message);
     }
 
     @doc("Start an actor, returning the ActorRef for communicating with it.")
@@ -45,7 +47,12 @@ namespace actors {
 
 	@doc("Deliver a message to the actor.")
 	void tell(ActorRef origin, Message msg) {
-	    self._dispatcher.tell(origin, msg, self._actor);
+	    self._dispatcher.tell(origin, msg, self._actor, false);
+	}
+
+	@doc("Deliver a request to the actor, get back Promise of a response.")
+	Promise ask(ActorRef origin, Message msg) {
+	    return self._dispatcher.tell(origin, msg, self._actor, true);
 	}
     }
 
@@ -53,15 +60,31 @@ namespace actors {
 	ActorRef origin;
 	Message msg;
 	Actor destination;
+	bool responseExpected;
+	PromiseFactory response;
 
-	_InFlightMessage(ActorRef origin, Message msg, Actor destination) {
+	_InFlightMessage(ActorRef origin, Message msg, Actor destination, bool responseExpected) {
 	    self.origin = origin;
 	    self.msg = msg;
 	    self.destination = destination;
+	    self.responseExpected = responseExpected;
+	    self.response = new PromiseFactory();
 	}
 
-       Object deliver() {
-	    return self.destination.onMessage(self.origin, self.msg);
+	Object _addResult(bool ignore, Object result) {
+	    return result;
+	}
+
+	void deliver() {
+	    if (self.responseExpected) {
+		Object result = self.destination.onAsk(self.origin, self.msg);
+		// XXX not sure if PromiseFactory.resolve() with a Promise DTRT,
+		// so do workaround in case it doesn't:
+		self.response.promise.andThen(bind(self, "_addResult", [result]))
+		self.response.resolve(true);
+		return;
+	    }
+	    self.destination.onMessage(self.origin, self.msg);
 	}
     }
 
@@ -71,13 +94,15 @@ namespace actors {
 	bool _delivering = false;
 	Mutex _lock; // Will become unnecessary once we abandon Quark runtime
 
-	@doc("Deliver an event from origin to destination.")
-	void tell(ActorRef origin, Message message, Actor destination) {
+	@doc("Queue a message from origin to destination, and trigger delivery if necessary.")
+	Promise tell(ActorRef origin, Message message, Actor destination, bool responseExpected) {
 	    self._lock.acquire();
-	    self.queued.add(new _MessageInFlight(origin, event, destination));
+	    _MessageInFlight inFlight = new _MessageInFlight(origin, event, destination, responseExpected);
+	    Promise result = inFlight.response.promise;
+	    self.queued.add(inFlight);
 	    if (self._delivering) {
 		self._lock.release();
-		return;
+		return result;
 	    }
 	    self._delivering = true;
 	    List<_MessageInFlight> toDeliver = self._queued;
@@ -86,16 +111,11 @@ namespace actors {
 
 	    long idx = 0;
 	    while (idx < toDeliver.size()) {
-		Object result = toDeliver[idx].deliver();
-		if (result != NoResponse) {
-		    // Once ask() is implemented returning NoResponse on ask()
-		    // is a bug in user code, as is returning something else for
-		    // tell().
-		    panic("ask() not implemented yet.");
-		}
+		toDeliver[idx].deliver();
 		idx = idx + 1l;
 	    }
 	    self._lock.release();
+	    return result;
 	}
     }
 
