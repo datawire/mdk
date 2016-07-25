@@ -1,9 +1,9 @@
 quark 1.0;
 
-import quark.concurrency;
+use actors.q;
 import actors;
 
-@doc("""\
+@doc("""
 Standard dependency names:
 
 Services, i.e. synchronous blocking APIs:
@@ -35,7 +35,7 @@ namespace dependency {
 	}
 
 	@doc("Look up an actor by name.")
-	void getActor(String name) {
+	ActorRef getActor(String name) {
 	    if (!self._actors.contains(name)) {
 		panic("Actor '" + name + "' not found!");
 	    }
@@ -43,7 +43,7 @@ namespace dependency {
 	}
 
 	@doc("Look up a service by name.")
-	void getService(String name) {
+	Object getService(String name) {
 	    if (!self._services.contains(name)) {
 		panic("Service '" + name + "' not found!");
 	    }

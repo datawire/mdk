@@ -1,19 +1,20 @@
 quark 1.0;
 
+use actors.q;
 import actors;
 
 namespace mdk_runtime {
-    @doc("""\
+    @doc("""
     Return current time.
     """)
     interface Time {
-	@doc("""\
+	@doc("""
         Return the current time in seconds since the Unix epoch.
         """)
 	float time();
     }
 
-    @doc("""\
+    @doc("""
     An actor that can schedule events.
 
     Accepts Schedule messages and send Happening events to originator at the
@@ -21,11 +22,11 @@ namespace mdk_runtime {
     """)
     interface SchedulingActor extends Actor {}
 
-    @doc("""\
+    @doc("""
     Please send me a Happening message with given event name in given number of
     milliseconds.
     """)
-    class Schedule implements Message {
+    class Schedule extends Message {
 	String event;
 	float seconds;
 
@@ -36,7 +37,7 @@ namespace mdk_runtime {
     }
 
     @doc("A scheduled event is now happening.")
-    class Happening implements Message {
+    class Happening extends Message {
 	String event;
 	float currentTime;
 
@@ -46,7 +47,7 @@ namespace mdk_runtime {
 	}
     }
 
-    class _ScheduleTask implements Task {
+    class _ScheduleTask extends Task {
 	QuarkRuntimeTime timeService;
 	ActorRef requester;
 	String event;
@@ -62,11 +63,11 @@ namespace mdk_runtime {
 	}
     }
 
-    @doc("""\
+    @doc("""
     Temporary implementation based on Quark runtime, until we have native
     implementation.
     """)
-    class QuarkRuntimeTime implements Time, ScheduleActor {
+    class QuarkRuntimeTime extends Time, SchedulingActor {
 	void onMessage(ActorRef origin, Message msg) {
 	    Schedule sched = ?msg;
 	    Context.runtime().schedule(new _ScheduleTask(self, origin, sched.event), sched.seconds);
@@ -77,7 +78,8 @@ namespace mdk_runtime {
 	}
 
 	float time() {
-	    return Context.runtime().now() / 1000.0;
+	    float milliseconds = ?Context.runtime().now();
+	    return milliseconds / 1000.0;
 	}
     }
 
@@ -94,13 +96,13 @@ namespace mdk_runtime {
     }
 
     @doc("Testing fake.")
-    class FakeTime implements Time, ScheduleActor {
+    class FakeTime extends Time, SchedulingActor {
 	float _now = 1000.0;
-	Map<long,_FakeTimeRequest> _scheduled = [];
+	Map<long,_FakeTimeRequest> _scheduled = {};
 
 	void onMessage(ActorRef origin, Message msg) {
 	    Schedule sched = ?msg;
-	    _scheduled[_scheduled.size()] = new _FakeTimeRequest(origin, sched.event, self._now + sched.seconds);
+	    _scheduled[_scheduled.keys().size()] = new _FakeTimeRequest(origin, sched.event, self._now + sched.seconds);
 	}
 
 	Message onAsk(ActorRef origin, Message msg) {
@@ -114,10 +116,10 @@ namespace mdk_runtime {
 	@doc("Move time forward.")
 	void advance(float seconds) {
 	    self._now = self._now + seconds;
-	    long idx = 0l;
+	    long idx = 0;
 	    List<long> keys = self._scheduled.keys();
 	    while (idx < keys.size()) {
-		_FakeTimeRequest request = scheduled[keys[idx]];
+		_FakeTimeRequest request = _scheduled[keys[idx]];
 		if (request.happensAt <= self._now) {
 		    self._scheduled.remove(keys[idx]);
 		    request.requester.tell(self, new Happening(request.event, time()));

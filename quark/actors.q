@@ -1,6 +1,6 @@
 quark 1.0;
 
-import stdlib;
+import quark.concurrent;
 
 namespace actors {
 
@@ -8,14 +8,14 @@ namespace actors {
     interface Message {}
 
     @doc("Indicates inability to respond a message.")
-    class Unhandled implements Message {}
+    class Unhandled extends Message {}
 
     @doc("A store of some state. Emits events and handles events.")
     interface Actor {
 	@doc("Called on incoming one-way message from another actor sent via tell().")
 	void onMessage(ActorRef origin, Message message);
 
-	@doc("""\
+	@doc("""
         Called on incoming ask() request from another actor that requires a response.
 
         Return either a Message or a Promise that resolves to a Message.
@@ -85,17 +85,17 @@ namespace actors {
 		Object result = underlyingDestination.onAsk(self.origin, self.msg);
 		// XXX not sure if PromiseFactory.resolve() with a Promise DTRT,
 		// so do workaround in case it doesn't:
-		self.response.promise.andThen(bind(self, "_addResult", [result]))
+		self.response.promise.andThen(bind(self, "_addResult", [result]));
 		self.response.resolve(true);
 		return;
 	    }
-	    underlyingDestination.onMessage(self.destination.self.origin, self.msg);
+	    underlyingDestination.onMessage(self.origin, self.msg);
 	}
     }
 
     @doc("Ensure no re-entrancy by making sure message are run asynchronously.")
     class MessageDispatcher {
-	List<_MessageInFlight> queued = [];
+	List<_InFlightMessage> _queued = [];
 	bool _delivering = false;
 	Mutex _lock; // Will become unnecessary once we abandon Quark runtime
 	Map<Actor,ActorRef> _actors = {};
@@ -113,21 +113,21 @@ namespace actors {
 	Promise tell(Actor origin, Message message, ActorRef destination, bool responseExpected) {
 	    self._lock.acquire();
 	    ActorRef originRef = self._actors[origin];
-	    _MessageInFlight inFlight = new _MessageInFlight(originRef, event, destination, responseExpected);
+	    _InFlightMessage inFlight = new _InFlightMessage(originRef, message, destination, responseExpected);
 	    Promise result = inFlight.response.promise;
-	    self.queued.add(inFlight);
+	    self._queued.add(inFlight);
 	    if (self._delivering) {
 		self._lock.release();
 		return result;
 	    }
 	    self._delivering = true;
-	    List<_MessageInFlight> toDeliver = self._queued;
+	    List<_InFlightMessage> toDeliver = self._queued;
 	    self._queued = [];
 
 	    long idx = 0;
 	    while (idx < toDeliver.size()) {
 		toDeliver[idx].deliver();
-		idx = idx + 1l;
+		idx = idx + 1;
 	    }
 	    self._lock.release();
 	    return result;
@@ -135,7 +135,7 @@ namespace actors {
     }
 
     @doc("Deliver a single Message to multiple Actors.")
-    class Multicast implements Actor {
+	class Multicast extends Actor {
 	List<ActorRef> destinations;
 
 	Multicast(List<ActorRef> destinations) {
@@ -150,7 +150,7 @@ namespace actors {
 	    long idx = 0;
 	    while (idx < destinations.size()) {
 		destinations[idx].tell(origin.getActor(), message);
-		idx = idx + 1l;
+		idx = idx + 1;
 	    }
 	}
     }
