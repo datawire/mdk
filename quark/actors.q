@@ -24,8 +24,7 @@ namespace actors {
 
     @doc("Start an actor, returning the ActorRef for communicating with it.")
     ActorRef startActor(ActorRef parent, Actor theActor) {
-	// XXX no way to catch multiple starts.
-	return new ActorRef(parent.getDispatcher(), theActor);
+	return parent.getDispatcher()._startActor(theActor);
     }
 
     @doc("""A reference to an actor.
@@ -93,6 +92,16 @@ namespace actors {
 	List<_MessageInFlight> queued = [];
 	bool _delivering = false;
 	Mutex _lock; // Will become unnecessary once we abandon Quark runtime
+	Map<Actor,ActorRef> _actors = {};
+
+	ActorRef _startActor(Actor actor) {
+	    if (self._actors.contains(actor)) {
+		panic("Actor already started.");
+	    }
+	    ActorRef result = new ActorRef(self, actor);
+	    self._actors[actor] = result;
+	    return result;
+	}
 
 	@doc("Queue a message from origin to destination, and trigger delivery if necessary.")
 	Promise tell(ActorRef origin, Message message, Actor destination, bool responseExpected) {
@@ -129,7 +138,7 @@ namespace actors {
 	Object onMesssage(ActorRef origin, Message message) {
 	    long idx = 0;
 	    while (idx < destinations.size()) {
-		destinations[idx].onMessage(origin, message);
+		destinations[idx].tell(origin, message);
 		idx = idx + 1l;
 	    }
 	    return NoResponse;
