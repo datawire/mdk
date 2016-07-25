@@ -97,7 +97,7 @@ namespace actors {
     class MessageDispatcher {
 	List<_InFlightMessage> _queued = [];
 	bool _delivering = false;
-	Mutex _lock; // Will become unnecessary once we abandon Quark runtime
+	Lock _lock = new Lock(); // Will become unnecessary once we abandon Quark runtime
 	Map<Actor,ActorRef> _actors = {};
 
 	ActorRef _startActor(Actor actor) {
