@@ -4,14 +4,14 @@ package datawire_mdk_discovery 3.0.0;
 
 use util-1.0.q;
 include discovery-protocol-3.0.q;
-use dependency.q;
+use mdk_runtime.q;
 
 import quark.concurrent;
 import quark.reflect;
 
 import mdk_discovery.protocol;
 import mdk_util;  // bring in EnvironmentVariable, WaitForPromise
-import dependency;
+import mdk_runtime;
 
 /*
   Context:
@@ -330,13 +330,13 @@ namespace mdk_discovery {
         bool started = false;
         Lock mutex = new Lock();
         DiscoClient client;
-        Dependencies dependencies;
+        MDKRuntime runtime;
 
         @doc("Construct a Discovery object. You must set the token before doing")
         @doc("anything else; see the withToken() method.")
-        Discovery(Dependencies dependencies) {
+        Discovery(MDKRuntime runtime) {
             logger.info("Discovery created!");
-            self.dependencies = dependencies;
+            self.runtime = runtime;
         }
 
         // XXX PRIVATE API.
@@ -345,7 +345,7 @@ namespace mdk_discovery {
             mutex.acquire();
 
             if (client == null) {
-                client = new DiscoClient(self, dependencies);
+                client = new DiscoClient(self, runtime);
             }
         }
 
@@ -412,8 +412,8 @@ namespace mdk_discovery {
         }
 
         @doc("Easy startup of a Discovery service with a given token and the default URL.")
-        static Discovery init(String token, Dependencies dependencies) {
-            return new Discovery(dependencies).withToken(token).connect().start();
+        static Discovery init(String token, MDKRuntime runtime) {
+            return new Discovery(runtime).withToken(token).connect().start();
         }
 
         @doc("Stop the uplink to the discovery service.")

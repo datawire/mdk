@@ -1,9 +1,32 @@
 quark 1.0;
 
 use actors.q;
+use dependency.q;
 import actors;
+import dependency;
 
 namespace mdk_runtime {
+    @doc("""
+    Runtime environment for a particular MDK instance.
+
+    Required registered services:
+    - 'time': A provider of mdk_runtime.Time;
+
+    Required registered actors:
+    - 'schedule': Implements the mdk_runtime.ScheduleActor actor protocol.
+
+    XXX can probably automate enforcing the above requirements.
+    """)
+    class MDKRuntime {
+	Dependencies dependencies = new Dependencies();
+	MessageDispatcher dispatcher = new MessageDispatcher();
+
+	@doc("Return Time service.")
+	Time getTimeService() {
+	    return ?self.dependencies.getService("time");
+	}
+    }
+
     @doc("""
     Return current time.
     """)

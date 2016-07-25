@@ -6,11 +6,9 @@ import quark.concurrent;
 import quark.reflect;
 
 use mdk_runtime.q;
-use dependency.q;
 
 import mdk_runtime;
 import actors;
-import dependency;
 
 namespace mdk_protocol {
 
@@ -426,9 +424,11 @@ namespace mdk_protocol {
         Time timeService;
         ActorRef schedulingActor;
 
-        WSClient(Dependencies dependencies) {
-            self.timeService = ?dependencies.getService("time");
-            self.schedulingActor = dependencies.getActor("schedule");
+        WSClient(MDKRuntime runtime) {
+            self.timeService = runtime.getTimeService();
+            self.schedulingActor = runtime.dependencies.getActor("schedule");
+            // Definitely the wrong place to do this, but this works for now:
+            runtime.dispatcher.startActor(self);
         }
 
         String url();

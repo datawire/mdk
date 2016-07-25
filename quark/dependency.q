@@ -4,13 +4,6 @@ use actors.q;
 import actors;
 
 @doc("""
-Standard dependency names:
-
-Services, i.e. synchronous blocking APIs:
-- 'time': A provider of mdk_runtime.Time;
-
-Actors:
-- 'schedule': Implements the mdk_runtime.ScheduleActor actor protocol.
 """)
 namespace dependency {
     @doc("Trivial dependency injection setup.")
@@ -18,7 +11,7 @@ namespace dependency {
 	Map<String,ActorRef> _actors = {};
 	Map<String,Object> _services = {};
 
-	@doc("Register a service object.")
+	@doc("Register a service object, i.e. a synchronous blocking API.")
 	void registerService(String name, Object service) {
 	    if (self._services.contains(name)) {
 		panic("Can't register service '" + name + "' twice.");

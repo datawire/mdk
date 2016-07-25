@@ -23,11 +23,6 @@ namespace actors {
 	Object onAsk(ActorRef origin, Message message);
     }
 
-    @doc("Start an actor, returning the ActorRef for communicating with it.")
-    ActorRef startActor(ActorRef parent, Actor theActor) {
-	return parent.getDispatcher()._startActor(theActor);
-    }
-
     @doc("""A reference to an actor.
 
     Typically not created directly. Instead, use startActor().
@@ -51,12 +46,12 @@ namespace actors {
 
 	@doc("Deliver a message to the actor.")
 	void tell(Actor origin, Message msg) {
-	    self._dispatcher.tell(origin, msg, self, false);
+	    self._dispatcher._tell(origin, msg, self, false);
 	}
 
 	@doc("Deliver a request to the actor, get back Promise of a response.")
 	Promise ask(Actor origin, Message msg) {
-	    return self._dispatcher.tell(origin, msg, self, true);
+	    return self._dispatcher._tell(origin, msg, self, true);
 	}
     }
 
@@ -100,7 +95,8 @@ namespace actors {
 	Lock _lock = new Lock(); // Will become unnecessary once we abandon Quark runtime
 	Map<Actor,ActorRef> _actors = {};
 
-	ActorRef _startActor(Actor actor) {
+	@doc("Start an actor, returning the ActorRef for communicating with it.")
+	ActorRef startActor(Actor actor) {
 	    if (self._actors.contains(actor)) {
 		panic("Actor already started.");
 	    }
@@ -110,25 +106,35 @@ namespace actors {
 	}
 
 	@doc("Queue a message from origin to destination, and trigger delivery if necessary.")
-	Promise tell(Actor origin, Message message, ActorRef destination, bool responseExpected) {
+	Promise _tell(Actor origin, Message message, ActorRef destination, bool responseExpected) {
 	    self._lock.acquire();
+	    if (!self._actors.contains(origin)) {
+		self._lock.release();
+		panic("Origin actor not started!");
+	    }
 	    ActorRef originRef = self._actors[origin];
 	    _InFlightMessage inFlight = new _InFlightMessage(originRef, message, destination, responseExpected);
 	    Promise result = inFlight.response.promise;
 	    self._queued.add(inFlight);
 	    if (self._delivering) {
+		// Someone higher in call stack is doing delivery, they'll deal
+		// with it.
 		self._lock.release();
 		return result;
 	    }
 	    self._delivering = true;
-	    List<_InFlightMessage> toDeliver = self._queued;
-	    self._queued = [];
+	    // Delivering messages may cause additional ones to be queued:
+	    while (self._queued.size() > 0) {
+		List<_InFlightMessage> toDeliver = self._queued;
+		self._queued = [];
 
-	    long idx = 0;
-	    while (idx < toDeliver.size()) {
-		toDeliver[idx].deliver();
-		idx = idx + 1;
+		long idx = 0;
+		while (idx < toDeliver.size()) {
+		    toDeliver[idx].deliver();
+		    idx = idx + 1;
+		}
 	    }
+	    self._delivering = false;
 	    self._lock.release();
 	    return result;
 	}

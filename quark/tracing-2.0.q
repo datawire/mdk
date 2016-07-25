@@ -10,7 +10,6 @@ import mdk_introspection;
 import mdk_tracing.protocol;
 
 import quark.concurrent;
-import dependency;
 
 @doc("""
 Tracing is the log collector for the MDK.
@@ -58,14 +57,14 @@ namespace mdk_tracing {
 
         TLS<SharedContext> _context = new TLS<SharedContext>(new SharedContextInitializer());
         protocol.TracingClient _client;
-        Dependencies dependencies;
+        MDKRuntime runtime;
 
-        Tracer(Dependencies dependencies) {
-            self.dependencies = dependencies;
+        Tracer(MDKRuntime runtime) {
+            self.runtime = runtime;
         }
 
-        static Tracer withURLsAndToken(String url, String queryURL, String token, Dependencies dependencies) {
-            Tracer newTracer = new Tracer(dependencies);
+        static Tracer withURLsAndToken(String url, String queryURL, String token, MDKRuntime runtime) {
+            Tracer newTracer = new Tracer(runtime);
 
             newTracer.url = url;
 
@@ -93,7 +92,7 @@ namespace mdk_tracing {
 
         void _openIfNeeded() {
             if (_client == null) {
-                _client = new protocol.TracingClient(self, dependencies);
+                _client = new protocol.TracingClient(self, runtime);
             }
 
             if (token == null) {
@@ -442,8 +441,8 @@ namespace mdk_tracing {
                 _myLog.debug(s + message);
             }
 
-            TracingClient(Tracer tracer, Dependencies dependencies) {
-                super(dependencies);
+            TracingClient(Tracer tracer, MDKRuntime runtime) {
+                super(runtime);
                 _tracer = tracer;
             }
 
