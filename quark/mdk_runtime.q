@@ -4,10 +4,7 @@ import actors;
 
 namespace mdk_runtime {
     @doc("""\
-    Handle time and scheduling.
-
-    This should be an Actor that accepts Schedule messages and creates Happening
-    events at appropriate time.
+    Return current time.
     """)
     interface Time {
 	@doc("""\
@@ -17,10 +14,18 @@ namespace mdk_runtime {
     }
 
     @doc("""\
+    An actor that can schedule events.
+
+    Accepts Schedule messages and send Happening events to originator at the
+    appropriate time.
+    """)
+    interface SchedulingActor extends Actor {}
+
+    @doc("""\
     Please send me a Happening message with given event name in given number of
     milliseconds.
     """)
-    class Schedule {
+    class Schedule implements Message {
 	String event;
 	float seconds;
 
@@ -31,7 +36,7 @@ namespace mdk_runtime {
     }
 
     @doc("A scheduled event is now happening.")
-    class Happening {
+    class Happening implements Message {
 	String event;
 	float currentTime;
 
@@ -62,7 +67,7 @@ namespace mdk_runtime {
     Temporary implementation based on Quark runtime, until we have native
     implementation.
     """)
-    class QuarkRuntimeTime implements Time, Actor {
+    class QuarkRuntimeTime implements Time, ScheduleActor {
 	void onMessage(ActorRef selfRef, ActorRef origin, Message msg) {
 	    Schedule sched = ?msg;
 	    Context.runtime().schedule(new _ScheduleTask(selfRef, origin, sched.event), sched.seconds);
@@ -90,7 +95,7 @@ namespace mdk_runtime {
     }
 
     @doc("Testing fake.")
-    class FakeTime implements Time, Actor {
+    class FakeTime implements Time, ScheduleActor {
 	float _now = 1000.0;
 	Map<long,_FakeTimeRequest> _scheduled = [];
 	ActorRef selfRef;
