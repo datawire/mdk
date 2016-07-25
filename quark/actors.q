@@ -107,7 +107,6 @@ namespace actors {
 	    self._delivering = true;
 	    List<_MessageInFlight> toDeliver = self._queued;
 	    self._queued = [];
-	    self._lock.release();
 
 	    long idx = 0;
 	    while (idx < toDeliver.size()) {
