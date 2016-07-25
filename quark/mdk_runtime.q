@@ -47,19 +47,18 @@ namespace mdk_runtime {
     }
 
     class _ScheduleTask implements Task {
-	ActorRef timeActor;
+	QuarkRuntimeTime timeService;
 	ActorRef requester;
 	String event;
 
-	_ScheduleTask(ActorRef timeActor, ActorRef requester, String event) {
-	    self.timeActor = timeActor;
+	_ScheduleTask(QuarkRuntimeTime timeService, ActorRef requester, String event) {
+	    self.timeService = timeService;
 	    self.requester = requester;
 	    self.event = event;
 	}
 
 	void onExecute(Runtime runtime) {
-	    QuarkRuntimeTime time = ?self.timeActor.getActor();
-	    self.requester.tell(self.timeActor, new Happening(self.event, time.time()));
+	    self.requester.tell(self.timeService, new Happening(self.event, self.timeService.time()));
 	}
     }
 
@@ -68,12 +67,12 @@ namespace mdk_runtime {
     implementation.
     """)
     class QuarkRuntimeTime implements Time, ScheduleActor {
-	void onMessage(ActorRef selfRef, ActorRef origin, Message msg) {
+	void onMessage(ActorRef origin, Message msg) {
 	    Schedule sched = ?msg;
-	    Context.runtime().schedule(new _ScheduleTask(selfRef, origin, sched.event), sched.seconds);
+	    Context.runtime().schedule(new _ScheduleTask(self, origin, sched.event), sched.seconds);
 	}
 
-	Message onAsk(ActorRef selfRef, ActorRef origin, Message msg) {
+	Message onAsk(ActorRef origin, Message msg) {
 	    return new Unhandled();
 	}
 
@@ -98,15 +97,13 @@ namespace mdk_runtime {
     class FakeTime implements Time, ScheduleActor {
 	float _now = 1000.0;
 	Map<long,_FakeTimeRequest> _scheduled = [];
-	ActorRef selfRef;
 
-	void onMessage(ActorRef selfRef, ActorRef origin, Message msg) {
-	    self.selfRef = selfRef;
+	void onMessage(ActorRef origin, Message msg) {
 	    Schedule sched = ?msg;
 	    _scheduled[_scheduled.size()] = new _FakeTimeRequest(origin, sched.event, self._now + sched.seconds);
 	}
 
-	Message onAsk(ActorRef selfRef, ActorRef origin, Message msg) {
+	Message onAsk(ActorRef origin, Message msg) {
 	    return new Unhandled();
 	}
 
@@ -123,7 +120,7 @@ namespace mdk_runtime {
 		_FakeTimeRequest request = scheduled[keys[idx]];
 		if (request.happensAt <= self._now) {
 		    self._scheduled.remove(keys[idx]);
-		    request.requester.tell(self.selfRef, new Happening(request.event, time()));
+		    request.requester.tell(self, new Happening(request.event, time()));
 		}
 		idx = idx + 1;
 	    }
