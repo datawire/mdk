@@ -134,7 +134,7 @@ namespace mdk_tracing {
             _context.setValue(self.getContext().finish_span());
         }
 
-        void log(String procUUID, String level, String category, String text) {
+        void logTypedData(String procUUID, String level, String category, String contentType, String encodedContent) {
             self._openIfNeeded();
 
             SharedContext ctx = self.getContext();
@@ -158,9 +158,13 @@ namespace mdk_tracing {
             evt.node = procUUID;
             evt.level = level;
             evt.category = category;
-            evt.contentType = "text/plain";
-            evt.text = text;
+            evt.contentType = contentType;
+            evt.text = encodedContent;
             _client.log(evt);
+        }
+
+        void log(String procUUID, String level, String category, String text) {
+            self.logTypedData(procUUID, level, category, "text/plain", text);
         }
 
         Promise poll() {

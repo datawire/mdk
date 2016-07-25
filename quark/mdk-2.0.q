@@ -201,13 +201,17 @@ namespace mdk {
              This will update circuit breaker state for the remote
              nodes, as well as reporting all nodes involved to the
              tracing system.
+
+             It does not make sense to call both fail_interaction and finish_interaction for the same interaction.
              """)
         void fail_interaction(String message);
 
         @doc("""
              Finish an interaction.
 
-             This marks an interaction as completed.
+             This marks an interaction as having completed successfully.
+
+             It does not make sense to call both fail_interaction and finish_interaction for the same interaction.
              """)
         void finish_interaction();
 
@@ -258,6 +262,11 @@ namespace mdk {
             node.version = version;
             node.address = address;
             node.properties = {};
+
+            String nodeJSON = quark.toJSON(node, node.getClass()).toString();
+
+            self._tracer.logTypedData(self.procUUID, "INFO", "mdk_services", "datawire/mdk-register", nodeJSON);
+
             _disco.register(node);
         }
 
@@ -288,6 +297,11 @@ namespace mdk {
                 SharedContext ctx = SharedContext.decode(encodedContext);
                 _context = ctx.start_span();
             }
+        }
+
+        void logTypedData(String level, String category, String contentType, String encodedContent) {
+            _mdk._tracer.setContext(_context);
+            _mdk._tracer.logTypedData(_mdk.procUUID, level, category, contentType, encodedContent);
         }
 
         void _log(String level, String category, String text) {
@@ -322,6 +336,13 @@ namespace mdk {
         }
 
         Promise _resolve(String service, String version) {
+            Map<String,String> params = {
+                "service": service,
+                "version": version
+            };
+
+            self.logTypedData("INFO", "mdk_services", "datawire/mdk-resolve", params.toJSON().toString());
+
             return _mdk._disco._resolve(service, version).
                 andThen(bind(self, "_resolvedCallback", []));
         }
