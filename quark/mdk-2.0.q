@@ -8,12 +8,15 @@ use discovery-3.0.q;
 use tracing-2.0.q;
 use introspection-1.0.q;
 use util-1.0.q;
+use dependency.q;
+use mdk_runtime.q;
+use actors.q;
 
 import mdk_discovery;
 import mdk_tracing;
 import mdk_introspection;
 import mdk_util;
-
+import actors;
 import quark.concurrent;
 
 @doc("Microservices Development Kit -- obtain a reference using MDK.init()")
@@ -25,15 +28,23 @@ namespace mdk {
 
     @doc("Create an unstarted instance of the MDK.")
     MDK init() {
-        return new MDKImpl();
+        // XXX once we have native package wrappers for this code they will
+        // create the DI registry and actor disptacher. Until then, we create those
+        // here:
+        dependency.Dependencies dependencies = new dependency.Dependencies();
+        actors.MessageDispatcher dispatcher = new actors.MessageDispatcher();
+        mdk_runtime.QuarkRuntimeTime timeService = new mdk_runtime.QuarkRuntimeTime();
+        dependencies.registerService("time", timeService);
+        dependencies.registerActor("schedule", dispatcher._startActor(timeService));
+        return new MDKImpl(dependencies);
     }
 
     @doc("""
          Create a started instance of the MDK. This is equivalent to
-         callint init() followed by start() on the resulting instance.
+         calling init() followed by start() on the resulting instance.
          """)
     MDK start() {
-        MDK m = new MDKImpl();
+        MDK m = init();
         m.start();
         return m;
     }
@@ -225,17 +236,18 @@ namespace mdk {
 
         static Logger logger = new Logger("mdk");
 
-        Discovery _disco = new Discovery();
+        Discovery _disco;
         Tracer _tracer;
         String procUUID = Context.runtime().uuid();
 
-        MDKImpl() {
+        MDKImpl(Dependencies dependencies) {
+            _disco = new Discovery(dependencies);
             _disco.url = _get("MDK_DISCOVERY_URL", "wss://discovery.datawire.io/ws/v1");
             _disco.token = DatawireToken.getToken();
 
             String tracingURL = _get("MDK_TRACING_URL", "wss://tracing.datawire.io/ws/v1");
             String tracingQueryURL = _get("MDK_TRACING_API_URL", "https://tracing.datawire.io/api/v1/logs");
-            _tracer = Tracer.withURLsAndToken(tracingURL, tracingQueryURL, _disco.token);
+            _tracer = Tracer.withURLsAndToken(tracingURL, tracingQueryURL, _disco.token, dependencies);
             _tracer.initContext();
         }
 

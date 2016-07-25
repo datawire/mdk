@@ -1,8 +1,10 @@
 quark 1.0;
 
 use protocol-1.0.q;
+use dependency.q;
 
 import mdk_protocol;
+import dependency;
 
 namespace mdk_discovery {
     namespace protocol {
@@ -14,7 +16,8 @@ namespace mdk_discovery {
 
             Discovery disco;
 
-            DiscoClient(Discovery discovery) {
+            DiscoClient(Discovery discovery, Dependencies dependencies) {
+                super(dependencies);
                 disco = discovery;
             }
 

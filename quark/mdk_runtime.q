@@ -78,7 +78,7 @@ namespace mdk_runtime {
 	}
 
 	float time() {
-	    float milliseconds = ?Context.runtime().now();
+	    float milliseconds = Context.runtime().now().toFloat();
 	    return milliseconds / 1000.0;
 	}
     }
@@ -113,9 +113,8 @@ namespace mdk_runtime {
 	    return self._now;
 	}
 
-	@doc("Move time forward.")
-	void advance(float seconds) {
-	    self._now = self._now + seconds;
+	@doc("Run scheduled events whose time has come.")
+	void pump() {
 	    long idx = 0;
 	    List<long> keys = self._scheduled.keys();
 	    while (idx < keys.size()) {
@@ -126,6 +125,11 @@ namespace mdk_runtime {
 		}
 		idx = idx + 1;
 	    }
+	}
+
+	@doc("Move time forward.")
+	void advance(float seconds) {
+	    self._now = self._now + seconds;
 	}
     }
 }
