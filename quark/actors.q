@@ -5,9 +5,8 @@ namespace actors {
     @doc("A message.")
     interface Message {}
 
-    @doc("Indicates no response to a message.")
-    class _NoResponse {}
-    var NoResponse = new _NoResponse();
+    @doc("Indicates inability to respond a message.")
+    class Unhandled implements Message {}
 
     @doc("A store of some state. Emits events and handles events.")
     interface Actor {
