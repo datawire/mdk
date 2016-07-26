@@ -311,8 +311,8 @@ namespace mdk {
             return _context.properties.contains(property);
         }
 
-        void route(String service, String version, String address) {
-            Map<String,Map<String,Object>> routes;
+        void route(String service, String target, String version) {
+            Map<String,Map<String,String>> routes;
             if (!has("routes")) {
                 routes = {};
                 set("routes", routes);
@@ -320,20 +320,7 @@ namespace mdk {
                 routes = ?get("routes");
             }
 
-            Node node = new Node();
-            node.service = service;
-            node.version = version;
-            node.address = address;
-            // XXX: I tried using automatic serialization here, but it
-            //      blew up tracing
-            // XXX: would be nice if I could just render this to a map
-            Map<String,Object> nodeMap = {
-                "service": service,
-                "version": version,
-                "address": address
-            };
-
-            routes[service] = nodeMap;
+            routes[service] = {"service": target, "version": version};
         }
 
         void trace(String level) {
@@ -399,16 +386,11 @@ namespace mdk {
         }
 
         Promise _resolve(String service, String version) {
-            Map<String,Map<String,Object>> routes = ?get("routes");
+            Map<String,Map<String,String>> routes = ?get("routes");
             if (routes != null && routes.contains(service)) {
-                Map<String,Object> nodeMap = routes[service];
-                Node node = new Node();
-                node.service = ?nodeMap["service"];
-                node.version = ?nodeMap["version"];
-                node.address = ?nodeMap["address"];
-                PromiseFactory factory = new PromiseFactory();
-                factory.resolve(node);
-                return factory.promise;
+                Map<String,String> route = routes[service];
+                service = route["service"];
+                version = route["version"];
             }
 
             return _mdk._disco._resolve(service, version).
