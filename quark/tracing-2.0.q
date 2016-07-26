@@ -49,8 +49,8 @@ namespace mdk_tracing {
     class Tracer {
         static Logger logger = new Logger("MDK Tracer");
 
-        String url = "wss://tracing.datawire.io/ws";
-        String queryURL = "https://tracing.datawire.io/api/logs";
+        String url = "wss://tracing.datawire.io/ws/v1";
+        String queryURL = "https://tracing.datawire.io/api/v1/logs";
 
         String token;
         long lastPoll = 0L;
@@ -75,7 +75,7 @@ namespace mdk_tracing {
                     parsedURL.scheme = "https";
                 }
 
-                parsedURL.path = "/api/logs";
+                parsedURL.path = "/api/v1/logs";
 
                 newTracer.queryURL = parsedURL.toString();
             } else {
@@ -139,7 +139,7 @@ namespace mdk_tracing {
 
             SharedContext ctx = self.getContext();
             ctx.tick();
-            logger.info("CTX " + ctx.toString());
+            logger.trace("CTX " + ctx.toString());
 
             LogEvent evt = new LogEvent();
 
@@ -167,7 +167,7 @@ namespace mdk_tracing {
             // XXX: this shouldn't really be necessary
             self._openIfNeeded();
 
-            logger.info("Polling for logs...");
+            logger.trace("Polling for logs...");
 
             long rightNow = now();
             Promise result = query(lastPoll, rightNow);
@@ -176,7 +176,7 @@ namespace mdk_tracing {
         }
 
         List<LogEvent> deresultify(api.GetLogEventsResult result) {
-            logger.info("got " + result.result.size().toString() + " log events");
+            logger.trace("got " + result.result.size().toString() + " log events");
             return result.result;
         }
 
@@ -239,7 +239,7 @@ namespace mdk_tracing {
                     error = "HTTP response " + code.toString();
                 }
 
-                logger.info("OH NO! " + error);
+                logger.error("query failure: " + error);
 
                 return new HTTPError(error);
             }
