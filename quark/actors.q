@@ -107,7 +107,6 @@ namespace actors {
 
 	@doc("Queue a message from origin to destination, and trigger delivery if necessary.")
 	Promise _tell(Actor origin, Message message, ActorRef destination, bool responseExpected) {
-	    self._lock.acquire();
 	    if (!self._actors.contains(origin)) {
 		self._lock.release();
 		panic("Origin actor not started!");
@@ -115,24 +114,28 @@ namespace actors {
 	    ActorRef originRef = self._actors[origin];
 	    _InFlightMessage inFlight = new _InFlightMessage(originRef, message, destination, responseExpected);
 	    Promise result = inFlight.response.promise;
+	    self._lock.acquire();
 	    self._queued.add(inFlight);
+	    self._lock.release();
 	    if (self._delivering) {
 		// Someone higher in call stack is doing delivery, they'll deal
 		// with it.
-		self._lock.release();
 		return result;
 	    }
+	    self._lock.acquire();
 	    self._delivering = true;
 	    // Delivering messages may cause additional ones to be queued:
 	    while (self._queued.size() > 0) {
 		List<_InFlightMessage> toDeliver = self._queued;
 		self._queued = [];
 
+		self._lock.release();
 		long idx = 0;
 		while (idx < toDeliver.size()) {
 		    toDeliver[idx].deliver();
 		    idx = idx + 1;
 		}
+		self._lock.acquire();
 	    }
 	    self._delivering = false;
 	    self._lock.release();
