@@ -146,6 +146,9 @@ namespace mdk {
         @doc("Grabs the encoded context.")
         String inject();
 
+        @doc("Returns an externalized representation of the distributed session.")
+        String externalize();
+
         @doc("Record a log entry at the CRITICAL logging level.")
         void critical(String category, String text);
 
@@ -275,6 +278,12 @@ namespace mdk {
 
     class SessionImpl extends Session {
 
+        static Map<String,int> _levels = {"CRITICAL": 0,
+                                          "ERROR": 1,
+                                          "WARN": 2,
+                                          "INFO": 3,
+                                          "DEBUG": 4};
+
         MDKImpl _mdk;
         List<Node> _resolved = [];
         SharedContext _context;
@@ -290,6 +299,64 @@ namespace mdk {
             }
         }
 
+        Object get(String property) {
+            return _context.properties[property];
+        }
+
+        void set(String property, Object value) {
+            _context.properties[property] = value;
+        }
+
+        bool has(String property) {
+            return _context.properties.contains(property);
+        }
+
+        void route(String service, String version, String address) {
+            Map<String,Map<String,Object>> routes;
+            if (!has("routes")) {
+                routes = {};
+                set("routes", routes);
+            } else {
+                routes = ?get("routes");
+            }
+
+            Node node = new Node();
+            node.service = service;
+            node.version = version;
+            node.address = address;
+            // XXX: I tried using automatic serialization here, but it
+            //      blew up tracing
+            // XXX: would be nice if I could just render this to a map
+            Map<String,Object> nodeMap = {
+                "service": service,
+                "version": version,
+                "address": address
+            };
+
+            routes[service] = nodeMap;
+        }
+
+        void trace(String level) {
+            set("trace", level);
+        }
+
+        static int _level(String level) {
+            if (_levels.contains(level)) {
+                return _levels[level];
+            } else {
+                return 0;
+            }
+        }
+
+        bool _enabled(String level) {
+            int ilevel = _level("INFO");
+            if (has("trace")) {
+                ilevel = _level(?get("trace"));
+            }
+
+            return _level(level) <= ilevel;
+        }
+
         void _log(String level, String category, String text) {
             _mdk._tracer.setContext(_context);
             _mdk._tracer.log(_mdk.procUUID, level, category, text);
@@ -297,31 +364,53 @@ namespace mdk {
 
         void critical(String category, String text) {
             // XXX: no critical
-            _mdk.logger.error(category + ": " + text);
-            _log("CRITICAL", category, text);
+            if (_enabled("CRITICAL")) {
+                _mdk.logger.error(category + ": " + text);
+                _log("CRITICAL", category, text);
+            }
         }
 
         void error(String category, String text) {
-            _mdk.logger.error(category + ": " + text);
-            _log("ERROR", category, text);
+            if (_enabled("ERROR")) {
+                _mdk.logger.error(category + ": " + text);
+                _log("ERROR", category, text);
+            }
         }
 
         void warn(String category, String text) {
-            _mdk.logger.warn(category + ": " + text);
-            _log("WARN", category, text);
+            if (_enabled("WARN")) {
+                _mdk.logger.warn(category + ": " + text);
+                _log("WARN", category, text);
+            }
         }
 
         void info(String category, String text) {
-            _mdk.logger.info(category + ": " + text);
-            _log("INFO", category, text);
+            if (_enabled("INFO")) {
+                _mdk.logger.info(category + ": " + text);
+                _log("INFO", category, text);
+            }
         }
 
         void debug(String category, String text) {
-            _mdk.logger.debug(category + ": " + text);
-            _log("DEBUG", category, text);
+            if (_enabled("DEBUG")) {
+                _mdk.logger.debug(category + ": " + text);
+                _log("DEBUG", category, text);
+            }
         }
 
         Promise _resolve(String service, String version) {
+            Map<String,Map<String,Object>> routes = ?get("routes");
+            if (routes != null && routes.contains(service)) {
+                Map<String,Object> nodeMap = routes[service];
+                Node node = new Node();
+                node.service = ?nodeMap["service"];
+                node.version = ?nodeMap["version"];
+                node.address = ?nodeMap["address"];
+                PromiseFactory factory = new PromiseFactory();
+                factory.resolve(node);
+                return factory.promise;
+            }
+
             return _mdk._disco._resolve(service, version).
                 andThen(bind(self, "_resolvedCallback", []));
         }
@@ -349,7 +438,13 @@ namespace mdk {
         }
 
         String inject() {
-            return _context.encode();
+            return externalize();
+        }
+
+        String externalize() {
+            String result = _context.encode();
+            _context.tick();
+            return result;
         }
 
         void fail_interaction(String message) {
