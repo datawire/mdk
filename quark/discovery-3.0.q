@@ -412,8 +412,8 @@ namespace mdk_discovery {
         }
 
         @doc("Easy startup of a Discovery service with a given token and the default URL.")
-        static Discovery init(String token, MDKRuntime runtime) {
-            return new Discovery(runtime).withToken(token).connect().start();
+        static Discovery init(String token) {
+            return new Discovery(defaultRuntime()).withToken(token).connect().start();
         }
 
         @doc("Stop the uplink to the discovery service.")

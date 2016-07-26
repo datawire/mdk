@@ -29,11 +29,7 @@ namespace mdk {
         // XXX once we have native package wrappers for this code they will
         // create the DI registry and actor disptacher. Until then, we create those
         // here:
-        mdk_runtime.MDKRuntime runtime = new MDKRuntime();
-        mdk_runtime.QuarkRuntimeTime timeService = new mdk_runtime.QuarkRuntimeTime();
-        runtime.dependencies.registerService("time", timeService);
-        runtime.dependencies.registerActor("schedule", runtime.dispatcher.startActor(timeService));
-        return new MDKImpl(runtime);
+        return new MDKImpl(mdk_runtime.defaultRuntime());
     }
 
     @doc("""
@@ -244,7 +240,10 @@ namespace mdk {
 
             String tracingURL = _get("MDK_TRACING_URL", "wss://tracing.datawire.io/ws/v1");
             String tracingQueryURL = _get("MDK_TRACING_API_URL", "https://tracing.datawire.io/api/v1/logs");
-            _tracer = Tracer.withURLsAndToken(tracingURL, tracingQueryURL, _disco.token, runtime);
+            _tracer = Tracer(runtime);
+            _tracer.url = tracingURL;
+            _tracer.queryURL = tracingQueryURL;
+            _tracer.token = _disco.token;
             _tracer.initContext();
         }
 

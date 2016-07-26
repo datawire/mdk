@@ -155,4 +155,13 @@ namespace mdk_runtime {
 	    self._now = self._now + seconds;
 	}
     }
+
+    @doc("Create a MDKRuntime with the default configuration.")
+    MDKRuntime defaultRuntime() {
+	MDKRuntime runtime = new MDKRuntime();
+        QuarkRuntimeTime timeService = new QuarkRuntimeTime();
+        runtime.dependencies.registerService("time", timeService);
+        runtime.dependencies.registerActor("schedule", runtime.dispatcher.startActor(timeService));
+	return runtime;
+    }
 }

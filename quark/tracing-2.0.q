@@ -63,8 +63,8 @@ namespace mdk_tracing {
             self.runtime = runtime;
         }
 
-        static Tracer withURLsAndToken(String url, String queryURL, String token, MDKRuntime runtime) {
-            Tracer newTracer = new Tracer(runtime);
+        static Tracer withURLsAndToken(String url, String queryURL, String token) {
+            Tracer newTracer = new Tracer(defaultRuntime());
 
             newTracer.url = url;
 
