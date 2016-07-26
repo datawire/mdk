@@ -16,7 +16,7 @@ function main() {
     setTimeout(function() {
 	console.log("timeout");
 	MDK.stop();
-    });
+    }, 30000);
     var ssn = MDK.session();
     ssn.resolve_async(process.argv[2], "1.0.0").then(showResult, showError);
 }

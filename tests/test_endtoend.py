@@ -47,7 +47,7 @@ class PythonTests(TestCase):
         self.addCleanup(lambda: p.terminate())
         resolved_address = check_output(
             ["node", os.path.join(CODE_PATH, "resolve.js"), service])
-        self.assertEqual(address, resolved_address)
+        self.assertIn(address, resolved_address)
 
     def test_logging(self):
         """Minimal logging end-to-end test.
