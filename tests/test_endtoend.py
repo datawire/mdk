@@ -9,10 +9,6 @@ from unittest import TestCase
 CODE_PATH = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "source"))
 
-os.putenv("MDK_DISCOVERY_URL", "wss://discovery-develop.datawire.io/ws/v1")
-os.putenv("MDK_TRACING_URL", "wss://tracing-develop.datawire.io/ws/v1")
-os.putenv("MDK_TRACING_API_URL", "https://tracing-develop.datawire.io/api/v1/logs")
-
 
 def random_string():
     return "random_" + str(random())[2:]
