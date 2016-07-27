@@ -257,7 +257,9 @@ namespace mdk {
             node.service = service;
             node.version = version;
             node.address = address;
-            node.properties = {};
+
+            node.properties = { "datawire_nodeId": procUUID };
+
             _disco.register(node);
         }
 
