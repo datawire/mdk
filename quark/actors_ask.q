@@ -1,5 +1,6 @@
 quark 1.0;
 
+import quark.reflect;
 import actors.core;
 
 namespace actors {
@@ -27,7 +28,7 @@ namespace ask {
 	@doc("""
         Called on incoming ask() request from another actor that requires a response.
 
-        Return either a result of some sort or a Promise that resolves to the result..
+        Return either a result of some sort or a Promise that resolves to the result.
         """)
 	Object onAsk(ActorRef origin, Message message);
     }
@@ -41,9 +42,31 @@ namespace ask {
 	    self.wrapped = message;
 	    self.askRouter = askRouter;
 	}
+
+	bool _respond(Object result, AskActor destination) {
+	    askRouter.tell(destination, new _AskResponse(result, askRouter));
+	    return true;
+	}
+
+	@doc("Deliver the message, send the response to the _AskRouter.")
+	void deliver(ActorRef origin, AskActor destination) {
+	    Object result = destination.onAsk(origin, self.wrapped);
+	    if (Class.get("quark.Promise").hasInstance(result)) {
+		// In order to preserve non-reentrancy, we want to make sure we
+		// only send the message once we have a result. Sending a
+		// message with an asynchronous result like a Promise would mean
+		// that the Promise might fire and cause reentrancy in code that
+		// is then run.
+		Promise resultPromise = ?result;
+		resultPromise.andThen(bind(self, "_respond", [destination]));
+		return;
+	    }
+	    // Synchronous result, can deliver response immediately:
+	    self._respond(result, destination);
+	}
     }
 
-    @doc("Wraps a message or Promise of message.")
+    @doc("Wraps a resolved response to an ask(), i.e. anything but a Promise.")
     class _AskResponse extends Message {
 	Object response;
         ActorRef askRouter;
@@ -71,8 +94,7 @@ namespace ask {
     bool deliverAsks(ActorRef origin, Message msg, AskActor destination) {
 	if (quark.reflect.Class.get("actors._AskRequest").hasInstance(msg)) {
 	    _AskRequest request = ?msg;
-	    Object result = destination.onAsk(origin, request.wrapped);
-	    request.askRouter.tell(destination, new _AskResponse(result, request.askRouter));
+	    request.deliver(origin, destination);
 	    return true;
 	}
 	return false;
@@ -80,28 +102,14 @@ namespace ask {
 
     @doc("""
     Handle ask() replies by resolving the appropriate Promise.
-
-    We use this instead of just resolving Promises directly in order to preserve
-    the no-reentrancy guarantee.
-
-    XXX This design is buggy: non-reentrancy isn't actually guaranteed if the
-    response to the ask() is a Promise.
     """)
     class _AskRouter extends Actor {
 	PromiseFactory factory = new PromiseFactory();
 
-	Object _addResult(bool ignore, _AskResponse response) {
-	    // We're done, shut down this Actor:
-	    response.askRouter.stop();
-	    return response.response;
-	}
-
 	void onMessage(ActorRef origin, Message msg) {
 	    _AskResponse response = ?msg;
-	    // XXX not sure if PromiseFactory.resolve() with a Promise DTRT,
-	    // so do workaround in case it doesn't:
-	    self.factory.promise.andThen(bind(self, "_addResult", [response]));
-	    self.factory.resolve(true);
+	    self.factory.resolve(response.response);
+	    response.askRouter.stop(); // All done with this actor
 	}
     }
 
