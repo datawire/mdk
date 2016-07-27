@@ -1,7 +1,7 @@
 quark 1.0;
 
 use actors.q;
-import actors;
+import actors.core;
 
 @doc("""
 """)

@@ -2,7 +2,7 @@ quark 1.0;
 
 use actors.q;
 use dependency.q;
-import actors;
+import actors.core;
 import dependency;
 
 namespace mdk_runtime {
@@ -96,10 +96,6 @@ namespace mdk_runtime {
 	    Context.runtime().schedule(new _ScheduleTask(self, origin, sched.event), sched.seconds);
 	}
 
-	Message onAsk(ActorRef origin, Message msg) {
-	    return new Unhandled();
-	}
-
 	float time() {
 	    float milliseconds = Context.runtime().now().toFloat();
 	    return milliseconds / 1000.0;
@@ -126,10 +122,6 @@ namespace mdk_runtime {
 	void onMessage(ActorRef origin, Message msg) {
 	    Schedule sched = ?msg;
 	    _scheduled[_scheduled.keys().size()] = new _FakeTimeRequest(origin, sched.event, self._now + sched.seconds);
-	}
-
-	Message onAsk(ActorRef origin, Message msg) {
-	    return new Unhandled();
 	}
 
 	float time() {

@@ -8,7 +8,7 @@ import quark.reflect;
 use mdk_runtime.q;
 
 import mdk_runtime;
-import actors;
+import actors.core;
 
 namespace mdk_protocol {
 
@@ -482,10 +482,6 @@ namespace mdk_protocol {
                 self.onScheduledEvent();
             }
         }
-
-        Object onAsk(ActorRef origin, Message message) {
-	    return new Unhandled();
-	}
 
         void onScheduledEvent() {
             /*
