@@ -8,9 +8,6 @@ namespace core {
     @doc("A message.")
     interface Message {}
 
-    @doc("Indicates inability to respond a message.")
-    class Unhandled extends Message {}
-
     @doc("A store of some state. Emits events and handles events.")
     interface Actor {
 	@doc("Called on incoming one-way message from another actor sent via tell().")
