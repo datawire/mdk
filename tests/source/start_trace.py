@@ -10,7 +10,7 @@ mdk = start()
 def main():
     session = mdk.session()
     session.info("process1", "hello")
-    time.sleep(1)
+    time.sleep(5)
     sys.stdout.write(session.inject())
     sys.stdout.flush()
     mdk.stop()
