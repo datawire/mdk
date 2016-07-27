@@ -42,6 +42,11 @@ namespace core {
 	void tell(Actor origin, Message msg) {
 	    self._dispatcher._tell(origin, msg, self);
 	}
+
+	@doc("Stop the Actor. Should only be called once.")
+	void stop() {
+	    self._dispatcher._stopActor(self._actor);
+	}
     }
 
     @doc("A message that queued for delivery by a MessageDispatcher.")
@@ -84,6 +89,11 @@ namespace core {
 	    ActorRef result = new ActorRef(self, actor);
 	    self._actors[actor] = result;
 	    return result;
+	}
+
+	@doc("Stop an actor.")
+	void _stopActor(Actor actor) {
+	    self._actors.remove(actor);
 	}
 
 	@doc("Queue a message from origin to destination, and trigger delivery if necessary.")

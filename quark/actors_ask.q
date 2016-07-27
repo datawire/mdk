@@ -27,7 +27,7 @@ namespace ask {
 	@doc("""
         Called on incoming ask() request from another actor that requires a response.
 
-        Return either a Message or a Promise that resolves to a Message.
+        Return either a result of some sort or a Promise that resolves to the result..
         """)
 	Object onAsk(ActorRef origin, Message message);
     }
@@ -83,18 +83,24 @@ namespace ask {
 
     We use this instead of just resolving Promises directly in order to preserve
     the no-reentrancy guarantee.
+
+    XXX This design is buggy: non-reentrancy isn't actually guaranteed if the
+    response to the ask() is a Promise.
     """)
     class _AskRouter extends Actor {
 	PromiseFactory factory = new PromiseFactory();
 
-	Object _addResult(bool ignore, Object result) {
-	    return result;
+	Object _addResult(bool ignore, _AskResponse response) {
+	    // We're done, shut down this Actor:
+	    response.askRouter.stop();
+	    return response.response;
 	}
 
 	void onMessage(ActorRef origin, Message msg) {
+	    _AskResponse response = ?msg;
 	    // XXX not sure if PromiseFactory.resolve() with a Promise DTRT,
 	    // so do workaround in case it doesn't:
-	    self.factory.promise.andThen(bind(self, "_addResult", [msg]));
+	    self.factory.promise.andThen(bind(self, "_addResult", [response]));
 	    self.factory.resolve(true);
 	}
     }
