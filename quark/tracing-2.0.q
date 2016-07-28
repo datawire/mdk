@@ -302,6 +302,7 @@ namespace mdk_tracing {
 
         interface TracingHandler extends ProtocolHandler {
             void onLogEvent(LogEvent event);
+            void onSubscribe(Subscribe sub);
         }
 
         @doc("""A single event in the stream that Tracing has to manage.""")
@@ -316,6 +317,10 @@ namespace mdk_tracing {
 
             static ProtocolEvent decode(String encoded) {
                 return ?Serializable.decodeClassName("mdk_tracing.protocol.LogEvent", encoded);
+            }
+
+            void dispatch(ProtocolHandler handler) {
+                dispatchTracingEvent(?handler);
             }
 
             void dispatchTracingEvent(TracingHandler handler);
@@ -357,10 +362,6 @@ namespace mdk_tracing {
             @doc("Should the server send an acknowledgement?")
             int sync;
 
-            void dispatch(ProtocolHandler handler) {
-                dispatchTracingEvent(?handler);
-            }
-
             void dispatchTracingEvent(TracingHandler handler) {
                 handler.onLogEvent(self);
             }
@@ -370,6 +371,18 @@ namespace mdk_tracing {
                     ", " + node + ", " + level + ", " + category + ", " + contentType + ", " + text + ">";
             }
 
+        }
+
+        class Subscribe extends TracingEvent {
+            static Discriminator _discriminator = anyof(["subscribe"]);
+
+            void dispatchTracingEvent(TracingHandler handler) {
+                handler.onSubscribe(self);
+            }
+
+            String toString() {
+                return "<Subscribe>";
+            }
         }
 
         interface TracingClientHandler extends ProtocolHandler {
