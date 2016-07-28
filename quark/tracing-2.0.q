@@ -449,17 +449,22 @@ namespace mdk_tracing {
 
             bool isStarted() {
                 _mutex.acquire();
-                int size = _buffered.size();
+                bool result = _started || _buffered.size() > 0 || _handler != null;
                 _mutex.release();
-                return _started || size > 0;
+                return result;
+            }
+
+            void _startIfNeeded() {
+                if (!_started) {
+                    self.start();
+                    _started = true;
+                }
             }
 
             void subscribe(UnaryCallable handler) {
                 _mutex.acquire();
                 _handler = handler;
-                if (self.isConnected()) {
-                    self.sock.send(new Subscribe().encode());
-                }
+                _startIfNeeded();
                 _mutex.release();
             }
 
@@ -548,10 +553,7 @@ namespace mdk_tracing {
                 _logged = _logged + 1;
                 _buffered.add(evt);
                 _debug("logged #" + evt.sequence.toString());
-                if (!_started) {
-                    self.start();
-                    _started = true;
-                }
+                _startIfNeeded();
                 _mutex.release();
             }
 
