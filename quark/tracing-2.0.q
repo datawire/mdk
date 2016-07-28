@@ -316,7 +316,7 @@ namespace mdk_tracing {
             }
 
             static ProtocolEvent decode(String encoded) {
-                return ?Serializable.decodeClassName("mdk_tracing.protocol.LogEvent", encoded);
+                return ?Serializable.decodeClassName("mdk_tracing.protocol.TracingEvent", encoded);
             }
 
             void dispatch(ProtocolHandler handler) {
@@ -374,6 +374,7 @@ namespace mdk_tracing {
         }
 
         class Subscribe extends TracingEvent {
+
             static Discriminator _discriminator = anyof(["subscribe"]);
 
             void dispatchTracingEvent(TracingHandler handler) {
