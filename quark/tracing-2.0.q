@@ -312,6 +312,7 @@ namespace mdk_tracing {
                 ProtocolEvent result = ProtocolEvent.construct(type);
                 if (result != null) { return result; }
                 if (LogEvent._discriminator.matches(type)) { return new LogEvent(); }
+                if (Subscribe._discriminator.matches(type)) { return new Subscribe(); }
                 return null;
             }
 
