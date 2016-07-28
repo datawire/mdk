@@ -175,6 +175,11 @@ namespace mdk_tracing {
             return result.andThen(bind(self, "deresultify", []));
         }
 
+        void subscribe(UnaryCallable handler) {
+            _openIfNeeded();
+            _client.subscribe(handler);
+        }
+
         List<LogEvent> deresultify(api.GetLogEventsResult result) {
             logger.trace("got " + result.result.size().toString() + " log events");
             return result.result;
@@ -301,7 +306,9 @@ namespace mdk_tracing {
     namespace protocol {
 
         interface TracingHandler extends ProtocolHandler {
-            void onLogEvent(LogEvent event);
+            void onLogEvent(LogEvent event) {}
+            void onLogAck(LogAck ack) {}
+            void onSubscribe(Subscribe sub) {}
         }
 
         @doc("""A single event in the stream that Tracing has to manage.""")
@@ -311,11 +318,17 @@ namespace mdk_tracing {
                 ProtocolEvent result = ProtocolEvent.construct(type);
                 if (result != null) { return result; }
                 if (LogEvent._discriminator.matches(type)) { return new LogEvent(); }
+                if (LogAck._discriminator.matches(type)) { return new LogAck(); }
+                if (Subscribe._discriminator.matches(type)) { return new Subscribe(); }
                 return null;
             }
 
             static ProtocolEvent decode(String encoded) {
-                return ?Serializable.decodeClassName("mdk_tracing.protocol.LogEvent", encoded);
+                return ?Serializable.decodeClassName("mdk_tracing.protocol.TracingEvent", encoded);
+            }
+
+            void dispatch(ProtocolHandler handler) {
+                dispatchTracingEvent(?handler);
             }
 
             void dispatchTracingEvent(TracingHandler handler);
@@ -357,10 +370,6 @@ namespace mdk_tracing {
             @doc("Should the server send an acknowledgement?")
             int sync;
 
-            void dispatch(ProtocolHandler handler) {
-                dispatchTracingEvent(?handler);
-            }
-
             void dispatchTracingEvent(TracingHandler handler) {
                 handler.onLogEvent(self);
             }
@@ -372,54 +381,42 @@ namespace mdk_tracing {
 
         }
 
-        interface TracingClientHandler extends ProtocolHandler {
-            void onLogAck(LogAckEvent ack);
-        }
+        class Subscribe extends TracingEvent {
 
-        @doc("""A single event in the stream that a Tracing client has to manage.""")
-        class TracingClientEvent extends ProtocolEvent {
+            static Discriminator _discriminator = anyof(["subscribe"]);
 
-            static ProtocolEvent construct(String type) {
-                ProtocolEvent result = ProtocolEvent.construct(type);
-                if (result != null) { return result; }
-                if (LogAckEvent._discriminator.matches(type)) { return new LogAckEvent(); }
-                return null;
+            void dispatchTracingEvent(TracingHandler handler) {
+                handler.onSubscribe(self);
             }
 
-            static ProtocolEvent decode(String encoded) {
-                return ?Serializable.decodeClassName("mdk_tracing.protocol.LogAckEvent", encoded);
+            String toString() {
+                return "<Subscribe>";
             }
-
-            void dispatchTracingClientEvent(TracingClientHandler handler);
-
         }
 
-        class LogAckEvent extends TracingClientEvent {
+        class LogAck extends TracingEvent {
 
             static Discriminator _discriminator = anyof(["logack", "mdk_tracing.protocol.LogAckEvent"]);
 
             @doc("Sequence number of the last log message being acknowledged.")
             long sequence;
 
-            void dispatch(ProtocolHandler handler) {
-                dispatchTracingClientEvent(?handler);
-            }
-
-            void dispatchTracingClientEvent(TracingClientHandler handler) {
+            void dispatchTracingEvent(TracingHandler handler) {
                 handler.onLogAck(self);
             }
 
             String toString() {
-                return "<LogAckEvent " + sequence.toString() + ">";
+                return "<LogAck " + sequence.toString() + ">";
             }
 
         }
 
-        class TracingClient extends WSClient, TracingClientHandler {
+        class TracingClient extends WSClient, TracingHandler {
 
             Tracer _tracer;
             bool _started = false;
             Lock _mutex = new Lock();
+            UnaryCallable _handler = null;
 
             long _syncRequestPeriod = 5000L;  // how often (in ms) sync requests should be sent
             int  _syncInFlightMax = 50;       // max size of the in-flight buffer before sending a sync request
@@ -457,6 +454,15 @@ namespace mdk_tracing {
                 return _started || size > 0;
             }
 
+            void subscribe(UnaryCallable handler) {
+                _mutex.acquire();
+                _handler = handler;
+                if (self.isConnected()) {
+                    self.sock.send(new Subscribe().encode());
+                }
+                _mutex.release();
+            }
+
             void stop() {
                 _started = false;
                 super.stop();
@@ -470,6 +476,9 @@ namespace mdk_tracing {
                     _buffered.insert(0, evt);
                     _failedSends = _failedSends + 1;
                     _debug("no ack for #" + evt.sequence.toString());
+                }
+                if (_handler != null) {
+                    self.sock.send(new Subscribe().encode());
                 }
                 _mutex.release();
             }
@@ -498,7 +507,7 @@ namespace mdk_tracing {
 
             void onWSMessage(WebSocket socket, String message) {
                 // Decode and dispatch incoming messages.
-                ProtocolEvent event = TracingClientEvent.decode(message);
+                ProtocolEvent event = TracingEvent.decode(message);
                 if (event == null) {
                     // Unknown message, drop it on the floor. The decoding will
                     // already have logged it.
@@ -507,7 +516,15 @@ namespace mdk_tracing {
                 event.dispatch(self);
             }
 
-            void onLogAck(LogAckEvent ack) {
+            void onLogEvent(LogEvent evt) {
+                _mutex.acquire();
+                if (_handler != null) {
+                    _handler.__call__(evt);
+                }
+                _mutex.release();
+            }
+
+            void onLogAck(LogAck ack) {
                 _mutex.acquire();
                 // Discard in-flight messages older than the acked sequence number; they have been logged.
                 while (_inFlight.size() > 0) {
