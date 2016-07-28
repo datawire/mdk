@@ -1,6 +1,7 @@
 from unittest import TestCase
 
 from actors.core import MessageDispatcher
+from actors.promise import PromiseResolver
 
 
 class RecordingActor(object):
@@ -45,6 +46,32 @@ class StartingActor(object):
 
     def onMessage(self, origin, message):
         self.record.append(message)
+
+
+class Callback(object):
+    def __init__(self, record):
+        self.record = record
+
+    def call(self, arg):
+        self.record.append("callback: " + arg)
+
+
+class PromiseActor(object):
+    """
+    An actor that resolves a Promise on message receiption.
+    """
+    def __init__(self):
+        self.record = []
+
+    def onStart(self, dispatcher):
+        self.dispatcher = dispatcher
+
+    def onMessage(self, origin, message):
+        self.record.append("start")
+        resolver = PromiseResolver(self.dispatcher)
+        resolver.promise.andThen(Callback(self.record))
+        resolver.resolve("hello")
+        self.record.append("end")
 
 
 class MessageDispatcherTests(TestCase):
@@ -101,3 +128,13 @@ class MessageDispatcherTests(TestCase):
                 # And only after *that* is done, A receives its message:
                 'A received 123 from B: start',
                 'A received 123 from B: end'])
+
+    def test_no_promise_reentrancy(self):
+        """
+        MessageDispatcher does not allow re-entrancy of Promise callbacks.
+        """
+        dispatcher = MessageDispatcher()
+        actor = PromiseActor()
+        dispatcher.startActor(actor)
+        dispatcher.tell(actor, "hello", actor)
+        self.assertEqual(actor.record, ["start", "end", "callback: hello"])
