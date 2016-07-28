@@ -101,8 +101,15 @@ class TracingTest extends MockRuntimeTest {
         Tracer tracer = new Tracer();
         List<LogEvent> events = [];
         tracer.subscribe(bind(self, "_subhandler", [events]));
-        SocketEvent sev = startTracer(tracer);
+        self.pump();
+        SocketEvent sev = self.expectSocket(tracer.url + "?token=" + tracer.token);
+        if (sev == null) { return null; }
+        sev.accept();
+        self.pump();
+        Open open = expectOpen(sev);
+        if (open == null) { return null; }
         Subscribe sub = expectSubscribe(sev);
+        if (sub == null) { return null; }
         LogEvent e = new LogEvent();
         e.text = "asdf";
         sev.send(e.encode());
