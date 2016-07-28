@@ -422,11 +422,13 @@ namespace mdk_protocol {
         long lastHeartbeat = 0L;
 
         Time timeService;
-        ActorRef schedulingActor;
+        Actor schedulingActor;
+        MessageDispatcher dispatcher;
 
         WSClient(MDKRuntime runtime) {
+            self.dispatcher = runtime.dispatcher;
             self.timeService = runtime.getTimeService();
-            self.schedulingActor = runtime.dependencies.getActor("schedule");
+            self.schedulingActor = runtime.getScheduleService();
             // Definitely the wrong place to do this, but this works for now:
             runtime.dispatcher.startActor(self);
         }
@@ -448,7 +450,7 @@ namespace mdk_protocol {
         }
 
         void schedule(float time) {
-            self.schedulingActor.tell(self, new Schedule("wakeup", time));
+            self.dispatcher.tell(self, new Schedule("wakeup", time), self.schedulingActor);
         }
 
         void scheduleReconnect() {
@@ -477,7 +479,9 @@ namespace mdk_protocol {
             }
         }
 
-        void onMessage(ActorRef origin, Message message) {
+        void onStart(MessageDispatcher dispatcher) {}
+
+        void onMessage(Actor origin, Object message) {
             if (Class.get("mdk_runtime.Happening").hasInstance(message)) {
                 self.onScheduledEvent();
             }

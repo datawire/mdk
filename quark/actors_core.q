@@ -2,57 +2,34 @@ quark 1.0;
 
 import quark.concurrent;
 
+/*
+Core implementation of actors.
+*/
+
 namespace actors {
 namespace core {
 
-    @doc("A message.")
-    interface Message {}
-
     @doc("A store of some state. Emits events and handles events.")
     interface Actor {
+	@doc("Called when the Actor is started.")
+	void onStart(MessageDispatcher dispatcher);
+
 	@doc("Called on incoming one-way message from another actor sent via tell().")
-	void onMessage(ActorRef origin, Message message);
+	void onMessage(Actor origin, Object message);
     }
 
-    @doc("""A reference to an actor.
-
-    Should not be created directly. Instead, use MessageDispatcher.startActor().
-    """)
-    class ActorRef {
-	Actor _actor;
-	MessageDispatcher _dispatcher;
-
-	ActorRef(MessageDispatcher dispatcher, Actor actor) {
-	    self._dispatcher = dispatcher;
-	    self._actor = actor;
-	}
-
-	Actor getActor() {
-	    return self._actor;
-	}
-
-	MessageDispatcher getDispatcher() {
-	    return self._dispatcher;
-	}
-
-	@doc("Asynchronously send a message to the actor.")
-	void tell(Actor origin, Message msg) {
-	    self._dispatcher._tell(origin, msg, self);
-	}
-
-	@doc("Stop the Actor. Should only be called once.")
-	void stop() {
-	    self._dispatcher._stopActor(self._actor);
-	}
+    @doc("A message that can be queued for delivery in a MessageDispatcher.")
+    interface _QueuedMessage {
+	void deliver();
     }
 
     @doc("A message that queued for delivery by a MessageDispatcher.")
-    class _InFlightMessage {
-	ActorRef origin;
-	Message msg;
-	ActorRef destination;
+    class _InFlightMessage extends _QueuedMessage {
+	Actor origin;
+	Object msg;
+	Actor destination;
 
-	_InFlightMessage(ActorRef origin, Message msg, ActorRef destination) {
+	_InFlightMessage(Actor origin, Object msg, Actor destination) {
 	    self.origin = origin;
 	    self.msg = msg;
 	    self.destination = destination;
@@ -60,8 +37,22 @@ namespace core {
 
 	@doc("Deliver the message.")
 	void deliver() {
-	    Actor underlyingDestination = self.destination.getActor();
-	    underlyingDestination.onMessage(self.origin, self.msg);
+	    self.destination.onMessage(self.origin, self.msg);
+	}
+    }
+
+    @doc("Start an Actor.")
+    class _StartActor extends _QueuedMessage {
+	Actor actor;
+	MessageDispatcher dispatcher;
+
+	_StartActor(Actor actor, MessageDispatcher dispatcher) {
+	    self.actor = actor;
+	    self.dispatcher = dispatcher;
+	}
+
+	void deliver() {
+	    self.actor.onStart(self.dispatcher);
 	}
     }
 
@@ -70,37 +61,26 @@ namespace core {
 
     Each Actor should only be started and used by one MessageDispatcher.
 
-    Ensure no re-entrancy by making sure message are run asynchronously.
+    Reduce accidental re-entrancy by making sure messages are run asynchronously.
     """)
     class MessageDispatcher {
-	List<_InFlightMessage> _queued = [];
+	List<_QueuedMessage> _queued = [];
 	bool _delivering = false;
 	Lock _lock = new Lock(); // Will become unnecessary once we abandon Quark runtime
-	Map<Actor,ActorRef> _actors = {};
-
-	@doc("Start an actor, returning the ActorRef for communicating with it.")
-	ActorRef startActor(Actor actor) {
-	    if (self._actors.contains(actor)) {
-		panic("Actor already started.");
-	    }
-	    ActorRef result = new ActorRef(self, actor);
-	    self._actors[actor] = result;
-	    return result;
-	}
-
-	@doc("Stop an actor.")
-	void _stopActor(Actor actor) {
-	    self._actors.remove(actor);
-	}
 
 	@doc("Queue a message from origin to destination, and trigger delivery if necessary.")
-	void _tell(Actor origin, Message message, ActorRef destination) {
-	    if (!self._actors.contains(origin)) {
-		self._lock.release();
-		panic("Origin actor not started!");
-	    }
-	    ActorRef originRef = self._actors[origin];
-	    _InFlightMessage inFlight = new _InFlightMessage(originRef, message, destination);
+	void tell(Actor origin, Object message, Actor destination) {
+	    _InFlightMessage inFlight = new _InFlightMessage(origin, message, destination);
+	    self._queue(inFlight);
+	}
+
+	@doc("Start an Actor.")
+	void startActor(Actor actor) {
+	    self._queue(new _StartActor(actor, self));
+	}
+
+	@doc("Queue a message for delivery.")
+	void _queue(_QueuedMessage inFlight) {
 	    self._lock.acquire();
 	    self._queued.add(inFlight);
 	    self._lock.release();
@@ -113,7 +93,7 @@ namespace core {
 	    self._delivering = true;
 	    // Delivering messages may cause additional ones to be queued:
 	    while (self._queued.size() > 0) {
-		List<_InFlightMessage> toDeliver = self._queued;
+		List<_QueuedMessage> toDeliver = self._queued;
 		self._queued = [];
 
 		self._lock.release();

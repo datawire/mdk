@@ -2,7 +2,7 @@ quark 1.0;
 
 package datawire_mdk_test 1.0.0;
 
-use mdk-2.0.q;
+use ../mdk-2.0.q;
 
 import quark.test;
 import quark.mock;
@@ -20,7 +20,8 @@ MDKRuntime fakeRuntime() {
     MDKRuntime result = new MDKRuntime();
     FakeTime timeService = new FakeTime();
     result.dependencies.registerService("time", timeService);
-    result.dependencies.registerActor("schedule", result.dispatcher.startActor(timeService));
+    result.dependencies.registerService("schedule", timeService);
+    result.dispatcher.startActor(timeService);
     return result;
 }
 

@@ -11,8 +11,6 @@ namespace mdk_runtime {
 
     Required registered services:
     - 'time': A provider of mdk_runtime.Time;
-
-    Required registered actors:
     - 'schedule': Implements the mdk_runtime.ScheduleActor actor protocol.
 
     XXX can probably automate enforcing the above requirements.
@@ -25,6 +23,12 @@ namespace mdk_runtime {
 	Time getTimeService() {
 	    return ?self.dependencies.getService("time");
 	}
+
+	@doc("Return Schedule service.")
+	Actor getScheduleService() {
+	    return ?self.dependencies.getService("schedule");
+	}
+
     }
 
     @doc("""
@@ -49,7 +53,7 @@ namespace mdk_runtime {
     Please send me a Happening message with given event name in given number of
     milliseconds.
     """)
-    class Schedule extends Message {
+    class Schedule {
 	String event;
 	float seconds;
 
@@ -60,7 +64,7 @@ namespace mdk_runtime {
     }
 
     @doc("A scheduled event is now happening.")
-    class Happening extends Message {
+    class Happening {
 	String event;
 	float currentTime;
 
@@ -72,17 +76,18 @@ namespace mdk_runtime {
 
     class _ScheduleTask extends Task {
 	QuarkRuntimeTime timeService;
-	ActorRef requester;
+	Actor requester;
 	String event;
 
-	_ScheduleTask(QuarkRuntimeTime timeService, ActorRef requester, String event) {
+	_ScheduleTask(QuarkRuntimeTime timeService, Actor requester, String event) {
 	    self.timeService = timeService;
 	    self.requester = requester;
 	    self.event = event;
 	}
 
 	void onExecute(Runtime runtime) {
-	    self.requester.tell(self.timeService, new Happening(self.event, self.timeService.time()));
+	    timeService.dispatcher.tell(
+	        self.timeService, new Happening(self.event, self.timeService.time()), self.requester);
 	}
     }
 
@@ -91,7 +96,13 @@ namespace mdk_runtime {
     implementation.
     """)
     class QuarkRuntimeTime extends Time, SchedulingActor {
-	void onMessage(ActorRef origin, Message msg) {
+	MessageDispatcher dispatcher;
+
+	void onStart(MessageDispatcher dispatcher) {
+	    self.dispatcher = dispatcher;
+	}
+
+	void onMessage(Actor origin, Object msg) {
 	    Schedule sched = ?msg;
 	    Context.runtime().schedule(new _ScheduleTask(self, origin, sched.event), sched.seconds);
 	}
@@ -103,11 +114,11 @@ namespace mdk_runtime {
     }
 
     class _FakeTimeRequest {
-	ActorRef requester;
+	Actor requester;
 	String event;
 	float happensAt;
 
-	_FakeTimeRequest(ActorRef requester, String event, float happensAt) {
+	_FakeTimeRequest(Actor requester, String event, float happensAt) {
 	    self.requester = requester;
 	    self.event = event;
 	    self.happensAt = happensAt;
@@ -118,8 +129,13 @@ namespace mdk_runtime {
     class FakeTime extends Time, SchedulingActor {
 	float _now = 1000.0;
 	Map<long,_FakeTimeRequest> _scheduled = {};
+	MessageDispatcher dispatcher;
 
-	void onMessage(ActorRef origin, Message msg) {
+	void onStart(MessageDispatcher dispatcher) {
+	    self.dispatcher = dispatcher;
+	}
+
+	void onMessage(Actor origin, Object msg) {
 	    Schedule sched = ?msg;
 	    _scheduled[_scheduled.keys().size()] = new _FakeTimeRequest(origin, sched.event, self._now + sched.seconds);
 	}
@@ -136,7 +152,7 @@ namespace mdk_runtime {
 		_FakeTimeRequest request = _scheduled[keys[idx]];
 		if (request.happensAt <= self._now) {
 		    self._scheduled.remove(keys[idx]);
-		    request.requester.tell(self, new Happening(request.event, time()));
+		    self.dispatcher.tell(self, new Happening(request.event, time()), request.requester);
 		}
 		idx = idx + 1;
 	    }
@@ -153,7 +169,8 @@ namespace mdk_runtime {
 	MDKRuntime runtime = new MDKRuntime();
         QuarkRuntimeTime timeService = new QuarkRuntimeTime();
         runtime.dependencies.registerService("time", timeService);
-        runtime.dependencies.registerActor("schedule", runtime.dispatcher.startActor(timeService));
+        runtime.dependencies.registerService("schedule", timeService);
+	runtime.dispatcher.startActor(timeService);
 	return runtime;
     }
 }
