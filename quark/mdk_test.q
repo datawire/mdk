@@ -103,13 +103,13 @@ class TracingTest extends MockRuntimeTest {
         tracer.subscribe(bind(self, "_subhandler", [events]));
         self.pump();
         SocketEvent sev = self.expectSocket(tracer.url + "?token=" + tracer.token);
-        if (sev == null) { return null; }
+        if (sev == null) { return; }
         sev.accept();
         self.pump();
         Open open = expectOpen(sev);
-        if (open == null) { return null; }
+        if (open == null) { return; }
         Subscribe sub = expectSubscribe(sev);
-        if (sub == null) { return null; }
+        if (sub == null) { return; }
         LogEvent e = new LogEvent();
         e.text = "asdf";
         sev.send(e.encode());
