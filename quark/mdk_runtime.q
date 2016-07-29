@@ -12,8 +12,6 @@ namespace mdk_runtime {
     Required registered services:
     - 'time': A provider of mdk_runtime.Time;
     - 'schedule': Implements the mdk_runtime.ScheduleActor actor protocol.
-
-    XXX can probably automate enforcing the above requirements.
     """)
     class MDKRuntime {
 	Dependencies dependencies = new Dependencies();
