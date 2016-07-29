@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk 2.0.0;
+package datawire_mdk 2.0.1;
 
 // DATAWIRE MDK
 
@@ -265,7 +265,9 @@ namespace mdk {
             node.service = service;
             node.version = version;
             node.address = address;
-            node.properties = {};
+
+            node.properties = { "datawire_nodeId": procUUID };
+
             _disco.register(node);
         }
 

@@ -62,6 +62,10 @@ class TracingTest extends MockRuntimeTest {
         return ?expectTracingEvent(evt, "mdk_tracing.protocol.LogEvent");
     }
 
+    Subscribe expectSubscribe(SocketEvent evt) {
+        return ?expectTracingEvent(evt, "mdk_tracing.protocol.Subscribe");
+    }
+
     /////////////////
     // Tests
 
@@ -109,6 +113,32 @@ class TracingTest extends MockRuntimeTest {
         sev.send("{\"type\": \"UnknownMessage\"}");
         self.pump();
         checkEqual(false, sev.sock.closed);
+    }
+
+    void _subhandler(LogEvent evt, List<LogEvent> events) {
+        events.add(evt);
+    }
+
+    void testSubscribe() {
+        Tracer tracer = new Tracer();
+        List<LogEvent> events = [];
+        tracer.subscribe(bind(self, "_subhandler", [events]));
+        self.pump();
+        SocketEvent sev = self.expectSocket(tracer.url + "?token=" + tracer.token);
+        if (sev == null) { return; }
+        sev.accept();
+        self.pump();
+        Open open = expectOpen(sev);
+        if (open == null) { return; }
+        Subscribe sub = expectSubscribe(sev);
+        if (sub == null) { return; }
+        LogEvent e = new LogEvent();
+        e.text = "asdf";
+        sev.send(e.encode());
+        self.pump();
+        checkEqual(1, events.size());
+        LogEvent evt = events[0];
+        checkEqual("asdf", evt.text );
     }
 
 }
