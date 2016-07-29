@@ -217,7 +217,7 @@ namespace promise {
         @doc("Add callback that will be called on non-Error values. ")
         @doc("Its result will become the value of the returned Promise.")
         Promise andThen(UnaryCallable callable) {
-            Promise result = new Promise(new MessageDispatcher());
+            Promise result = new Promise(self._dispatcher);
             self._lock.acquire();
             self._successCallbacks.add(new _Callback(callable, result));
             self._failureCallbacks.add(new _Callback(new _Passthrough(), result));
@@ -229,7 +229,7 @@ namespace promise {
         @doc("Add callback that will be called on Error values. ")
         @doc("Its result will become the value of the returned Promise.")
         Promise andCatch(reflect.Class errorClass, UnaryCallable callable) {
-            Promise result = new Promise(new MessageDispatcher());
+            Promise result = new Promise(self._dispatcher);
             _Callback callback = new _Callback(new _CallIfIsInstance(callable, errorClass), result);
             self._lock.acquire();
             self._failureCallbacks.add(callback);
@@ -241,7 +241,7 @@ namespace promise {
 
         @doc("Two callbacks, one for success and one for error results.")
         Promise andEither(UnaryCallable success, UnaryCallable failure) {
-            Promise result = new Promise(new MessageDispatcher());
+            Promise result = new Promise(self._dispatcher);
             self._lock.acquire();
             self._successCallbacks.add(new _Callback(success, result));
             self._failureCallbacks.add(new _Callback(failure, result));

@@ -1,3 +1,9 @@
+"""
+Tests for actors.q.
+"""
+
+from __future__ import absolute_import
+
 from unittest import TestCase
 
 from actors.core import MessageDispatcher
@@ -137,4 +143,5 @@ class MessageDispatcherTests(TestCase):
         actor = PromiseActor()
         dispatcher.startActor(actor)
         dispatcher.tell(actor, "hello", actor)
+        # Promise callback should only happen *after* message delivery is done:
         self.assertEqual(actor.record, ["start", "end", "callback: hello"])
