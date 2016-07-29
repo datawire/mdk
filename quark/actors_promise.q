@@ -217,26 +217,18 @@ namespace promise {
         @doc("Add callback that will be called on non-Error values. ")
         @doc("Its result will become the value of the returned Promise.")
         Promise andThen(UnaryCallable callable) {
-            Promise result = new Promise(self._dispatcher);
-            self._lock.acquire();
-            self._successCallbacks.add(new _Callback(callable, result));
-            self._failureCallbacks.add(new _Callback(new _Passthrough(), result));
-            self._lock.release();
-            self._maybeRunCallbacks();
-            return result;
+            return andEither(callable, new _Passthrough());
         }
 
         @doc("Add callback that will be called on Error values. ")
         @doc("Its result will become the value of the returned Promise.")
         Promise andCatch(reflect.Class errorClass, UnaryCallable callable) {
-            Promise result = new Promise(self._dispatcher);
-            _Callback callback = new _Callback(new _CallIfIsInstance(callable, errorClass), result);
-            self._lock.acquire();
-            self._failureCallbacks.add(callback);
-            self._successCallbacks.add(new _Callback(new _Passthrough(), result));
-            self._lock.release();
-            self._maybeRunCallbacks();
-            return result;
+            return andEither(new _Passthrough(), new _CallIfIsInstance(callable, errorClass));
+        }
+
+        @doc("Callback that will be called for both success and error results.")
+        Promise andFinally(UnaryCallable callable) {
+            return andEither(callable, callable);
         }
 
         @doc("Two callbacks, one for success and one for error results.")
@@ -248,11 +240,6 @@ namespace promise {
             self._lock.release();
             self._maybeRunCallbacks();
             return result;
-        }
-
-        @doc("Callback that will be called for both success and error results.")
-        Promise andFinally(UnaryCallable callable) {
-            return andEither(callable, callable);
         }
 
         @doc("Synchronous extraction of the promise's current value, if it has any. ")
