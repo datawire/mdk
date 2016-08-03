@@ -49,7 +49,7 @@ namespace mdk_runtime {
 
     @doc("""
     Please send me a Happening message with given event name in given number of
-    milliseconds.
+    seconds.
     """)
     class Schedule {
 	String event;
