@@ -210,13 +210,14 @@ class WebSocketsTest extends Actor {
 	if (origin != connection) {
 	    panic("Got message from unexpected source: " + origin.toString());
 	}
-	if (message.getClass().id == "mdk_runtime.WSMessage" && self.state == "testMessage") {
+	if (message.getClass().id == "mdk_runtime.WSMessage" && self.state == "testMessages") {
 	    WSMessage m = ?message;
 	    self._gotMessage(m.body);
 	    return;
 	}
 	if (message.getClass().id == "mdk_runtime.WSClosed" && self.state == "testClose") {
 	    self._gotClose();
+	    return;
 	}
 	panic("Unexpected message, state: " + self.state + " message: " + message.toString());
     }

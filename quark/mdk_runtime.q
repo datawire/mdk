@@ -140,7 +140,7 @@ namespace mdk_runtime {
 	    if (self.connected) {
 		self.connected = false;
 		self.socket = null;
-		self.dispatcher.tell(self, new WSClose(), self.originator);
+		self.dispatcher.tell(self, new WSClosed(), self.originator);
 	    }
 	}
     }
