@@ -144,7 +144,7 @@ namespace mdk_runtime {
 
 	@doc("Run scheduled events whose time has come.")
 	void pump() {
-	    long idx = 0;
+	    int idx = 0;
 	    List<long> keys = self._scheduled.keys();
 	    while (idx < keys.size()) {
 		_FakeTimeRequest request = _scheduled[keys[idx]];

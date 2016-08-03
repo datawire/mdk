@@ -96,7 +96,7 @@ namespace core {
 		self._queued = [];
 
 		self._lock.release();
-		long idx = 0;
+		int idx = 0;
 		while (idx < toDeliver.size()) {
 		    toDeliver[idx].deliver();
 		    idx = idx + 1;
