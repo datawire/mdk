@@ -130,11 +130,10 @@ class WebSocketsTest extends Actor {
     WSActor connection;
     String state = "initial";
 
-    WebSocketTest(Actor runner, WebSockets websockets, String serverURL, String badURL) {
-	self.runner = runner;
+    WebSocketsTest(WebSockets websockets, String serverURL, String badURL) {
 	self.websockets = websockets;
 	self.serverURL = serverURL;
-	self.badURL;
+	self.badURL = badURL;
     }
 
     void onStart(MessageDispatcher dispatcher) {
@@ -194,12 +193,14 @@ class WebSocketsTest extends Actor {
     @doc("The connection can be closed.")
     void testClose() {
 	self.state = "testClose";
-	self.connection.tell(self, new WSClose(), self.connection);
+	self.dispatcher.tell(self, new WSClose(), self.connection);
 	// Close will be delivered by calling _gotClose().
     }
 
     void onMessage(Actor origin, Object message) {
 	if (message.getClass().id == "runtime_test.Start") {
+	    Start start = ?message;
+	    self.runner = start.testRunner;
 	    testBadURL();
 	    return;
 	}
@@ -209,8 +210,10 @@ class WebSocketsTest extends Actor {
 	if (origin != connection) {
 	    panic("Got message from unexpected source: " + origin.toString());
 	}
-	if (message.getClass().id == "quark.String" && self.state == "testMessage") {
-	    self._gotMessage(message);
+	if (message.getClass().id == "mdk_runtime.WSMessage" && self.state == "testMessage") {
+	    WSMessage m = ?message;
+	    self._gotMessage(m.body);
+	    return;
 	}
 	if (message.getClass().id == "mdk_runtime.WSClosed" && self.state == "testClose") {
 	    self._gotClose();
@@ -310,8 +313,12 @@ void main(List<String> args) {
     runtime.dispatcher.startActor(fakeTime);
     Actor fakeTimeTest = new TimeScheduleTest(fakeTime, fakeTime,
 					      new FakeSleep(fakeTime));
+    Actor realWebSockets = new WebSocketsTest(new QuarkRuntimeWebSockets(runtime.dispatcher),
+					     "wss://echo.websocket.org/", "wss://localhost:1/");
     Actor runner = new TestRunner({"real runtime: time, scheduling": realTimeTest,
-				   "fake runtime: time, scheduling": fakeTimeTest},
+				   "fake runtime: time, scheduling": fakeTimeTest,
+				   "real runtime: websockets": realWebSockets
+	                          },
 	                          runtime);
     runtime.dispatcher.startActor(runner);
 }

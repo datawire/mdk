@@ -51,8 +51,11 @@ namespace mdk_runtime {
     Service that can open new WebSocket connections.
     """)
     interface WebSockets {
-	@doc("The Promise resolves to a WSActor or WSConnectError. The destination will receive messages.")
-	Promise connect(String url, Actor destination);
+	@doc("""
+        The Promise resolves to a WSActor or WSConnectError. The originator will
+        receive messages.
+        """)
+	Promise connect(String url, Actor originator);
     }
 
     @doc("Connection failed.")
@@ -61,17 +64,104 @@ namespace mdk_runtime {
     @doc("""
     Actor representing a specific WebSocket connection.
 
-    Accepts String and WSClose messages, sends String and WSClosed
+    Accepts String and WSClose messages, sends WSMessage and WSClosed
     messages to the originator of the connection (Actor passed to
     WebSockets.connect()).
     """)
     interface WSActor extends Actor {}
 
+    @doc("A message was received from the server.")
+    class WSMessage {
+	String body;
+
+	WSMessage(String body) {
+	    self.body = body;
+	}
+    }
+
     @doc("Tell WSActor to close the connection.")
-    class WSClose() {}
+    class WSClose {}
 
     @doc("Notify of WebSocket connection having closed.")
-    class WSClosed() {}
+    class WSClosed {}
+
+    @doc("""
+    WSActor that uses current Quark runtime as temporary expedient.
+    """)
+    class QuarkRuntimeWSActor extends WSActor, WSHandler {
+	// XXX need better story for logging; perhaps integrate MDK Session with
+	// the MessageDispatcher?
+	static Logger logger = new Logger("protocol");
+	bool connected = false;
+	WebSocket socket;
+	PromiseFactory factory = new PromiseFactory();
+	Actor originator;
+	MessageDispatcher dispatcher;
+
+	QuarkRuntimeWSActor(Actor originator) {
+	    self.originator = originator;
+	}
+
+	// Actor
+	void onStart(MessageDispatcher dispatcher) {
+	    self.dispatcher = dispatcher;
+	}
+
+	void onMessage(Actor origin, Object message) {
+	    if (message.getClass().id == "quark.String") {
+		self.socket.send(?message);
+		return;
+	    }
+	    if (message.getClass().id == "mdk_runtime.WSClose") {
+		self.socket.close();
+	    }
+	}
+
+	// WSHandler
+	void onWSConnected(WebSocket socket) {
+	    self.connected = true;
+	    self.socket = socket;
+	    self.factory.resolve(self);
+	}
+
+	void onWSError(WebSocket socket, WSError error) {
+	    if (self.connected) {
+		logger.error("WebSocket error: " + error.toString());
+	    } else {
+		self.factory.reject(new WSConnectError(error.toString()));
+	    }
+	}
+
+	void onWSMessage(WebSocket socket, String message) {
+	    self.dispatcher.tell(self, new WSMessage(message), self.originator);
+	}
+
+	void onWSFinal(WebSocket socket) {
+	    if (self.connected) {
+		self.connected = false;
+		self.socket = null;
+		self.dispatcher.tell(self, new WSClose(), self.originator);
+	    }
+	}
+    }
+
+    @doc("""
+    WebSocket that uses current Quark runtime as temporary expedient.
+    """)
+    class QuarkRuntimeWebSockets extends WebSockets {
+	MessageDispatcher dispatcher;
+
+	QuarkRuntimeWebSockets(MessageDispatcher dispatcher) {
+	    self.dispatcher = dispatcher;
+	}
+
+	Promise connect(String url, Actor originator) {
+	    QuarkRuntimeWSActor actor = new QuarkRuntimeWSActor(originator);
+	    self.dispatcher.startActor(actor);
+	    Context.runtime().open(url, actor);
+	    return actor.factory.promise;
+	}
+    }
 
     @doc("""
     Please send me a Happening message with given event name in given number of
