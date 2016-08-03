@@ -120,7 +120,7 @@ class TracingTest extends MockRuntimeTest {
     }
 
     void testSubscribe() {
-        Tracer tracer = new Tracer();
+        Tracer tracer = new Tracer(runtime);
         List<LogEvent> events = [];
         tracer.subscribe(bind(self, "_subhandler", [events]));
         self.pump();
