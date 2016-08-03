@@ -83,13 +83,12 @@ namespace core {
 	void _queue(_QueuedMessage inFlight) {
 	    self._lock.acquire();
 	    self._queued.add(inFlight);
-	    self._lock.release();
 	    if (self._delivering) {
 		// Someone higher in call stack is doing delivery, they'll deal
 		// with it.
+		self._lock.release();
 		return;
 	    }
-	    self._lock.acquire();
 	    self._delivering = true;
 	    // Delivering messages may cause additional ones to be queued:
 	    while (self._queued.size() > 0) {
