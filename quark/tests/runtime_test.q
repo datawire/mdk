@@ -109,8 +109,113 @@ class TimeScheduleTest extends Actor {
 	if (happened.event == "5second") {
 	    self.assertElapsed(5.0, happened.currentTime);
 	    self.assertElapsed(5.0, self.timeService.time());
+	    // All done, tell test runner to proceed.
 	    self.dispatcher.tell(self, "next", self.runner);
 	}
+    }
+}
+
+@doc("""
+Tests for the WebSockets service.
+
+Takes two server URLS. The good one should act as an echo server, and close when
+it receives 'close'. The bad one should just be a connection refused.
+""")
+class WebSocketsTest extends Actor {
+    Actor runner;
+    WebSockets websockets;
+    String serverURL;
+    String badURL;
+    MessageDispatcher dispatcher;
+    WSActor connection;
+    String state = "initial";
+
+    WebSocketTest(Actor runner, WebSockets websockets, String serverURL, String badURL) {
+	self.runner = runner;
+	self.websockets = websockets;
+	self.serverURL = serverURL;
+	self.badURL;
+    }
+
+    void onStart(MessageDispatcher dispatcher) {
+	self.dispatcher = dispatcher;
+    }
+
+    void failure(Object result, String reason) {
+	panic("WebSocket test failed: " + reason + " with " + result.toString());
+    }
+
+    bool _gotError(WSConnectError error) {
+	self.testGoodURL();
+	return true;
+    }
+
+    @doc("Bad URLs result in Promise rejected with WSError.")
+    void testBadURL() {
+	self.state = "testBadURL";
+	Promise p = self.websockets.connect(badURL, self);
+	p.andEither(bind(self, "failure", ["unexpected successful connection"]),
+		    bind(self, "_gotError", []));
+    }
+
+    bool _gotWebSocket(WSActor actor) {
+	self.connection = actor;
+	testMessages();
+	return true;
+    }
+
+    @doc("A good URL results in a Promise resolved with a WSActor.")
+    void testGoodURL() {
+	self.state = "testGoodURL";
+	Promise p = self.websockets.connect(serverURL, self);
+	p.andEither(bind(self, "_gotWebSocket", []),
+		    bind(self, "failure", ["unexpected connect error"]));
+    }
+
+    void _gotMessage(String message) {
+	if (message != "can you hear me?") {
+	    panic("Unexpected echo message: " + message);
+	}
+	self.testClose();
+    }
+
+    @doc("Messages can be sent and received.")
+    void testMessages() {
+	self.state = "testMessages";
+	self.dispatcher.tell(self, "can you hear me?", self.connection);
+	// Response will go to _gotMessage.
+    }
+
+    void _gotClose() {
+	// All done, tell test runner to proceed.
+	self.dispatcher.tell(self, "next", self.runner);
+    }
+
+    @doc("The connection can be closed.")
+    void testClose() {
+	self.state = "testClose";
+	self.connection.tell(self, new WSClose(), self.connection);
+	// Close will be delivered by calling _gotClose().
+    }
+
+    void onMessage(Actor origin, Object message) {
+	if (message.getClass().id == "runtime_test.Start") {
+	    testBadURL();
+	    return;
+	}
+	if (connection == null) {
+	    panic("Got message while still unconnected.");
+	}
+	if (origin != connection) {
+	    panic("Got message from unexpected source: " + origin.toString());
+	}
+	if (message.getClass().id == "quark.String" && self.state == "testMessage") {
+	    self._gotMessage(message);
+	}
+	if (message.getClass().id == "mdk_runtime.WSClosed" && self.state == "testClose") {
+	    self._gotClose();
+	}
+	panic("Unexpected message, state: " + self.state + " message: " + message.toString());
     }
 }
 

@@ -48,6 +48,32 @@ namespace mdk_runtime {
     interface SchedulingActor extends Actor {}
 
     @doc("""
+    Service that can open new WebSocket connections.
+    """)
+    interface WebSockets {
+	@doc("The Promise resolves to a WSActor or WSConnectError. The destination will receive messages.")
+	Promise connect(String url, Actor destination);
+    }
+
+    @doc("Connection failed.")
+    class WSConnectError extends Error {}
+
+    @doc("""
+    Actor representing a specific WebSocket connection.
+
+    Accepts String and WSClose messages, sends String and WSClosed
+    messages to the originator of the connection (Actor passed to
+    WebSockets.connect()).
+    """)
+    interface WSActor extends Actor {}
+
+    @doc("Tell WSActor to close the connection.")
+    class WSClose() {}
+
+    @doc("Notify of WebSocket connection having closed.")
+    class WSClosed() {}
+
+    @doc("""
     Please send me a Happening message with given event name in given number of
     seconds.
     """)
