@@ -75,6 +75,11 @@ class PythonTests(TestCase):
         service = random_string()
         run_python("write_logs.py", [service])
 
+    def test_logging_js(self):
+        """Logs are written, and then the same logs should be read back."""
+        check_call(["node", os.path.join(CODE_PATH, "write_logs.js"),
+                    random_string()])
+
     def test_tracing(self):
         """Minimal tracing end-to-end test.
 
