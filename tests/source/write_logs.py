@@ -3,6 +3,8 @@
 import sys
 import time
 import os
+import logging
+logging.basicConfig(file=sys.stderr, level=logging.DEBUG)
 
 from mdk import start
 mdk = start()
