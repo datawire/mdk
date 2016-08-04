@@ -486,8 +486,9 @@ namespace mdk_tracing {
                     _failedSends = _failedSends + 1;
                     _debug("no ack for #" + evt.sequence.toString());
                 }
+                _debug("Starting up! with connection " + self.sock.toString());
                 if (_handler != null) {
-                    self.sock.send(new Subscribe().encode());
+                    self.dispatcher.tell(self, new Subscribe().encode(), self.sock);
                 }
                 _mutex.release();
             }
@@ -506,15 +507,16 @@ namespace mdk_tracing {
                         _lastSyncTime = evt.timestamp;
                         debugSuffix = " with sync set";
                     }
-                    self.sock.send(evt.encode());
+                    self.dispatcher.tell(self, evt.encode(), self.sock);
                     evt.sync = 0;
                     _sent = _sent + 1;
-                    _debug("sent #" + evt.sequence.toString() + debugSuffix);
+                    _debug("sent #" + evt.sequence.toString() + debugSuffix +
+                           " to " + self.sock.toString());
                 }
                 _mutex.release();
             }
 
-            void onWSMessage(WebSocket socket, String message) {
+            void onWSMessage(String message) {
                 // Decode and dispatch incoming messages.
                 ProtocolEvent event = TracingEvent.decode(message);
                 if (event == null) {

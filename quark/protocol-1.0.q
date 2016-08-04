@@ -356,7 +356,7 @@ namespace mdk_protocol {
     }
 
     @doc("Common protocol machinery for web socket based protocol clients.")
-    class WSClient extends ProtocolHandler, WSHandler, Actor {
+    class WSClient extends ProtocolHandler, Actor {
 
         /*
 
@@ -366,16 +366,16 @@ namespace mdk_protocol {
 
           - subclass.start() or something else arranges for subclass.isStarted() to return true
           - WSClient.start() schedules .onExecute()
-          - the Runtime calls .onExecute()
-          - .onExecute() notices not .isConnected() and subclass.isStarted() so eventually calls .doOpen(),
+          - the Runtime delivers Hapenning message to .onMessage(), whihc calls .onScheduledEvent()
+          - .onScheduledEvent() notices not .isConnected() and subclass.isStarted() so eventually calls .doOpen(),
             then schedules itself for execution again
           - .doOpen() calls .open() using subclass.url() and manages retries/backoff
-          - .open() calls subclass.token() and constructs a real URL, then calls Runtime.open()
-          - the Runtime calls .onWSConnected()
+          - .open() calls subclass.token() and constructs a real URL, then calls WebSockets.connect()
+          - the resulting promise calls .onWSConnected()
           - .onWSConnected() saves the socket for .isConnected() to check,
             then sends an Open protocol oevent, calls subclass.startup(), calls subclass.pump()
-          - the Runtime calls .onExecute()
-          - .onExecute() notices .isConnected() and subclass.isStarted() so
+          - the ScheduleActor send a Happening message to .onMessage(), which calls onScheduledEvent
+          - .onScheduledEvent() notices .isConnected() and subclass.isStarted() so
             calls subclass.pump() and maybe .doHeartbeat()
             then schedules itself for execution again
           - .doHeartbeat() calls subclass.heartbeat() and tracks heartbeat timing
@@ -388,22 +388,22 @@ namespace mdk_protocol {
           - the Runtime maybe calls .onWSClosed(), which does nothing
           - the Runtime calls .onWSFinal()
           - .onWSFinal() nulls out the saved socket so .isConnected() will return false
-          - the Runtime calls .onExecute()
-          - .onExecute() notices not .isConnected() and subclass.isStarted() so eventually calls .doOpen(),
+          - the ScheduleActor sends message to .onMessage(), which calls .onScheduledEvent()
+          - .onScheduledEvent() notices not .isConnected() and subclass.isStarted() so eventually calls .doOpen(),
             then schedules itself for execution again -- see above
 
           Note that subclass.shutdown() is not called in this case, but subclass.startup() is called.
 
           ## Something arranges for subclass.isStarted() to return false
 
-          - the Runtime calls .onExecute()
-          - onExecute() notices .isConnected() and not .isStarted() so
+          - the ScheduleActor sends message to .onMessage(), which calls onScheduledEvent()
+          - onScheduledEvent() notices .isConnected() and not .isStarted() so
             it calls subclass.shutdown(), closes the socket, and
             nulls out the saved socket so .isConnected() will return false
             then does not schedule itself for execution again
 
           Must override: .isStarted(), .url(), .token()
-          May Override: .startup(), .pump(), .heartbeat(), .onWSMessage(), .onWSBinary()
+          May Override: .startup(), .pump(), .heartbeat(), .onWSMessage()
 
         */
 
@@ -415,7 +415,7 @@ namespace mdk_protocol {
         float ttl = 30.0;
         float tick = 1.0;
 
-        WebSocket sock = null;
+        WSActor sock = null;
         String sockUrl = null;
 
         long lastConnectAttempt = 0L;
@@ -423,12 +423,14 @@ namespace mdk_protocol {
 
         Time timeService;
         Actor schedulingActor;
+        WebSockets websockets;
         MessageDispatcher dispatcher;
 
         WSClient(MDKRuntime runtime) {
             self.dispatcher = runtime.dispatcher;
             self.timeService = runtime.getTimeService();
             self.schedulingActor = runtime.getScheduleService();
+            self.websockets = runtime.getWebSocketsService();
             // Definitely the wrong place to do this, but this works for now:
             runtime.dispatcher.startActor(self);
         }
@@ -484,6 +486,16 @@ namespace mdk_protocol {
         void onMessage(Actor origin, Object message) {
             if (Class.get("mdk_runtime.Happening").hasInstance(message)) {
                 self.onScheduledEvent();
+                return;
+            }
+            if (Class.get("mdk_runtime.WSClosed").hasInstance(message)) {
+                self.onWSClosed();
+                return;
+            }
+            if (Class.get("mdk_runtime.WSMessage").hasInstance(message)) {
+                WSMessage wsmessage = ?message;
+                self.onWSMessage(wsmessage.body);
+                return;
             }
         }
 
@@ -516,7 +528,7 @@ namespace mdk_protocol {
                     }
                 } else {
                     shutdown();
-                    sock.close();
+                    self.dispatcher.tell(self, new WSClose(), sock);
                     sock = null;
                 }
             } else {
@@ -549,7 +561,9 @@ namespace mdk_protocol {
 
             logger.info("opening " + sockUrl);
 
-            Context.runtime().open(url, self);
+            self.websockets.connect(url, self)
+                .andEither(bind(self, "onWSConnected", []),
+                           bind(self, "onWSError", []));
         }
 
         void startup() {}
@@ -560,34 +574,32 @@ namespace mdk_protocol {
 
         void shutdown() {}
 
-        void onWSInit(WebSocket socket) {/* unused */ }
+        void onWSMessage(String message) {
+            // Override in subclasses
+        }
 
-        void onWSConnected(WebSocket socket) {
+        void onWSConnected(WSActor socket) {
             // Whenever we (re)connect, notify the server of any
             // nodes we have registered.
-            logger.info("connected to " + sockUrl);
+            logger.info("connected to " + sockUrl + " via " + socket.toString());
 
             reconnectDelay = firstDelay;
             sock = socket;
 
-            sock.send(new Open().encode());
+            self.dispatcher.tell(self, new Open().encode(), sock);
 
             startup();
             pump();
         }
 
-        void onWSBinary(WebSocket socket, Buffer message) { /* unused */ }
-
-        void onWSClosed(WebSocket socket) { /* unused */ }
-
-        void onWSError(WebSocket socket, WSError error) {
-            logger.error(error.toString());
+        void onWSError(Error error) {
+            logger.error("onWSError in protocol! " + error.toString());
             // Any non-transient errors should be reported back to the
             // user via any Nodes they have requested.
             doBackoff();
         }
 
-        void onWSFinal(WebSocket socket) {
+        void onWSClosed() {
             logger.info("closed " + sockUrl);
             sock = null;
         }
