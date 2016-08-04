@@ -144,6 +144,11 @@ class WebSocketsTest extends Actor {
 	panic("WebSocket test failed: " + reason + " with " + result.toString());
     }
 
+    void changeState(String state) {
+	print("State: " + state);
+	self.state = state;
+    }
+
     bool _gotError(WSConnectError error) {
 	self.testGoodURL();
 	return true;
@@ -151,7 +156,7 @@ class WebSocketsTest extends Actor {
 
     @doc("Bad URLs result in Promise rejected with WSError.")
     void testBadURL() {
-	self.state = "testBadURL";
+	self.changeState("testBadURL");
 	Promise p = self.websockets.connect(badURL, self);
 	p.andEither(bind(self, "failure", ["unexpected successful connection"]),
 		    bind(self, "_gotError", []));
@@ -165,7 +170,7 @@ class WebSocketsTest extends Actor {
 
     @doc("A good URL results in a Promise resolved with a WSActor.")
     void testGoodURL() {
-	self.state = "testGoodURL";
+	self.changeState("testGoodURL");
 	Promise p = self.websockets.connect(serverURL, self);
 	p.andEither(bind(self, "_gotWebSocket", []),
 		    bind(self, "failure", ["unexpected connect error"]));
@@ -180,21 +185,30 @@ class WebSocketsTest extends Actor {
 
     @doc("Messages can be sent and received.")
     void testMessages() {
-	self.state = "testMessages";
+	self.changeState("testMessages");
 	self.dispatcher.tell(self, "can you hear me?", self.connection);
 	// Response will go to _gotMessage.
     }
 
     void _gotClose() {
-	// All done, tell test runner to proceed.
-	self.dispatcher.tell(self, "next", self.runner);
+	self.testSendToClosed();
     }
 
     @doc("The connection can be closed.")
     void testClose() {
-	self.state = "testClose";
+	self.changeState("testClose");
 	self.dispatcher.tell(self, new WSClose(), self.connection);
 	// Close will be delivered by calling _gotClose().
+    }
+
+    @doc("Send to closed socket is just dropped on the floor.")
+    void testSendToClosed() {
+	self.changeState("testSendToClosed");
+	// These should not blow up, should instead just be dropped on the floor:
+	self.dispatcher.tell(self, "goes nowhere", self.connection);
+	self.dispatcher.tell(self, new WSClose(), self.connection);
+	// All done, tell test runner to proceed.
+	self.dispatcher.tell(self, "next", self.runner);
     }
 
     void onMessage(Actor origin, Object message) {

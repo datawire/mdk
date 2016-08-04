@@ -12,6 +12,7 @@ namespace mdk_runtime {
     Required registered services:
     - 'time': A provider of mdk_runtime.Time;
     - 'schedule': Implements the mdk_runtime.ScheduleActor actor protocol.
+    - 'websockets': A provider of mdk_runtime.WebSockets.
     """)
     class MDKRuntime {
 	Dependencies dependencies = new Dependencies();
@@ -25,6 +26,11 @@ namespace mdk_runtime {
 	@doc("Return Schedule service.")
 	Actor getScheduleService() {
 	    return ?self.dependencies.getService("schedule");
+	}
+
+	@doc("Return WebSockets service.")
+	WebSockets getWebSocketsService() {
+	    return ?self.dependencies.getService("websockets");
 	}
 
     }
@@ -108,12 +114,13 @@ namespace mdk_runtime {
 	}
 
 	void onMessage(Actor origin, Object message) {
-	    if (message.getClass().id == "quark.String") {
+	    if (message.getClass().id == "quark.String" && self.connected) {
 		self.socket.send(?message);
 		return;
 	    }
-	    if (message.getClass().id == "mdk_runtime.WSClose") {
+	    if (message.getClass().id == "mdk_runtime.WSClose" && self.connected) {
 		self.socket.close();
+		self.connected = false;
 	    }
 	}
 
@@ -127,6 +134,7 @@ namespace mdk_runtime {
 	void onWSError(WebSocket socket, WSError error) {
 	    if (self.connected) {
 		logger.error("WebSocket error: " + error.toString());
+		self.connected = false;
 	    } else {
 		self.factory.reject(new WSConnectError(error.toString()));
 	    }
@@ -136,8 +144,8 @@ namespace mdk_runtime {
 	    self.dispatcher.tell(self, new WSMessage(message), self.originator);
 	}
 
-	void onWSFinal(WebSocket socket) {
-	    if (self.connected) {
+	void onWSClosed(WebSocket socket) {
+	    if (self.socket != null) {
 		self.connected = false;
 		self.socket = null;
 		self.dispatcher.tell(self, new WSClosed(), self.originator);
@@ -284,6 +292,8 @@ namespace mdk_runtime {
         QuarkRuntimeTime timeService = new QuarkRuntimeTime();
         runtime.dependencies.registerService("time", timeService);
         runtime.dependencies.registerService("schedule", timeService);
+	runtime.dependencies.registerService("websockets",
+					     new QuarkRuntimeWebSockets(runtime.dispatcher));
 	runtime.dispatcher.startActor(timeService);
 	return runtime;
     }
