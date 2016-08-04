@@ -164,6 +164,18 @@ namespace mdk {
         @doc("Record a log entry at the DEBUG logging level.")
         void debug(String category, String text);
 
+        @doc("Set the logging level for the session.")
+        void trace(String level);
+
+        @doc("""
+             Override service resolution for the current distributed
+             session. All attempts to resolve *service*, *version*
+             will be replaced with an attempt to resolve *target*,
+             *targetVersion*. This effect will be propogated to any
+             downstream services involved in the distributed session.
+             """)
+        void route(String service, String version, String target, String targetVersion);
+
         @doc("""
              Locate a compatible service instance.
              """)
@@ -313,8 +325,8 @@ namespace mdk {
             return _context.properties.contains(property);
         }
 
-        void route(String service, String target, String version) {
-            Map<String,Map<String,String>> routes;
+        void route(String service, String version, String target, String targetVersion) {
+            Map<String,List<Map<String,String>>> routes;
             if (!has("routes")) {
                 routes = {};
                 set("routes", routes);
@@ -322,7 +334,15 @@ namespace mdk {
                 routes = ?get("routes");
             }
 
-            routes[service] = {"service": target, "version": version};
+            List<Map<String,String>> targets;
+            if (routes.contains(service)) {
+                targets = routes[service];
+            } else {
+                targets = [];
+                routes[service] = targets;
+            }
+
+            targets.add({"version": version, "target": target, "targetVersion": targetVersion});
         }
 
         void trace(String level) {
@@ -388,11 +408,19 @@ namespace mdk {
         }
 
         Promise _resolve(String service, String version) {
-            Map<String,Map<String,String>> routes = ?get("routes");
+            Map<String,List<Map<String,String>>> routes = ?get("routes");
             if (routes != null && routes.contains(service)) {
-                Map<String,String> route = routes[service];
-                service = route["service"];
-                version = route["version"];
+                List<Map<String,String>> targets = routes[service];
+                int idx = 0;
+                while (idx < targets.size()) {
+                    Map<String,String> target = targets[idx];
+                    if (versionMatch(target["version"], version)) {
+                        service = target["target"];
+                        version = target["targetVersion"];
+                        break;
+                    }
+                    idx = idx + 1;
+                }
             }
 
             return _mdk._disco._resolve(service, version).
