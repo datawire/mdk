@@ -44,6 +44,7 @@ def read_logs():
 
 def main():
     session = mdk.session()
+    session.trace("DEBUG")
     category = sys.argv[1]
 
     for level in ["critical", "error", "warn", "info", "debug"]:
