@@ -3,6 +3,7 @@ quark 1.0;
 use actors.q;
 use dependency.q;
 import actors.core;
+import actors.promise;
 import dependency;
 
 namespace mdk_runtime {
@@ -65,7 +66,11 @@ namespace mdk_runtime {
     }
 
     @doc("Connection failed.")
-    class WSConnectError extends Error {}
+    class WSConnectError extends Error {
+	String toString() {
+	    return "<WSConnectionError: " + super.toString() + ">";
+	}
+    }
 
     @doc("""
     Actor representing a specific WebSocket connection.
@@ -93,19 +98,23 @@ namespace mdk_runtime {
 
     @doc("""
     WSActor that uses current Quark runtime as temporary expedient.
+
+    State can be 'ERROR', 'CONNECTING', 'CONNECTED', 'DISCONNECTING',
+    'DISCONNECTED'.
     """)
     class QuarkRuntimeWSActor extends WSActor, WSHandler {
 	// XXX need better story for logging; perhaps integrate MDK Session with
 	// the MessageDispatcher?
 	static Logger logger = new Logger("protocol");
-	bool connected = false;
 	WebSocket socket;
-	PromiseFactory factory = new PromiseFactory();
+	PromiseResolver factory;
 	Actor originator;
 	MessageDispatcher dispatcher;
+	String state = "CONNECTING";
 
-	QuarkRuntimeWSActor(Actor originator) {
+	QuarkRuntimeWSActor(Actor originator, PromiseResolver factory) {
 	    self.originator = originator;
+	    self.factory = factory;
 	}
 
 	// Actor
@@ -114,39 +123,56 @@ namespace mdk_runtime {
 	}
 
 	void onMessage(Actor origin, Object message) {
-	    if (message.getClass().id == "quark.String" && self.connected) {
+	    if (message.getClass().id == "quark.String"
+		&& self.state == "CONNECTED") {
 		self.socket.send(?message);
 		return;
 	    }
-	    if (message.getClass().id == "mdk_runtime.WSClose" && self.connected) {
+	    if (message.getClass().id == "mdk_runtime.WSClose"
+		&& self.state == "CONNECTED") {
+		self.state = "DISCONNECTING";
 		self.socket.close();
-		self.connected = false;
+		return;
 	    }
 	}
 
 	// WSHandler
 	void onWSConnected(WebSocket socket) {
-	    self.connected = true;
+	    logger.debug("onWSConnected, current state " + self.state +
+			 "originator: " + self.originator.toString() + " and I am " +
+			 self.toString());
+	    if (self.state == "ERROR") {
+		logger.debug("Connection event after error event!");
+		return;
+	    }
+	    self.state = "CONNECTED";
 	    self.socket = socket;
 	    self.factory.resolve(self);
 	}
 
 	void onWSError(WebSocket socket, WSError error) {
-	    if (self.connected) {
-		logger.error("WebSocket error: " + error.toString());
-		self.connected = false;
-	    } else {
+	    logger.debug("onWSError, current state " + self.state +
+			 "originator: " + self.originator.toString());
+	    self.state = "ERROR";
+	    if (self.state == "CONNECTING") {
+		logger.error("Error connecting to WebSocket: " + error.toString());
 		self.factory.reject(new WSConnectError(error.toString()));
+		return;
 	    }
+	    logger.error("WebSocket error: " + error.toString());
 	}
 
 	void onWSMessage(WebSocket socket, String message) {
+	    logger.debug("onWSMessage, current state: " + self.state +
+			 "originator: " + self.originator.toString());
 	    self.dispatcher.tell(self, new WSMessage(message), self.originator);
 	}
 
-	void onWSClosed(WebSocket socket) {
-	    if (self.socket != null) {
-		self.connected = false;
+	void onWSFinal(WebSocket socket) {
+	    logger.debug("onWSFinal, current state " + self.state +
+			 "originator: " + self.originator.toString());
+	    if (self.state == "DISCONNECTING" || self.state == "CONNECTED") {
+		self.state = "DISCONNECTED";
 		self.socket = null;
 		self.dispatcher.tell(self, new WSClosed(), self.originator);
 	    }
@@ -157,17 +183,24 @@ namespace mdk_runtime {
     WebSocket that uses current Quark runtime as temporary expedient.
     """)
     class QuarkRuntimeWebSockets extends WebSockets {
+	// XXX need better story for logging; perhaps integrate MDK Session with
+	// the MessageDispatcher?
+	static Logger logger = new Logger("protocol");
+
 	MessageDispatcher dispatcher;
 
 	QuarkRuntimeWebSockets(MessageDispatcher dispatcher) {
 	    self.dispatcher = dispatcher;
 	}
 
-	Promise connect(String url, Actor originator) {
-	    QuarkRuntimeWSActor actor = new QuarkRuntimeWSActor(originator);
+	actors.promise.Promise connect(String url, Actor originator) {
+	    logger.debug(originator.toString() + "requested connection to "
+			 + url);
+	    PromiseResolver factory =  new PromiseResolver(self.dispatcher);
+	    QuarkRuntimeWSActor actor = new QuarkRuntimeWSActor(originator, factory);
 	    self.dispatcher.startActor(actor);
 	    Context.runtime().open(url, actor);
-	    return actor.factory.promise;
+	    return factory.promise;
 	}
     }
 
