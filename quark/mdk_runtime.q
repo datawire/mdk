@@ -1,5 +1,7 @@
 quark 1.0;
 
+package datawire_mdk_runtime 1.0.0;
+
 use actors.q;
 use dependency.q;
 import actors.core;
