@@ -112,3 +112,27 @@ class RubyTests(TestCase):
             self,
             lambda service: check_output(
                 ["ruby", os.path.join(CODE_PATH, "resolve.rb"), service]))
+
+
+class JavaTests(TestCase):
+    """Tests for Java usage of MDK."""
+
+    def test_logging(self):
+        """Logs are written, and then the same logs should be read back."""
+        check_call(["mvn", "-f", os.path.join(CODE_PATH, "writelogs_java/pom.xml"),
+                    "package"])
+        check_call(
+            ["java", "-jar", os.path.join(CODE_PATH,
+                                          "writelogs_java/target/writelogs-0.0.1.jar"),
+             random_string()])
+
+    def test_discovery(self):
+        """Minimal discovery end-to-end test with a Javascript client."""
+        check_call(["mvn", "-f", os.path.join(CODE_PATH, "resolve_java/pom.xml"),
+                    "package"])
+        assertRegisteryDiscoverable(
+            self,
+            lambda service: check_output(
+                ["java", "-jar", os.path.join(
+                    CODE_PATH,"resolve_java/target/resolve-0.0.1.jar"),
+                 service]))
