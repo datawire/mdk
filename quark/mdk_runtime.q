@@ -104,7 +104,13 @@ namespace mdk_runtime {
 
 	void onMessage(Actor origin, Object msg) {
 	    Schedule sched = ?msg;
-	    Context.runtime().schedule(new _ScheduleTask(self, origin, sched.event), sched.seconds);
+            float seconds = sched.seconds;
+            if (seconds == 0.0) {
+                // Reduce chances of reentrant scheduled event; shouldn't be
+                // necessary in non-threaded versions.
+                seconds = 0.000001;
+            }
+	    Context.runtime().schedule(new _ScheduleTask(self, origin, sched.event), seconds);
 	}
 
 	float time() {
