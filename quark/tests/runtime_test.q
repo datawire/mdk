@@ -337,7 +337,7 @@ class TestPolicyFakeWebSockets extends WebSockets {
 
     actors.promise.Promise connect(String url, Actor originator) {
         Promise result = self.fake.connect(url, originator);
-        FakeWSActor actor = self.fake.fakeActors[self.fake.fakeActors.size() - 1];
+        FakeWSActor actor = self.fake.lastConnection();
         if (url == "wss://echo/") {
             // Create an echo server:
             actor.accept();

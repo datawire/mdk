@@ -323,6 +323,10 @@ namespace mdk_runtime {
             self.fakeActors.add(actor);
 	    return factory.promise;
 	}
+
+        FakeWSActor lastConnection() {
+            return self.fakeActors[self.fakeActors.size() - 1];
+        }
     }
 
     @doc("""
@@ -444,6 +448,11 @@ namespace mdk_runtime {
 	void advance(float seconds) {
 	    self._now = self._now + seconds;
 	}
+
+        @doc("Number of scheduled events.")
+        int scheduled() {
+            return self._scheduled.keys().size();
+        }
     }
 
     @doc("Create a MDKRuntime with the default configuration.")
