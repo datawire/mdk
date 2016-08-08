@@ -4,4 +4,4 @@ default:
 
 .PHONY: test
 test:
-	python -m unittest discover tests
+	python -m unittest discover -v tests

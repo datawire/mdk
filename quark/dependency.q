@@ -1,5 +1,7 @@
 quark 1.0;
 
+package datawire_dependency 1.0.0;
+
 use actors.q;
 import actors.core;
 

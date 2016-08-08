@@ -13,7 +13,22 @@ use ../actors.q;
 
 import mdk_runtime;
 import actors.core;
+import actors.promise;
 
+@doc("""
+An Actor that runs some tests.
+
+start() is called to start the test, and it should be called *not* via the
+MessageDispatcher mechanism. This means code run by start() can assume it is
+'top of the call stack'.
+
+(Technically it might not be, but there's a new MessageDispatcher for every test
+so for purposes of message delivery it is.)
+""")
+interface TestActor extends Actor {
+    @doc("Start the test. Should not be in current MessageDispatcher.")
+    void start(TestRunner runner);
+}
 
 class RealSleep extends UnaryCallable {
     Object call(Object seconds) {
@@ -53,13 +68,14 @@ class Sleep {
 }
 
 @doc("Tests for Time and Schedule services.")
-class TimeScheduleTest extends Actor {
-    Actor runner;
+class TimeScheduleTest extends TestActor {
+    TestRunner runner;
     Time timeService;
     Actor schedulingService;
     UnaryCallable sleepCallable;
     MessageDispatcher dispatcher;
     float startTime;
+    bool scheduling = false;
 
     TimeScheduleTest(Time time, Actor scheduling, UnaryCallable sleepCallable) {
 	self.timeService = time;
@@ -79,19 +95,22 @@ class TimeScheduleTest extends Actor {
 	}
     }
 
-    void onMessage(Actor origin, Object message) {
-	if (message.getClass().id == "runtime_test.Start") {
-	    Start start = ?message;
-	    self.runner = start.testRunner;
-	    self.startTime = self.timeService.time();
-	    self.dispatcher.tell(self, new Schedule("1second", 1.0),
-				 self.schedulingService);
-	    self.dispatcher.tell(self, new Schedule("5second", 5.0),
-				 self.schedulingService);
-	    self.dispatcher.tell(self, new Sleep(1.0), self);
-	    return;
-	}
+    void start(TestRunner runner) {
+        self.runner = runner;
+        self.startTime = self.timeService.time();
+        // Set a bool that will allow us to test for reentrancy.
+        self.scheduling = true;
+        self.dispatcher.tell(self, new Schedule("0second", 0.0),
+                             self.schedulingService);
+        self.scheduling = false;
+        self.dispatcher.tell(self, new Schedule("1second", 1.0),
+                             self.schedulingService);
+        self.dispatcher.tell(self, new Schedule("5second", 5.0),
+                             self.schedulingService);
+        self.dispatcher.tell(self, new Sleep(0.0), self);
+    }
 
+    void onMessage(Actor origin, Object message) {
 	if (message.getClass().id == "runtime_test.Sleep") {
 	    Sleep sleep = ?message;
 	    self.sleepCallable.__call__(sleep.seconds);
@@ -99,7 +118,17 @@ class TimeScheduleTest extends Actor {
 	}
 
 	Happening happened = ?message;
+        if (happened.event == "0second") {
+            print("0 second event delivered.");
+            if (self.scheduling) {
+                Context.runtime().fail("Scheduled event reentrantly!");
+            }
+            // Sleep 1 second to hit 1second scheduled event:
+            self.dispatcher.tell(self, new Sleep(1.0), self);
+            return;
+        }
 	if (happened.event == "1second") {
+            print("1 second event delivered.");
 	    self.assertElapsed(1.0, happened.currentTime);
 	    self.assertElapsed(1.0, self.timeService.time());
 	    // Already slept 1 seconds, now sleep 4 to hit 5 seconds:
@@ -107,10 +136,10 @@ class TimeScheduleTest extends Actor {
 	    return;
 	}
 	if (happened.event == "5second") {
+            print("5 second event delivered.");
 	    self.assertElapsed(5.0, happened.currentTime);
 	    self.assertElapsed(5.0, self.timeService.time());
-	    // All done, tell test runner to proceed.
-	    self.dispatcher.tell(self, "next", self.runner);
+            self.runner.runNextTest();
 	}
     }
 }
@@ -121,8 +150,8 @@ Tests for the WebSockets service.
 Takes two server URLS. The good one should act as an echo server, and close when
 it receives 'close'. The bad one should just be a connection refused.
 """)
-class WebSocketsTest extends Actor {
-    Actor runner;
+class WebSocketsTest extends TestActor {
+    TestRunner runner;
     WebSockets websockets;
     String serverURL;
     String badURL;
@@ -208,16 +237,15 @@ class WebSocketsTest extends Actor {
 	self.dispatcher.tell(self, "goes nowhere", self.connection);
 	self.dispatcher.tell(self, new WSClose(), self.connection);
 	// All done, tell test runner to proceed.
-	self.dispatcher.tell(self, "next", self.runner);
+        self.runner.runNextTest();
+    }
+
+    void start(TestRunner runner) {
+        self.runner = runner;
+        testBadURL();
     }
 
     void onMessage(Actor origin, Object message) {
-	if (message.getClass().id == "runtime_test.Start") {
-	    Start start = ?message;
-	    self.runner = start.testRunner;
-	    testBadURL();
-	    return;
-	}
 	if (connection == null) {
 	    panic("Got message while still unconnected.");
 	}
@@ -279,61 +307,77 @@ class KeepaliveActor extends Actor {
 
 @doc("""
 Run a series of actor-based tests. Receiving \"next\" triggers next test.
+
+Deliberately not an Actor so MessageDispatcher doesn't get affected by it and
+hide e.g. reentrancy issues in scheduling.
 """)
-class TestRunner extends Actor {
-    Map<String,Actor> tests;
+class TestRunner {
+    Map<String,UnaryCallable> tests;
     List<String> testNames;
     int nextTest = 0;
     MDKRuntime runtime;
     KeepaliveActor keepalive;
 
-    TestRunner(Map<String,Actor> tests, MDKRuntime runtime) {
-	self.tests = tests;
+    TestRunner() {
+	self.tests = {"real runtime: time, scheduling":
+                      bind(self, "testRealRuntimeScheduling", []),
+                      "fake runtime: time, scheduling":
+                      bind(self, "testFakeRuntimeScheduling", []),
+                      "real runtime: websockets":
+                      bind(self, "testRealRuntimeWebsockets", [])};
 	self.testNames = tests.keys();
-	self.runtime = runtime;
     }
 
-    void onStart(MessageDispatcher dispatcher) {
-	// Don't exit  if we  run out of  events somehow,  but do exit  if we  hit a
-	// timeout:
-	self.keepalive = new KeepaliveActor(self.runtime);
-	dispatcher.startActor(keepalive);
-	self.runtime.dispatcher.tell(self, "next", self);
+    TestActor testRealRuntimeScheduling(MDKRuntime runtime) {
+        return new TimeScheduleTest(runtime.getTimeService(),
+                                    runtime.getScheduleService(),
+                                    new RealSleep());
     }
 
-    void onMessage(Actor origin, Object msg) {
+    TestActor testFakeRuntimeScheduling(MDKRuntime runtime) {
+        FakeTime fakeTime = new FakeTime();
+        runtime.dispatcher.startActor(fakeTime);
+        return new TimeScheduleTest(fakeTime, fakeTime, new FakeSleep(fakeTime));
+
+    }
+
+    TestActor testRealRuntimeWebsockets(MDKRuntime runtime) {
+        // XXX should really use local server, not server on Internet
+        return new WebSocketsTest(new QuarkRuntimeWebSockets(runtime.dispatcher),
+                                  "wss://echo.websocket.org/", "wss://localhost:1/");
+    }
+
+    void runNextTest() {
+        // If we're not the first test, cleanup:
 	if (self.nextTest > 0) {
+	    self.runtime.dispatcher.tell(null, "stop", self.keepalive);
 	    print("Test finished successfully.\n");
 	}
+
+        // If there are no more tests we're done:
 	if (self.nextTest == testNames.size()) {
 	    print("All done.");
-	    // Shut down the keep-alive actor:
-	    self.runtime.dispatcher.tell(self, "stop", self.keepalive);
 	    return;
 	}
+
+        // Setup new runtime for a new test:
+        self.runtime = defaultRuntime();
+
+        // Don't exit if we run out of events somehow, but do exit if we hit a
+	// timeout:
+	self.keepalive = new KeepaliveActor(self.runtime);
+	self.runtime.dispatcher.startActor(keepalive);
+
+        // Run the next test:
 	String testName = self.testNames[self.nextTest];
 	print("Testing " + testName);
-	self.runtime.dispatcher.startActor(self.tests[testName]);
-	self.runtime.dispatcher.tell(self, new Start(self), self.tests[testName]);
-	self.nextTest = self.nextTest + 1;
+        TestActor test = ?self.tests[testName].__call__(self.runtime);
+        self.runtime.dispatcher.startActor(test);
+        self.nextTest = self.nextTest + 1;
+        test.start(self);
     }
 }
 
 void main(List<String> args) {
-    MDKRuntime runtime = defaultRuntime();
-    Actor realTimeTest = new TimeScheduleTest(runtime.getTimeService(),
-					      runtime.getScheduleService(),
-					      new RealSleep());
-    FakeTime fakeTime = new FakeTime();
-    runtime.dispatcher.startActor(fakeTime);
-    Actor fakeTimeTest = new TimeScheduleTest(fakeTime, fakeTime,
-					      new FakeSleep(fakeTime));
-    Actor realWebSockets = new WebSocketsTest(new QuarkRuntimeWebSockets(runtime.dispatcher),
-					     "wss://echo.websocket.org/", "wss://localhost:1/");
-    Actor runner = new TestRunner({"real runtime: time, scheduling": realTimeTest,
-				   "fake runtime: time, scheduling": fakeTimeTest,
-				   "real runtime: websockets": realWebSockets
-	                          },
-	                          runtime);
-    runtime.dispatcher.startActor(runner);
+    new TestRunner().runNextTest();
 }

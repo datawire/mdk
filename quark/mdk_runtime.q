@@ -1,5 +1,7 @@
 quark 1.0;
 
+package datawire_mdk_runtime 1.0.0;
+
 use actors.q;
 use dependency.q;
 import actors.core;
@@ -62,7 +64,7 @@ namespace mdk_runtime {
         The Promise resolves to a WSActor or WSConnectError. The originator will
         receive messages.
         """)
-	Promise connect(String url, Actor originator);
+	actors.promise.Promise connect(String url, Actor originator);
     }
 
     @doc("Connection failed.")
@@ -259,7 +261,13 @@ namespace mdk_runtime {
 
 	void onMessage(Actor origin, Object msg) {
 	    Schedule sched = ?msg;
-	    Context.runtime().schedule(new _ScheduleTask(self, origin, sched.event), sched.seconds);
+            float seconds = sched.seconds;
+            if (seconds == 0.0) {
+                // Reduce chances of reentrant scheduled event; shouldn't be
+                // necessary in non-threaded versions.
+                seconds = 0.001;
+            }
+	    Context.runtime().schedule(new _ScheduleTask(self, origin, sched.event), seconds);
 	}
 
 	float time() {
