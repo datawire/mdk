@@ -155,9 +155,9 @@ namespace mdk_runtime {
 	void onWSError(WebSocket socket, WSError error) {
 	    logger.debug("onWSError, current state " + self.state +
 			 "originator: " + self.originator.toString());
-	    self.state = "ERROR";
 	    if (self.state == "CONNECTING") {
 		logger.error("Error connecting to WebSocket: " + error.toString());
+                self.state = "ERROR";
 		self.factory.reject(new WSConnectError(error.toString()));
 		return;
 	    }
