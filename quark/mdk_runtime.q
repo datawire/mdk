@@ -206,6 +206,125 @@ namespace mdk_runtime {
 	}
     }
 
+    @doc("WSActor implementation for testing purposes.")
+    class FakeWSActor extends WSActor {
+        String url;
+        PromiseResolver resolver;
+        bool resolved = false;
+        MessageDispatcher dispatcher;
+        Actor originator;
+        List<String> sent = [];
+        String state = "CONNECTING";
+        int expectIdx = 0;
+
+        FakeWSActor(Actor originator, PromiseResolver resolver, String url) {
+            self.url = url;
+            self.originator = originator;
+            self.resolver = resolver;
+        }
+
+        void onStart(MessageDispatcher dispatcher) {
+	    self.dispatcher = dispatcher;
+	}
+
+        void onMessage(Actor origin, Object message) {
+            if (message.getClass().id == "quark.String"
+                && self.state == "CONNECTED") {
+		self.sent.add(?message);
+		return;
+	    }
+	    if (message.getClass().id == "mdk_runtime.WSClose"
+		&& self.state == "CONNECTED") {
+                self.close();
+		return;
+	    }
+        }
+
+        // Testing API:
+        @doc("""
+        Simulate the remote peer accepting the socket connect.
+        """)
+        void accept() {
+            if (resolved) {
+                Context.runtime().fail("Test bug. already accepted");
+            } else {
+                resolved = true;
+                self.state = "CONNECTED";
+                self.resolver.resolve(self);
+            }
+        }
+
+        @doc("Simulate the remote peer rejecting the socket connect.")
+        void reject() {
+            if (resolved) {
+                Context.runtime().fail("Test bug. already accepted");
+            } else {
+                resolved = true;
+                self.resolver.reject(new WSConnectError("connection refused"));
+            }
+        }
+
+        @doc("""
+        Simulate the remote peer sending a text message to the client.
+        """)
+        void send(String message) {
+            if (self.state != "CONNECTED") {
+                Context.runtime().fail("Test bug. Can't send when not connected.");
+            }
+            self.dispatcher.tell(self, new WSMessage(message), originator);
+        }
+
+        @doc("""
+        Simulate the remote peer closing the socket.
+        """)
+        void close() {
+            if (self.state == "CONNECTED") {
+                self.state = "DISCONNECTED";
+                self.dispatcher.tell(self, new WSClosed(), originator);
+            } else {
+                Context.runtime().fail("Test bug. Can't close already closed socket.");
+            }
+        }
+
+        @doc("""
+        Check that a message has been sent via this actor.
+        """)
+        String expectTextMessage() {
+            if (!resolved) {
+                Context.runtime().fail("not connected yet");
+                return "unreachable";
+            }
+
+            if (expectIdx < self.sent.size()) {
+                String msg = self.sent[expectIdx];
+                expectIdx = expectIdx + 1;
+                return msg;
+            }
+            Context.runtime().fail("no remaining message found");
+            return "unreachable";
+        }
+    }
+
+    @doc("""
+    WebSocket implementation for testing purposes.
+    """)
+    class FakeWebSockets extends WebSockets {
+        MessageDispatcher dispatcher;
+        List<FakeWSActor> fakeActors = [];
+
+	FakeWebSockets(MessageDispatcher dispatcher) {
+	    self.dispatcher = dispatcher;
+	}
+
+        actors.promise.Promise connect(String url, Actor originator) {
+            PromiseResolver factory =  new PromiseResolver(self.dispatcher);
+	    FakeWSActor actor = new FakeWSActor(originator, factory, url);
+	    self.dispatcher.startActor(actor);
+            self.fakeActors.add(actor);
+	    return factory.promise;
+	}
+    }
+
     @doc("""
     Please send me a Happening message with given event name in given number of
     seconds.
