@@ -11,9 +11,7 @@ echo "Git commit is:" $TRAVIS_COMMIT
 for CODE_LANG in --python --ruby --java --javascript ; do
     echo "Language is:" $CODE_LANG
     bash install.sh $CODE_LANG $TRAVIS_COMMIT
-    quark install $CODE_LANG quark/mdk_test.q
 done
 
 # Run the tests:
-make quark_test
-make native_test
+make test

@@ -1,9 +1,14 @@
 quark 1.0;
 
-package datawire_mdk_protocol 1.2.0;
+package datawire_mdk_protocol 1.3.0;
 
 import quark.concurrent;
 import quark.reflect;
+
+use mdk_runtime.q;
+
+import mdk_runtime;
+import actors.core;
 
 namespace mdk_protocol {
 
@@ -351,7 +356,7 @@ namespace mdk_protocol {
     }
 
     @doc("Common protocol machinery for web socket based protocol clients.")
-    class WSClient extends ProtocolHandler, WSHandler, Task {
+    class WSClient extends ProtocolHandler, WSHandler, Actor {
 
         /*
 
@@ -416,6 +421,18 @@ namespace mdk_protocol {
         long lastConnectAttempt = 0L;
         long lastHeartbeat = 0L;
 
+        Time timeService;
+        Actor schedulingActor;
+        MessageDispatcher dispatcher;
+
+        WSClient(MDKRuntime runtime) {
+            self.dispatcher = runtime.dispatcher;
+            self.timeService = runtime.getTimeService();
+            self.schedulingActor = runtime.getScheduleService();
+            // Definitely the wrong place to do this, but this works for now:
+            runtime.dispatcher.startActor(self);
+        }
+
         String url();
         String token();
         bool isStarted();
@@ -433,7 +450,7 @@ namespace mdk_protocol {
         }
 
         void schedule(float time) {
-            Context.runtime().schedule(self, time);
+            self.dispatcher.tell(self, new Schedule("wakeup", time), self.schedulingActor);
         }
 
         void scheduleReconnect() {
@@ -462,7 +479,15 @@ namespace mdk_protocol {
             }
         }
 
-        void onExecute(Runtime runtime) {
+        void onStart(MessageDispatcher dispatcher) {}
+
+        void onMessage(Actor origin, Object message) {
+            if (Class.get("mdk_runtime.Happening").hasInstance(message)) {
+                self.onScheduledEvent();
+            }
+        }
+
+        void onScheduledEvent() {
             /*
               Do our periodic chores here, this will involve checking
               the desired state held by disco against our actual
@@ -479,7 +504,7 @@ namespace mdk_protocol {
               do that.
             */
 
-            long rightNow = now();
+            long rightNow = (self.timeService.time()*1000.0).round();
             long heartbeatInterval = ((ttl/2.0)*1000.0).round();
             long reconnectInterval = (reconnectDelay*1000.0).round();
 
@@ -507,12 +532,12 @@ namespace mdk_protocol {
 
         void doOpen() {
             open(url());
-            lastConnectAttempt = now();
+            lastConnectAttempt = (self.timeService.time()*1000.0).round();
         }
 
         void doHeartbeat() {
             heartbeat();
-            lastHeartbeat = now();
+            lastHeartbeat = (self.timeService.time()*1000.0).round();
         }
 
         void open(String url) {

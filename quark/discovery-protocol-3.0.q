@@ -14,7 +14,8 @@ namespace mdk_discovery {
 
             Discovery disco;
 
-            DiscoClient(Discovery discovery) {
+            DiscoClient(Discovery discovery, MDKRuntime runtime) {
+                super(runtime);
                 disco = discovery;
             }
 

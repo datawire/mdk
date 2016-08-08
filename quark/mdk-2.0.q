@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk 2.0.1;
+package datawire_mdk 2.0.2;
 
 // DATAWIRE MDK
 
@@ -8,12 +8,13 @@ use discovery-3.0.q;
 use tracing-2.0.q;
 use introspection-1.0.q;
 use util-1.0.q;
+use dependency.q;
+use mdk_runtime.q;
 
 import mdk_discovery;
 import mdk_tracing;
 import mdk_introspection;
 import mdk_util;
-
 import quark.concurrent;
 
 @doc("Microservices Development Kit -- obtain a reference using MDK.init()")
@@ -25,15 +26,18 @@ namespace mdk {
 
     @doc("Create an unstarted instance of the MDK.")
     MDK init() {
-        return new MDKImpl();
+        // XXX once we have native package wrappers for this code they will
+        // create the DI registry and actor disptacher. Until then, we create those
+        // here:
+        return new MDKImpl(mdk_runtime.defaultRuntime());
     }
 
     @doc("""
          Create a started instance of the MDK. This is equivalent to
-         callint init() followed by start() on the resulting instance.
+         calling init() followed by start() on the resulting instance.
          """)
     MDK start() {
-        MDK m = new MDKImpl();
+        MDK m = init();
         m.start();
         return m;
     }
@@ -225,17 +229,21 @@ namespace mdk {
 
         static Logger logger = new Logger("mdk");
 
-        Discovery _disco = new Discovery();
+        Discovery _disco;
         Tracer _tracer;
         String procUUID = Context.runtime().uuid();
 
-        MDKImpl() {
+        MDKImpl(MDKRuntime runtime) {
+            _disco = new Discovery(runtime);
             _disco.url = _get("MDK_DISCOVERY_URL", "wss://discovery.datawire.io/ws/v1");
             _disco.token = DatawireToken.getToken();
 
             String tracingURL = _get("MDK_TRACING_URL", "wss://tracing.datawire.io/ws/v1");
             String tracingQueryURL = _get("MDK_TRACING_API_URL", "https://tracing.datawire.io/api/v1/logs");
-            _tracer = Tracer.withURLsAndToken(tracingURL, tracingQueryURL, _disco.token);
+            _tracer = Tracer(runtime);
+            _tracer.url = tracingURL;
+            _tracer.queryURL = tracingQueryURL;
+            _tracer.token = _disco.token;
             _tracer.initContext();
         }
 

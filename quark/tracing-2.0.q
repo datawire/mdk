@@ -57,11 +57,14 @@ namespace mdk_tracing {
 
         TLS<SharedContext> _context = new TLS<SharedContext>(new SharedContextInitializer());
         protocol.TracingClient _client;
+        MDKRuntime runtime;
 
-        Tracer() { }
+        Tracer(MDKRuntime runtime) {
+            self.runtime = runtime;
+        }
 
         static Tracer withURLsAndToken(String url, String queryURL, String token) {
-            Tracer newTracer = new Tracer();
+            Tracer newTracer = new Tracer(defaultRuntime());
 
             newTracer.url = url;
 
@@ -89,7 +92,7 @@ namespace mdk_tracing {
 
         void _openIfNeeded() {
             if (_client == null) {
-                _client = new protocol.TracingClient(self);
+                _client = new protocol.TracingClient(self, runtime);
             }
 
             if (token == null) {
@@ -435,7 +438,8 @@ namespace mdk_tracing {
                 _myLog.debug(s + message);
             }
 
-            TracingClient(Tracer tracer) {
+            TracingClient(Tracer tracer, MDKRuntime runtime) {
+                super(runtime);
                 _tracer = tracer;
             }
 

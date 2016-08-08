@@ -2,7 +2,7 @@ quark 1.0;
 
 package datawire_mdk_test 1.0.0;
 
-use mdk-2.0.q;
+use ../mdk-2.0.q;
 
 import quark.test;
 import quark.mock;
@@ -14,8 +14,30 @@ void main(List<String> args) {
 
 import mdk_tracing;
 import mdk_tracing.protocol;
+import mdk_runtime;
+
+MDKRuntime fakeRuntime() {
+    MDKRuntime result = new MDKRuntime();
+    FakeTime timeService = new FakeTime();
+    result.dependencies.registerService("time", timeService);
+    result.dependencies.registerService("schedule", timeService);
+    result.dispatcher.startActor(timeService);
+    return result;
+}
 
 class TracingTest extends MockRuntimeTest {
+    MDKRuntime runtime;
+
+    TracingTest() {
+        super();
+        self.runtime = fakeRuntime();
+    }
+
+    void pump() {
+        self.mock.pump();
+        FakeTime timeService = ?runtime.getTimeService();
+        timeService.pump();
+    }
 
     /////////////////
     // Helpers
@@ -70,7 +92,7 @@ class TracingTest extends MockRuntimeTest {
     }
 
     void doTestLog(String url) {
-        Tracer tracer = new Tracer();
+        Tracer tracer = new Tracer(runtime);
         if (url != null) {
             tracer.url = url;
         } else {
@@ -86,7 +108,7 @@ class TracingTest extends MockRuntimeTest {
 
     // Unexpected messages are ignored.
     void testUnexpectedMessage() {
-        Tracer tracer = new Tracer();
+        Tracer tracer = new Tracer(runtime);
         SocketEvent sev = startTracer(tracer);
         sev.send("{\"type\": \"UnknownMessage\"}");
         self.pump();
@@ -98,7 +120,7 @@ class TracingTest extends MockRuntimeTest {
     }
 
     void testSubscribe() {
-        Tracer tracer = new Tracer();
+        Tracer tracer = new Tracer(runtime);
         List<LogEvent> events = [];
         tracer.subscribe(bind(self, "_subhandler", [events]));
         self.pump();
@@ -141,6 +163,18 @@ class SerializableTest {
 }
 
 class DiscoveryTest extends MockRuntimeTest {
+    MDKRuntime runtime;
+
+    DiscoveryTest() {
+        super();
+        self.runtime = fakeRuntime();
+    }
+
+    void pump() {
+        self.mock.pump();
+        FakeTime timeService = ?runtime.getTimeService();
+        timeService.pump();
+    }
 
     /////////////////
     // Helpers
@@ -186,7 +220,7 @@ class DiscoveryTest extends MockRuntimeTest {
     // Tests
 
     void testStart() {
-        Discovery disco = new Discovery().connect();
+        Discovery disco = new Discovery(runtime).connect();
         SocketEvent sev = startDisco(disco);
         if (sev == null) { return; }
     }
@@ -196,7 +230,7 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testRegisterPreStart() {
-        Discovery disco = new Discovery().connect();
+        Discovery disco = new Discovery(runtime).connect();
 
         Node node = new Node();
         node.service = "svc";
@@ -216,7 +250,7 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testRegisterPostStart() {
-        Discovery disco = new Discovery().connect();
+        Discovery disco = new Discovery(runtime).connect();
         SocketEvent sev = startDisco(disco);
 
         Node node = new Node();
@@ -233,7 +267,7 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testRegisterTheNiceWay() {
-        Discovery disco = new Discovery().connect();
+        Discovery disco = new Discovery(runtime).connect();
         SocketEvent sev = startDisco(disco);
 
         Node node = new Node();
@@ -260,7 +294,7 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testResolvePreStart() {
-        Discovery disco = new Discovery().connect();
+        Discovery disco = new Discovery(runtime).connect();
 
         Promise promise = disco._resolve("svc", "1.0");
         checkEqual(false, promise.value().hasValue());
@@ -274,7 +308,7 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testResolvePostStart() {
-        Discovery disco = new Discovery().connect();
+        Discovery disco = new Discovery(runtime).connect();
         SocketEvent sev = startDisco(disco);
 
         Promise promise = disco._resolve("svc", "1.0");
@@ -286,7 +320,7 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testResolveAfterNotification() {
-        Discovery disco = new Discovery().connect();
+        Discovery disco = new Discovery(runtime).connect();
         SocketEvent sev = startDisco(disco);
 
         Node node = doActive(sev, "svc", "addr", "1.2.3");
@@ -298,7 +332,7 @@ class DiscoveryTest extends MockRuntimeTest {
     // This variant caught a bug in the code, so it's useful to have all of
     // these even though they're seemingly similar.
     void testResolveBeforeAndBeforeNotification() {
-        Discovery disco = new Discovery().connect();
+        Discovery disco = new Discovery(runtime).connect();
         SocketEvent sev = startDisco(disco);
         Promise promise = disco._resolve("svc", "1.0");
         Promise promise2 = disco._resolve("svc", "1.0");
@@ -312,7 +346,7 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testResolveBeforeAndAfterNotification() {
-        Discovery disco = new Discovery().connect();
+        Discovery disco = new Discovery(runtime).connect();
         SocketEvent sev = startDisco(disco);
         Promise promise = disco._resolve("svc", "1.0");
 
@@ -324,7 +358,7 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testResolveDifferentActive() {
-        Discovery disco = new Discovery().connect();
+        Discovery disco = new Discovery(runtime).connect();
         SocketEvent sev = startDisco(disco);
 
         Node node = doActive(sev, "svc", "addr", "1.2.3");
@@ -335,7 +369,7 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testResolveVersionAfterActive() {
-        Discovery disco = new Discovery().connect();
+        Discovery disco = new Discovery(runtime).connect();
         SocketEvent sev = startDisco(disco);
 
         Node n1 = doActive(sev, "svc", "addr1.0", "1.0.0");
@@ -348,7 +382,7 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testResolveVersionBeforeActive() {
-        Discovery disco = new Discovery().connect();
+        Discovery disco = new Discovery(runtime).connect();
         SocketEvent sev = startDisco(disco);
 
         Promise p1 = disco._resolve("svc", "1.0");
@@ -362,7 +396,7 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testResolveBreaker() {
-        Discovery disco = new Discovery().connect();
+        Discovery disco = new Discovery(runtime).connect();
         SocketEvent sev = startDisco(disco);
 
         Node n1 = doActive(sev, "svc", "addr1", "1.0.0");
@@ -387,7 +421,7 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testLoadBalancing() {
-        Discovery disco = new Discovery().connect();
+        Discovery disco = new Discovery(runtime).connect();
         SocketEvent sev = startDisco(disco);
 
         Promise promise = disco._resolve("svc", "1.0");
@@ -414,21 +448,13 @@ class DiscoveryTest extends MockRuntimeTest {
         }
     }
 
-    // Discovery.init() connects to the server, and sends the token:
-    void testInit() {
-        String token = "1234";
-        Discovery disco = Discovery.init(token);
-        self.pump();
-        self.expectSocket(disco.url + "?token=" + token);
-    }
-
     void testReconnect() {
         // ...
     }
 
     // Unexpected messages are ignored.
     void testUnexpectedMessage() {
-        Discovery disco = new Discovery().connect();
+        Discovery disco = new Discovery(runtime).connect();
         SocketEvent sev = startDisco(disco);
         sev.send("{\"type\": \"UnknownMessage\"}");
         self.pump();
@@ -436,7 +462,8 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testStop() {
-        Discovery disco = new Discovery().connect();
+        FakeTime timeService = ?runtime.getTimeService();
+        Discovery disco = new Discovery(runtime).connect();
         SocketEvent sev = startDisco(disco);
 
         Node node = new Node();
@@ -452,11 +479,11 @@ class DiscoveryTest extends MockRuntimeTest {
 
         disco.stop();
         // Might take some cleanup to stop everything:
-        self.mock.advanceClock(15000);
-        self.mock.pump();
-        self.mock.pump();
-        self.mock.pump();
-        self.mock.pump();
+        timeService.advance(15.0);
+        self.pump();
+        self.pump();
+        self.pump();
+        self.pump();
 
         // At this point we should have nothing scheduled and socket should be
         // closed:
