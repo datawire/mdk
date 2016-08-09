@@ -45,14 +45,14 @@ namespace mdk_discovery {
                 Active active = new Active();
                 active.node = node;
                 active.ttl = self.ttl;
-                self.sock.send(active.encode());
+                self.dispatcher.tell(self, active.encode(), self.sock);
                 dlog.info("active " + node.toString());
             }
 
             void expire(Node node) {
                 Expire expire = new Expire();
                 expire.node = node;
-                self.sock.send(expire.encode());
+                self.dispatcher.tell(self, expire.encode(), self.sock);
                 dlog.info("expire " + node.toString());
             }
 
@@ -116,7 +116,7 @@ namespace mdk_discovery {
                 }
             }
 
-            void onWSMessage(WebSocket socket, String message) {
+            void onWSMessage(String message) {
                 // Decode and dispatch incoming messages.
                 ProtocolEvent event = DiscoveryEvent.decode(message);
                 if (event == null) {
