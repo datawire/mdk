@@ -3,39 +3,62 @@ quark 1.0;
 use protocol-1.0.q;
 
 import mdk_protocol;
+import actors.core;
 
 namespace mdk_discovery {
     namespace protocol {
 
         @doc("The protocol machinery that wires together the public disco API to a server.")
-        class DiscoClient extends WSClient, DiscoHandler {
+        class DiscoClient extends WSClient, DiscoHandler, Actor {
+            bool _started = false;
+            String _token;
+            String _url;
+            // Clusters we advertise to the disco service.
+            Map<String, Cluster> registered = new Map<String, Cluster>();
 
             static Logger dlog = new Logger("discovery");
 
             Discovery disco;
 
-            DiscoClient(Discovery discovery, MDKRuntime runtime) {
+            DiscoClient(Discovery discovery, String token, String url, MDKRuntime runtime) {
                 super(runtime);
-                disco = discovery;
+                self.disco = discovery;
+                self._token = token;
+                self._url = url;
+            }
+
+            void start() {
+                self._started = true;
+                super.start();
+            }
+
+            void stop() {
+                self._started = false;
+                super.stop();
             }
 
             String url() {
-                return disco.url;
+                return self._url;
             }
 
             String token() {
-                return disco.token;
+                return self._token;
             }
 
             bool isStarted() {
-                return disco.started;
+                return self._started;
             }
 
-            void register(Node node) {
+            void register(Discovery disco, Node node) {
+                String service = node.service;
+                if (!registered.contains(service)) {
+                    registered[service] = new Cluster(disco);
+                }
+                registered[service].add(node);
+
                 // Trigger send of delta if we are connected, otherwise do
                 // nothing because the full set of nodes will be resent
                 // when we connect/reconnect.
-
                 if (self.isConnected()) {
                     active(node);
                 }
@@ -89,11 +112,11 @@ namespace mdk_discovery {
             }
 
             void heartbeat() {
-                List<String> services = disco.registered.keys();
+                List<String> services = self.registered.keys();
                 int idx = 0;
                 while (idx < services.size()) {
                     int jdx = 0;
-                    List<Node> nodes = disco.registered[services[idx]].nodes;
+                    List<Node> nodes = self.registered[services[idx]].nodes;
                     while (jdx < nodes.size()) {
                         active(nodes[jdx]);
                         jdx = jdx + 1;
@@ -103,11 +126,11 @@ namespace mdk_discovery {
             }
 
             void shutdown() {
-                List<String> services = disco.registered.keys();
+                List<String> services = self.registered.keys();
                 int idx = 0;
                 while (idx < services.size()) {
                     int jdx = 0;
-                    List<Node> nodes = disco.registered[services[idx]].nodes;
+                    List<Node> nodes = self.registered[services[idx]].nodes;
                     while (jdx < nodes.size()) {
                         expire(nodes[jdx]);
                         jdx = jdx + 1;

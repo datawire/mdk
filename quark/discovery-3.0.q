@@ -320,9 +320,6 @@ namespace mdk_discovery {
 
         static Logger logger = new Logger("discovery");
 
-        // Clusters we advertise to the disco service.
-        Map<String, Cluster> registered = new Map<String, Cluster>();
-
         // Clusters the disco says are available, as well as clusters for
         // which we are awaiting resolution.
         Map<String, Cluster> services = new Map<String, Cluster>();
@@ -345,7 +342,7 @@ namespace mdk_discovery {
             mutex.acquire();
 
             if (client == null) {
-                client = new DiscoClient(self, runtime);
+                client = new DiscoClient(self, self.token, self.url, runtime);
             }
         }
 
@@ -433,16 +430,7 @@ namespace mdk_discovery {
         @doc("usually start the uplink before this will do much; see start().")
         Discovery register(Node node) {
             self._lock();
-
-            String service = node.service;
-
-            if (!registered.contains(service)) {
-                registered[service] = new Cluster(self);
-            }
-
-            registered[service].add(node);
-            client.register(node);
-
+            client.register(self, node);
             self._release();
             return self;
         }
