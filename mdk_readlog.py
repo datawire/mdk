@@ -72,7 +72,7 @@ def main(docopt_args):
 
 
         # Created new tracer object?
-        tracer = mdk.mdk_tracing.Tracer()
+        tracer = mdk.mdk_tracing.Tracer(mdk.mdk_runtime.defaultRuntime())
         # Subscribe: 
             # takes only 1 parameter 
             # opens a connection if needed (_openIfNeeded())
