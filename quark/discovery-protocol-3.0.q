@@ -1,28 +1,41 @@
 quark 1.0;
 
 use protocol-1.0.q;
+use introspection-1.0.q;
+use util-1.0.q;
 
-import mdk_protocol;
 import actors.core;
+import mdk_protocol;
+import mdk_util;
 
 namespace mdk_discovery {
     namespace protocol {
+
+        @doc("Create a Discovery service client using standard MDK env variables.")
+        DiscoClient createClient(MDKRuntime runtime) {
+            // XXX Maybe pass in token as parameter in later stage of refactor
+            String token = EnvironmentVariable("DATAWIRE_TOKEN").orElseGet("");
+            EnvironmentVariable ddu = EnvironmentVariable("MDK_DISCOVERY_URL");
+            String url = ddu.orElseGet("wss://discovery.datawire.io/ws/v1");
+            return new DiscoClient(token, url, runtime);
+        }
 
         @doc("The protocol machinery that wires together the public disco API to a server.")
         class DiscoClient extends WSClient, DiscoHandler, Actor {
             bool _started = false;
             String _token;
             String _url;
+            FailurePolicyFactory _failurePolicyFactory;
+
             // Clusters we advertise to the disco service.
             Map<String, Cluster> registered = new Map<String, Cluster>();
 
             static Logger dlog = new Logger("discovery");
-
             Discovery disco;
 
-            DiscoClient(Discovery discovery, String token, String url, MDKRuntime runtime) {
+            DiscoClient(String token, String url, MDKRuntime runtime) {
                 super(runtime);
-                self.disco = discovery;
+                self._failurePolicyFactory = ?runtime.dependencies.getService("failurepolicy_factory");
                 self._token = token;
                 self._url = url;
             }
@@ -52,7 +65,7 @@ namespace mdk_discovery {
             void register(Discovery disco, Node node) {
                 String service = node.service;
                 if (!registered.contains(service)) {
-                    registered[service] = new Cluster(disco);
+                    registered[service] = new Cluster(self._failurePolicyFactory);
                 }
                 registered[service].add(node);
 

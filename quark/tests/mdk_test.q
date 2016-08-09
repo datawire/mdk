@@ -14,6 +14,7 @@ void main(List<String> args) {
 import mdk_tracing;
 import mdk_tracing.protocol;
 import mdk_runtime;
+import mdk_discovery;
 
 MDKRuntime fakeRuntime() {
     MDKRuntime result = new MDKRuntime();
@@ -23,13 +24,17 @@ MDKRuntime fakeRuntime() {
     result.dependencies.registerService("websockets",
                                         new FakeWebSockets(result.dispatcher));
     result.dispatcher.startActor(timeService);
+    result.dependencies.registerService("failurepolicy_factory",
+                                        new CircuitBreakerFactory());
     return result;
 }
 
 FakeWSActor expectSocket(MDKRuntime runtime, String url) {
     FakeWebSockets ws = ?runtime.getWebSocketsService();
     FakeWSActor actor = ws.lastConnection();
-    if (actor.url != url) {
+    // May or may not have token appended depending on env variables...
+    if (!actor.url.startsWith(url)) {
+        checkEqual(url, actor.url);
         return null;
     } else {
         return actor;
@@ -53,7 +58,10 @@ class TracingTest {
 
     ProtocolEvent expectTracingEvent(FakeWSActor sev, String expectedType) {
         String msg = sev.expectTextMessage();
-        if (msg == null) { return null; }
+        if (msg == null) {
+            check(false, "No message sent.");
+            return null;
+        }
         ProtocolEvent evt = TracingEvent.decode(msg);
         String type = evt.getClass().getName();
         if (check(type == expectedType, "expected " + expectedType + " event, got " + type)) {
@@ -91,7 +99,10 @@ class TracingTest {
         tracer.log("procUUID", "DEBUG", "blah", "testing...");
         self.pump();
         FakeWSActor sev = expectSocket(self.runtime, tracer.url + "?token=" + tracer.token);
-        if (sev == null) { return null; }
+        if (sev == null) {
+            check(false, "No FakeWSActor returned.");
+            return null;
+        }
         sev.accept();
         self.pump();
         Open open = expectOpen(sev);
@@ -108,6 +119,7 @@ class TracingTest {
             url = tracer.url;
         }
         FakeWSActor sev = startTracer(tracer);
+        if (sev == null) { return; }
         LogEvent evt = expectLogEvent(sev);
         if (evt == null) { return; }
         checkEqual("DEBUG", evt.level);
@@ -119,6 +131,7 @@ class TracingTest {
     void testUnexpectedMessage() {
         Tracer tracer = new Tracer(runtime);
         FakeWSActor sev = startTracer(tracer);
+        if (sev == null) { return; }
         sev.send("{\"type\": \"UnknownMessage\"}");
         self.pump();
         checkEqual("CONNECTED", sev.state);
@@ -188,7 +201,10 @@ class DiscoveryTest {
 
     ProtocolEvent expectDiscoveryEvent(FakeWSActor sev, String expectedType) {
         String msg = sev.expectTextMessage();
-        if (msg == null) { return null; }
+        if (msg == null) {
+            check(false, "No discovery event sent at all.");
+            return null;
+        }
         ProtocolEvent evt = DiscoveryEvent.decode(msg);
         String type = evt.getClass().getName();
         if (check(type == expectedType, "expected " + expectedType + " event, got " + type)) {
@@ -216,8 +232,11 @@ class DiscoveryTest {
     FakeWSActor startDisco(Discovery disco) {
         disco.start();
         self.pump();
-        FakeWSActor sev = expectSocket(self.runtime, disco.url);
-        if (sev == null) { return null; }
+        FakeWSActor sev = expectSocket(self.runtime, disco.client.url());
+        if (sev == null) {
+            check(false, "No FakeWSActor returned.");
+            return null;
+        }
         sev.accept();
         sev.send(new Open().encode());
         return sev;
@@ -227,9 +246,12 @@ class DiscoveryTest {
     // Tests
 
     void testStart() {
-        Discovery disco = new Discovery(runtime).connect();
+        Discovery disco = new Discovery(runtime);
         FakeWSActor sev = startDisco(disco);
-        if (sev == null) { return; }
+        if (sev == null) {
+            check(false, "No FakeWSActor created.");
+            return;
+        }
     }
 
     void testFailedStart() {
@@ -237,7 +259,7 @@ class DiscoveryTest {
     }
 
     void testRegisterPreStart() {
-        Discovery disco = new Discovery(runtime).connect();
+        Discovery disco = new Discovery(runtime);
 
         Node node = new Node();
         node.service = "svc";
@@ -257,7 +279,7 @@ class DiscoveryTest {
     }
 
     void testRegisterPostStart() {
-        Discovery disco = new Discovery(runtime).connect();
+        Discovery disco = new Discovery(runtime);
         FakeWSActor sev = startDisco(disco);
 
         Node node = new Node();
@@ -274,7 +296,7 @@ class DiscoveryTest {
     }
 
     void testRegisterTheNiceWay() {
-        Discovery disco = new Discovery(runtime).connect();
+        Discovery disco = new Discovery(runtime);
         FakeWSActor sev = startDisco(disco);
 
         Node node = new Node();
@@ -301,7 +323,7 @@ class DiscoveryTest {
     }
 
     void testResolvePreStart() {
-        Discovery disco = new Discovery(runtime).connect();
+        Discovery disco = new Discovery(runtime);
 
         Promise promise = disco._resolve("svc", "1.0");
         checkEqual(false, promise.value().hasValue());
@@ -315,7 +337,7 @@ class DiscoveryTest {
     }
 
     void testResolvePostStart() {
-        Discovery disco = new Discovery(runtime).connect();
+        Discovery disco = new Discovery(runtime);
         FakeWSActor sev = startDisco(disco);
 
         Promise promise = disco._resolve("svc", "1.0");
@@ -327,7 +349,7 @@ class DiscoveryTest {
     }
 
     void testResolveAfterNotification() {
-        Discovery disco = new Discovery(runtime).connect();
+        Discovery disco = new Discovery(runtime);
         FakeWSActor sev = startDisco(disco);
 
         Node node = doActive(sev, "svc", "addr", "1.2.3");
@@ -339,7 +361,7 @@ class DiscoveryTest {
     // This variant caught a bug in the code, so it's useful to have all of
     // these even though they're seemingly similar.
     void testResolveBeforeAndBeforeNotification() {
-        Discovery disco = new Discovery(runtime).connect();
+        Discovery disco = new Discovery(runtime);
         FakeWSActor sev = startDisco(disco);
         Promise promise = disco._resolve("svc", "1.0");
         Promise promise2 = disco._resolve("svc", "1.0");
@@ -353,7 +375,7 @@ class DiscoveryTest {
     }
 
     void testResolveBeforeAndAfterNotification() {
-        Discovery disco = new Discovery(runtime).connect();
+        Discovery disco = new Discovery(runtime);
         FakeWSActor sev = startDisco(disco);
         Promise promise = disco._resolve("svc", "1.0");
 
@@ -365,7 +387,7 @@ class DiscoveryTest {
     }
 
     void testResolveDifferentActive() {
-        Discovery disco = new Discovery(runtime).connect();
+        Discovery disco = new Discovery(runtime);
         FakeWSActor sev = startDisco(disco);
 
         Node node = doActive(sev, "svc", "addr", "1.2.3");
@@ -376,7 +398,7 @@ class DiscoveryTest {
     }
 
     void testResolveVersionAfterActive() {
-        Discovery disco = new Discovery(runtime).connect();
+        Discovery disco = new Discovery(runtime);
         FakeWSActor sev = startDisco(disco);
 
         Node n1 = doActive(sev, "svc", "addr1.0", "1.0.0");
@@ -389,7 +411,7 @@ class DiscoveryTest {
     }
 
     void testResolveVersionBeforeActive() {
-        Discovery disco = new Discovery(runtime).connect();
+        Discovery disco = new Discovery(runtime);
         FakeWSActor sev = startDisco(disco);
 
         Promise p1 = disco._resolve("svc", "1.0");
@@ -403,7 +425,7 @@ class DiscoveryTest {
     }
 
     void testResolveBreaker() {
-        Discovery disco = new Discovery(runtime).connect();
+        Discovery disco = new Discovery(runtime);
         FakeWSActor sev = startDisco(disco);
 
         Node n1 = doActive(sev, "svc", "addr1", "1.0.0");
@@ -416,7 +438,8 @@ class DiscoveryTest {
 
         Node failed = ?p.value().getValue();
         int idx = 0;
-        while (idx < disco.threshold) {
+        CircuitBreakerFactory fpfactory = ?disco._fpfactory;
+        while (idx < fpfactory.threshold) {
             failed.failure();
             idx = idx + 1;
         }
@@ -428,7 +451,7 @@ class DiscoveryTest {
     }
 
     void testLoadBalancing() {
-        Discovery disco = new Discovery(runtime).connect();
+        Discovery disco = new Discovery(runtime);
         FakeWSActor sev = startDisco(disco);
 
         Promise promise = disco._resolve("svc", "1.0");
@@ -461,7 +484,7 @@ class DiscoveryTest {
 
     // Unexpected messages are ignored.
     void testUnexpectedMessage() {
-        Discovery disco = new Discovery(runtime).connect();
+        Discovery disco = new Discovery(runtime);
         FakeWSActor sev = startDisco(disco);
         sev.send("{\"type\": \"UnknownMessage\"}");
         self.pump();
@@ -470,7 +493,7 @@ class DiscoveryTest {
 
     void testStop() {
         FakeTime timeService = ?runtime.getTimeService();
-        Discovery disco = new Discovery(runtime).connect();
+        Discovery disco = new Discovery(runtime);
         FakeWSActor sev = startDisco(disco);
 
         Node node = new Node();
