@@ -442,7 +442,6 @@ namespace mdk_discovery {
                 registrar = ?runtime.dependencies.getService("discovery_registrar");
             } else {
                 panic("Registration not supported as no Discovery Registrar was setup.");
-                return self;
             }
             self.runtime.dispatcher.tell(self, new RegisterNode(node), registrar);
             return self;
