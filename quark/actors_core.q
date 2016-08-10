@@ -61,6 +61,14 @@ namespace core {
 	    self.start = start;
 	}
 
+	String toString() {
+	    String result = "stopping";
+	    if (self.start) {
+		result = "starting";
+	    }
+	    return result + " " + self.actor.toString();
+	}
+
 	void deliver() {
 	    if (self.start) {
 		self.actor.onStart(self.dispatcher);
