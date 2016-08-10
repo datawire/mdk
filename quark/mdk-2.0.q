@@ -271,11 +271,11 @@ namespace mdk {
             _disco.register(node);
         }
 
-        SessionImpl session() {
+        Session session() {
             return new SessionImpl(self, null);
         }
 
-        SessionImpl join(String encodedContext) {
+        Session join(String encodedContext) {
             return new SessionImpl(self, encodedContext);
         }
 

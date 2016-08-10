@@ -39,6 +39,11 @@ namespace core {
 	void deliver() {
 	    self.destination.onMessage(self.origin, self.msg);
 	}
+
+	String toString() {
+	    return ("{" + origin.toString() + "->" + destination.toString()
+		    + ": " + msg.toString() + "}");
+	}
     }
 
     @doc("Start an Actor.")
@@ -64,6 +69,7 @@ namespace core {
     Reduce accidental re-entrancy by making sure messages are run asynchronously.
     """)
     class MessageDispatcher {
+	static Logger logger = new Logger("actors");
 	List<_QueuedMessage> _queued = [];
 	bool _delivering = false;
 	Lock _lock = new Lock(); // Will become unnecessary once we abandon Quark runtime
@@ -81,6 +87,7 @@ namespace core {
 
 	@doc("Queue a message for delivery.")
 	void _queue(_QueuedMessage inFlight) {
+	    logger.debug("Queued " + inFlight.toString());
 	    self._lock.acquire();
 	    self._queued.add(inFlight);
 	    if (self._delivering) {
@@ -98,6 +105,7 @@ namespace core {
 		self._lock.release();
 		int idx = 0;
 		while (idx < toDeliver.size()) {
+		    logger.debug("Delivering " + toDeliver[idx].toString());
 		    toDeliver[idx].deliver();
 		    idx = idx + 1;
 		}
