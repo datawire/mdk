@@ -167,6 +167,8 @@ namespace mdk {
         @doc("Set the logging level for the session.")
         void trace(String level);
 
+        // Temporarily disabled due to lack of authorization
+        /*
         @doc("""
              Override service resolution for the current distributed
              session. All attempts to resolve *service*, *version*
@@ -175,6 +177,7 @@ namespace mdk {
              downstream services involved in the distributed session.
              """)
         void route(String service, String version, String target, String targetVersion);
+        */
 
         @doc("""
              Locate a compatible service instance.
@@ -325,6 +328,8 @@ namespace mdk {
             return _context.properties.contains(property);
         }
 
+        // Temporarily disabled due to lack of authorization
+        /*
         void route(String service, String version, String target, String targetVersion) {
             Map<String,List<Map<String,String>>> routes;
             if (!has("routes")) {
@@ -344,6 +349,7 @@ namespace mdk {
 
             targets.add({"version": version, "target": target, "targetVersion": targetVersion});
         }
+        */
 
         void trace(String level) {
             set("trace", level);
@@ -408,6 +414,8 @@ namespace mdk {
         }
 
         Promise _resolve(String service, String version) {
+            // Temporarily disabled due to lack of authorization
+            /*
             Map<String,List<Map<String,String>>> routes = ?get("routes");
             if (routes != null && routes.contains(service)) {
                 List<Map<String,String>> targets = routes[service];
@@ -423,6 +431,7 @@ namespace mdk {
                 }
             }
 
+            */
             return _mdk._disco._resolve(service, version).
                 andThen(bind(self, "_resolvedCallback", []));
         }
