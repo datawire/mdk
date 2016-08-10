@@ -8,36 +8,55 @@ import actors.core;
 import mdk_protocol;
 import mdk_util;
 
+// REMAINING WORK FOR WEDNESDAY: Make DiscoClient an actor, address XXXs and todos
+
 namespace mdk_discovery {
     namespace protocol {
 
         @doc("Create a Discovery service client using standard MDK env variables.")
-        DiscoClient createClient(MDKRuntime runtime) {
+        DiscoClient createClient(Actor subscriber, MDKRuntime runtime) {
             // XXX Maybe pass in token as parameter in later stage of refactor
             String token = EnvironmentVariable("DATAWIRE_TOKEN").orElseGet("");
             EnvironmentVariable ddu = EnvironmentVariable("MDK_DISCOVERY_URL");
             String url = ddu.orElseGet("wss://discovery.datawire.io/ws/v1");
-            return new DiscoClient(token, url, runtime);
+            return new DiscoClient(subscriber, token, url, runtime);
         }
 
-        @doc("The protocol machinery that wires together the public disco API to a server.")
-        class DiscoClient extends WSClient, DiscoHandler, Actor {
+        @doc("""
+        A source of discovery information that talks to Datawire Discovery server.
+
+        Also supports registering discovery information with the server.
+        """)
+        class DiscoClient extends WSClient, DiscoHandler, DiscoverySource {
             bool _started = false;
             String _token;
             String _url;
             FailurePolicyFactory _failurePolicyFactory;
+            MessageDispatcher _dispatcher;
+            Actor _subscriber;  // We will send discovery events here
 
             // Clusters we advertise to the disco service.
             Map<String, Cluster> registered = new Map<String, Cluster>();
 
             static Logger dlog = new Logger("discovery");
-            Discovery disco;
 
-            DiscoClient(String token, String url, MDKRuntime runtime) {
+            DiscoClient(Actor subscriber, String token, String url, MDKRuntime runtime) {
                 super(runtime);
+                self._subscriber = subscriber;
                 self._failurePolicyFactory = ?runtime.dependencies.getService("failurepolicy_factory");
                 self._token = token;
                 self._url = url;
+            }
+
+            // Actor interface; placeholders for when we stop using WSClient as
+            // a superclass.
+            void onStart(MessageDispatcher dispatcher) {
+                self._dispatcher = dispatcher;
+                super.onStart(dispatcher);
+            }
+
+            void onMessage(Actor origin, Object message) {
+                super.onMessage(origin, message);
             }
 
             void start() {
@@ -102,18 +121,12 @@ namespace mdk_discovery {
 
             void onActive(Active active) {
                 // Stick the node in the available set.
-                disco._active(active.node);
+                self._dispatcher.tell(self, new NodeActive(active.node), self._subscriber);
             }
 
             void onExpire(Expire expire) {
                 // Remove the node from our available set.
-
-                // hmm, we could make all Node objects we hand out be
-                // continually updated until they expire...
-
-                Node node = expire.node;
-
-                disco._expire(node);
+                self._dispatcher.tell(self, new NodeExpired(expire.node), self._subscriber);
             }
 
             void onClear(Clear reset) {
@@ -161,9 +174,7 @@ namespace mdk_discovery {
                     return;
                 }
 
-                // disco.mutex.acquire();
                 event.dispatch(self);
-                // disco.mutex.release();
             }
 
         }

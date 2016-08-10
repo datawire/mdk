@@ -5,6 +5,7 @@ package datawire_mdk_discovery 3.1.0;
 use util-1.0.q;
 include discovery-protocol-3.0.q;
 use mdk_runtime.q;
+use actors.q;
 
 import quark.concurrent;
 import quark.reflect;
@@ -12,6 +13,7 @@ import quark.reflect;
 import mdk_discovery.protocol;
 import mdk_util;  // bring in EnvironmentVariable, WaitForPromise
 import mdk_runtime;
+import actors.core;
 
 /*
   Context:
@@ -36,6 +38,33 @@ import mdk_runtime;
 */
 
 namespace mdk_discovery {
+
+    @doc("A node has become active.")
+    class NodeActive {
+        Node node;
+
+        NodeActive(Node node) {
+            self.node = node;
+        }
+    }
+
+    @doc("A node has expired.")
+    class NodeExpired {
+        Node node;
+
+        NodeExpired(Node node) {
+            self.node = node;
+        }
+    }
+
+    @doc("""
+    A source of discovery information.
+
+    Sends NodeActive and NodeExpired messages to a subscriber. For now the
+    subscriber is presumed to be passed into implementation constructor somehow,
+    but will likely add a subscription incoming message in a future iteration.
+    """)
+    interface DiscoverySource extends Actor {}
 
     class _Request {
 
@@ -332,7 +361,7 @@ namespace mdk_discovery {
     @doc("Using it, a provider can register itself as providing a particular service")
     @doc("(see the register method) and a consumer can locate a provider for a")
     @doc("particular service (see the resolve method).")
-    class Discovery {
+    class Discovery extends Actor {
         static Logger logger = new Logger("discovery");
 
         // Clusters the disco says are available, as well as clusters for
@@ -351,9 +380,7 @@ namespace mdk_discovery {
             logger.info("Discovery created!");
             self.runtime = runtime;
             self._fpfactory = ?runtime.dependencies.getService("failurepolicy_factory");
-            client = createClient(runtime);
-            // DELETE ME ONCE EVENTS ARE IN, BEFORE MERGE:
-            client.disco = self;
+            self.client = createClient(self, runtime);
         }
 
         // XXX PRIVATE API.
@@ -449,6 +476,23 @@ namespace mdk_discovery {
         @doc("you do not want to use this in Javascript).")
         Node resolve_until(String service, String version, float timeout) {
             return ?WaitForPromise.wait(self._resolve(service, version), timeout, "service " + service);
+        }
+
+        // Actor interface:
+        void onStart(MessageDispatcher dispatcher) {}
+
+        void onMessage(Actor origin, Object message) {
+            String klass = message.getClass().id;
+            if (klass == "mdk_discovery.NodeActive") {
+                NodeActive active = ?message;
+                self._active(active.node);
+                return;
+            }
+            if (klass == "mdk_discovery.NodeExpired") {
+                NodeExpired expire = ?message;
+                self._expire(expire.node);
+                return;
+            }
         }
 
         // XXX PRIVATE API -- needs to not be here.
