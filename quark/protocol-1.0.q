@@ -484,15 +484,16 @@ namespace mdk_protocol {
         void onStart(MessageDispatcher dispatcher) {}
 
         void onMessage(Actor origin, Object message) {
-            if (Class.get("mdk_runtime.Happening").hasInstance(message)) {
+            String typeId = message.getClass().id;
+            if (typeId == "mdk_runtime.Happening") {
                 self.onScheduledEvent();
                 return;
             }
-            if (Class.get("mdk_runtime.WSClosed").hasInstance(message)) {
+            if (typeId == "mdk_runtime.WSClosed") {
                 self.onWSClosed();
                 return;
             }
-            if (Class.get("mdk_runtime.WSMessage").hasInstance(message)) {
+            if (typeId == "mdk_runtime.WSMessage") {
                 WSMessage wsmessage = ?message;
                 self.onWSMessage(wsmessage.body);
                 return;
