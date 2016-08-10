@@ -208,7 +208,7 @@ namespace mdk_protocol {
              We also provide a map of properties for later extension. Rememeber
              that these, too, will be shared across the whole system.
         """)
-        Map<String, Object> properties;
+        Map<String, Object> properties = {};
 
         int _lastEntry = 0;
 

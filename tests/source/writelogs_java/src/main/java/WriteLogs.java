@@ -10,6 +10,7 @@ public class WriteLogs {
         MDKImpl mdk = (MDKImpl)Functions.start();
         long start = System.currentTimeMillis();
         Session session = mdk.session();
+        session.trace("DEBUG");
         ArrayList<String> messages = new ArrayList<String>();
         String category = args[0];
         ArrayList<String> sent_messages = new ArrayList<String>();
@@ -51,4 +52,3 @@ public class WriteLogs {
         session.warn(category, sent_messages.get(4));
     }
 }
-
