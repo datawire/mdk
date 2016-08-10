@@ -266,17 +266,14 @@ class WebSocketsTest extends TestActor {
 Make sure we don't exit prematurely due to buggy tests.
 
 Times out after 60 seconds.
-
-Stops keep-alive scheduling if a \"stop\" message is received.
 """)
 class KeepaliveActor extends Actor {
     MDKRuntime runtime;
     float timeStarted;
-    bool stopped;
+    bool stopping = false;
 
     KeepaliveActor(MDKRuntime runtime) {
 	self.runtime = runtime;
-	self.stopped = false;
     }
 
     void onStart(MessageDispatcher tell) {
@@ -284,13 +281,13 @@ class KeepaliveActor extends Actor {
 	self.onMessage(self, "go");
     }
 
+    void onStop() {
+        self.stopping = true;
+    }
+
     void onMessage(Actor origin, Object message) {
-	if (message == "stop") {
-	    self.stopped = true;
-	    return;
-	}
-	// Must be a Happening message from the scheduling service:
-	if (self.stopped) {
+        // Must be a Happening message from the scheduling service.
+	if (self.stopping) {
 	    return;
 	}
 	if (self.runtime.getTimeService().time() - self.timeStarted > 60.0) {
@@ -402,7 +399,7 @@ class TestRunner {
     void runNextTest() {
         // If we're not the first test, cleanup:
 	if (self.nextTest > 0) {
-	    self.runtime.dispatcher.tell(null, "stop", self.keepalive);
+	    self.runtime.dispatcher.stopActor(self.keepalive);
 	    print("Test finished successfully.\n");
 	}
 
