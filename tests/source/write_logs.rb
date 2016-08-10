@@ -4,6 +4,7 @@ $mdk = ::Quark::Mdk.start()
 def main()
   start = Time.now
   session = $mdk.session()
+  session.trace("DEBUG")
   messages = []
   category = ARGV[0]
   sent_messages = ["hello critical " + category,

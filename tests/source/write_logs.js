@@ -11,6 +11,7 @@ var main = function() {
 	process.exit(1);
     }, 30000);
     var session = MDK.session();
+    session.trace("DEBUG");
     var category = process.argv[2];
     var messages = [];
     var sent_messages = ["hello critical " + category,
