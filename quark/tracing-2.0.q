@@ -102,7 +102,7 @@ namespace mdk_tracing {
 
         void stop() {
             if (_client != null) {
-                _client.stop();
+                runtime.dispatcher.stopActor(_client);
             }
         }
 
@@ -420,6 +420,7 @@ namespace mdk_tracing {
             bool _started = false;
             Lock _mutex = new Lock();
             UnaryCallable _handler = null;
+            MessageDispatcher _dispatcher;
 
             long _syncRequestPeriod = 5000L;  // how often (in ms) sync requests should be sent
             int  _syncInFlightMax = 50;       // max size of the in-flight buffer before sending a sync request
@@ -460,7 +461,7 @@ namespace mdk_tracing {
 
             void _startIfNeeded() {
                 if (!_started) {
-                    self.start();
+                    self._dispatcher.startActor(self);
                     _started = true;
                 }
             }
@@ -472,9 +473,14 @@ namespace mdk_tracing {
                 _mutex.release();
             }
 
-            void stop() {
+            void onStart(MessageDispatcher dispatcher) {
+                self._dispatcher = dispatcher;
+                super.onStart(dispatcher);
+            }
+
+            void onStop() {
                 _started = false;
-                super.stop();
+                super.onStop();
             }
 
             void startup() {

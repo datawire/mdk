@@ -52,7 +52,13 @@ namespace mdk_discovery {
             // a superclass.
             void onStart(MessageDispatcher dispatcher) {
                 self._dispatcher = dispatcher;
+                self._started = true;
                 super.onStart(dispatcher);
+            }
+
+            void onStop() {
+                self._started = false;
+                super.onStop();
             }
 
             void onMessage(Actor origin, Object message) {
@@ -62,16 +68,6 @@ namespace mdk_discovery {
                     return;
                 }
                 super.onMessage(origin, message);
-            }
-
-            void start() {
-                self._started = true;
-                super.start();
-            }
-
-            void stop() {
-                self._started = false;
-                super.stop();
             }
 
             String url() {
