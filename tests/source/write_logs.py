@@ -13,6 +13,7 @@ start = time.time()
 
 def main():
     session = mdk.session()
+    session.trace("DEBUG")
     category = sys.argv[1]
     results = set()
     expected = set(("hello {} {}".format(category, level), level.upper())
