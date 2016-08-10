@@ -1,14 +1,11 @@
 quark 1.0;
 
 use protocol-1.0.q;
-use introspection-1.0.q;
 use util-1.0.q;
 
 import actors.core;
 import mdk_protocol;
 import mdk_util;
-
-// REMAINING WORK FOR WEDNESDAY: Make DiscoClient an actor, address XXXs and todos
 
 namespace mdk_discovery {
     namespace protocol {
@@ -17,9 +14,7 @@ namespace mdk_discovery {
         Create a Discovery service client using standard MDK env variables and
         register it with the MDK.
         """)
-        DiscoClient createClient(Actor subscriber, MDKRuntime runtime) {
-            // XXX Maybe pass in token as parameter in later stage of refactor
-            String token = EnvironmentVariable("DATAWIRE_TOKEN").orElseGet("");
+        DiscoClient createClient(Actor subscriber, String token, MDKRuntime runtime) {
             EnvironmentVariable ddu = EnvironmentVariable("MDK_DISCOVERY_URL");
             String url = ddu.orElseGet("wss://discovery.datawire.io/ws/v1");
             DiscoClient client = new DiscoClient(subscriber, token, url, runtime);

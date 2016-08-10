@@ -240,14 +240,15 @@ namespace mdk {
         MDKImpl(MDKRuntime runtime) {
             runtime.dependencies.registerService("failurepolicy_factory", new CircuitBreakerFactory());
             _disco = new Discovery(runtime);
-            _discoClient = createClient(_disco, runtime);
+            String token = DatawireToken.getToken();
+            _discoClient = createClient(_disco, token, runtime);
             runtime.dispatcher.startActor(_discoClient);
             String tracingURL = _get("MDK_TRACING_URL", "wss://tracing.datawire.io/ws/v1");
             String tracingQueryURL = _get("MDK_TRACING_API_URL", "https://tracing.datawire.io/api/v1/logs");
             _tracer = Tracer(runtime);
             _tracer.url = tracingURL;
             _tracer.queryURL = tracingQueryURL;
-            _tracer.token = DatawireToken.getToken();
+            _tracer.token = token;
             _tracer.initContext();
         }
 

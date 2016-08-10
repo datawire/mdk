@@ -232,7 +232,7 @@ class DiscoveryTest {
 
     Discovery createDisco() {
         Discovery disco = new Discovery(runtime);
-        self.client = mdk_discovery.protocol.createClient(disco, self.runtime);
+        self.client = mdk_discovery.protocol.createClient(disco, "", self.runtime);
         return disco;
     }
 
