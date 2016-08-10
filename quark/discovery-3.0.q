@@ -66,6 +66,23 @@ namespace mdk_discovery {
     """)
     interface DiscoverySource extends Actor {}
 
+    @doc("Register a node.")
+    class RegisterNode {
+        Node node;
+
+        RegisterNode(Node node) {
+            self.node = node;
+        }
+    }
+
+    @doc("""
+    Allow registration of services.
+
+    Send this an actor a RegisterNode message to do so.
+    """)
+    interface DiscoveryRegistrar extends Actor {}
+
+
     class _Request {
 
         String version;
@@ -424,9 +441,7 @@ namespace mdk_discovery {
         @doc("Register info about a service node with the discovery service. You must")
         @doc("usually start the uplink before this will do much; see start().")
         Discovery register(Node node) {
-            self._lock();
-            client.register(self, node);
-            self._release();
+            self.runtime.dispatcher.tell(self, new RegisterNode(node), self.client);
             return self;
         }
 

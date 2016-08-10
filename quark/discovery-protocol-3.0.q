@@ -27,7 +27,7 @@ namespace mdk_discovery {
 
         Also supports registering discovery information with the server.
         """)
-        class DiscoClient extends WSClient, DiscoHandler, DiscoverySource {
+        class DiscoClient extends WSClient, DiscoHandler, DiscoverySource, DiscoveryRegistrar {
             bool _started = false;
             String _token;
             String _url;
@@ -48,7 +48,7 @@ namespace mdk_discovery {
                 self._url = url;
             }
 
-            // Actor interface; placeholders for when we stop using WSClient as
+            // Actor interface; placeholder for when we stop using WSClient as
             // a superclass.
             void onStart(MessageDispatcher dispatcher) {
                 self._dispatcher = dispatcher;
@@ -56,6 +56,11 @@ namespace mdk_discovery {
             }
 
             void onMessage(Actor origin, Object message) {
+                if (message.getClass().id == "mdk_discovery.RegisterNode") {
+                    RegisterNode register = ?message;
+                    _register(register.node);
+                    return;
+                }
                 super.onMessage(origin, message);
             }
 
@@ -81,7 +86,8 @@ namespace mdk_discovery {
                 return self._started;
             }
 
-            void register(Discovery disco, Node node) {
+            @doc("Register a node with the remote Discovery server.")
+            void _register(Node node) {
                 String service = node.service;
                 if (!registered.contains(service)) {
                     registered[service] = new Cluster(self._failurePolicyFactory);
