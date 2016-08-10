@@ -43,8 +43,9 @@ def heartbeater():
 # 
 def traceEvent(event):
     # how do i get the correct timeSinceStart? need the actual startTime to get timeSinceStart
-    timestamp = event.timestamp/1000
-    date = datetime.datetime.fromtimestamp(timestamp).strftime("%Y/%m/%d %H:%M")
+    timestamp = event.timestamp/1000.0
+    date = datetime.datetime.fromtimestamp(timestamp).isoformat()
+    date = date[:-3]
     clock = ""
     category = event.category
     level = event.level
@@ -56,9 +57,8 @@ def traceEvent(event):
         if lclock:
             clock = lclock.key()
 
-    eventStr = "" + date + " " + clock + " " + category + " " + level
-    # + " " + text
-
+    eventStr = "" + date + " " + clock + " " + category + " " + level + " " + text
+    
 
     print(eventStr)
 
