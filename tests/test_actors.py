@@ -26,6 +26,9 @@ class RecordingActor(object):
     def onStart(self, dispatcher):
         self.dispatcher = dispatcher
 
+    def onStop(self):
+        pass
+
     def onMessage(self, origin, message):
         isNew = message not in self.received
         self.received.add(message)
@@ -50,8 +53,30 @@ class StartingActor(object):
         dispatcher.tell(self, "hello", self)
         self.record.append("start finished")
 
+    def onStop(self):
+        pass
+
     def onMessage(self, origin, message):
         self.record.append(message)
+
+
+class StoppingActor(object):
+    """
+    An actor that sends a message on stop.
+    """
+    def __init__(self):
+        self.record = []
+
+    def onStart(self, dispatcher):
+        self.record.append("start started")
+        dispatcher.stopActor(self)
+        self.record.append("start finished")
+
+    def onStop(self):
+        self.record.append("stopped")
+
+    def onMessage(self, origin, message):
+        pass
 
 
 class Callback(object):
@@ -71,6 +96,9 @@ class PromiseActor(object):
 
     def onStart(self, dispatcher):
         self.dispatcher = dispatcher
+
+    def onStop(self):
+        pass
 
     def onMessage(self, origin, message):
         self.record.append("start")
@@ -95,6 +123,18 @@ class MessageDispatcherTests(TestCase):
                          ["start started",
                           "start finished",
                           "hello"])
+
+    def test_no_stop_reentrancy(self):
+        """
+        MessageDispatcher does not allow re-entrancy of actor stop.
+        """
+        dispatcher = MessageDispatcher()
+        actor = StoppingActor()
+        dispatcher.startActor(actor)
+        self.assertEqual(actor.record,
+                         ["start started",
+                          "start finished",
+                          "stopped"])
 
     def test_multiple_tell(self):
         """
