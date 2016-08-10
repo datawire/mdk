@@ -16,6 +16,7 @@ import mdk_tracing;
 import mdk_introspection;
 import mdk_util;
 import quark.concurrent;
+import actors.promise;
 
 @doc("Microservices Development Kit -- obtain a reference using MDK.init()")
 namespace mdk {
