@@ -50,6 +50,7 @@ def traceEvent(event):
     category = event.category
     level = event.level
     text = event.text
+    traceId = event.context.traceId
 
     if event.context:
         lclock = event.context.clock
@@ -57,7 +58,7 @@ def traceEvent(event):
         if lclock:
             clock = lclock.key()
 
-    eventStr = "" + date + " " + clock + " " + category + " " + level + " " + text
+    eventStr = date+ " " + traceId + " " + clock + " " + category + " " + level + " " + text
     
 
     print(eventStr)
