@@ -13,13 +13,18 @@ import mdk_util;
 namespace mdk_discovery {
     namespace protocol {
 
-        @doc("Create a Discovery service client using standard MDK env variables.")
+        @doc("""
+        Create a Discovery service client using standard MDK env variables and
+        register it with the MDK.
+        """)
         DiscoClient createClient(Actor subscriber, MDKRuntime runtime) {
             // XXX Maybe pass in token as parameter in later stage of refactor
             String token = EnvironmentVariable("DATAWIRE_TOKEN").orElseGet("");
             EnvironmentVariable ddu = EnvironmentVariable("MDK_DISCOVERY_URL");
             String url = ddu.orElseGet("wss://discovery.datawire.io/ws/v1");
-            return new DiscoClient(subscriber, token, url, runtime);
+            DiscoClient client = new DiscoClient(subscriber, token, url, runtime);
+            runtime.dependencies.registerService("discovery_registrar", client);
+            return client;
         }
 
         @doc("""

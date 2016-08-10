@@ -5,8 +5,6 @@ package datawire_dependency 1.0.0;
 use actors.q;
 import actors.core;
 
-@doc("""
-""")
 namespace dependency {
     @doc("Trivial dependency injection setup.")
     class Dependencies {
@@ -27,5 +25,11 @@ namespace dependency {
 	    }
 	    return self._services[name];
 	}
+
+	@doc("Return whether the service exists.")
+	bool hasService(String name) {
+	    return self._services.contains(name);
+	}
+
     }
 }

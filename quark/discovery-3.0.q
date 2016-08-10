@@ -374,7 +374,7 @@ namespace mdk_discovery {
         }
     }
 
-    @doc("The Discovery class functions as a conduit to the discovery service.")
+    @doc("The Discovery class functions as a conduit a source of discovery information.")
     @doc("Using it, a provider can register itself as providing a particular service")
     @doc("(see the register method) and a consumer can locate a provider for a")
     @doc("particular service (see the resolve method).")
@@ -387,7 +387,6 @@ namespace mdk_discovery {
 
         bool started = false;
         Lock mutex = new Lock();
-        DiscoClient client;
         MDKRuntime runtime;
         FailurePolicyFactory _fpfactory;
 
@@ -397,7 +396,6 @@ namespace mdk_discovery {
             logger.info("Discovery created!");
             self.runtime = runtime;
             self._fpfactory = ?runtime.dependencies.getService("failurepolicy_factory");
-            self.client = createClient(self, runtime);
         }
 
         // XXX PRIVATE API.
@@ -418,7 +416,6 @@ namespace mdk_discovery {
 
             if (!started) {
                 started = true;
-                client.start();
             }
 
             self._release();
@@ -431,17 +428,23 @@ namespace mdk_discovery {
 
             if (started) {
                 started = false;
-                client.stop();
             }
 
             self._release();
             return self;
         }
 
-        @doc("Register info about a service node with the discovery service. You must")
+        @doc("Register info about a service node with a discovery source of truth. You must")
         @doc("usually start the uplink before this will do much; see start().")
         Discovery register(Node node) {
-            self.runtime.dispatcher.tell(self, new RegisterNode(node), self.client);
+            DiscoveryRegistrar registrar;
+            if (runtime.dependencies.hasService("discovery_registrar")) {
+                registrar = ?runtime.dependencies.getService("discovery_registrar");
+            } else {
+                panic("Registration not supported as no Discovery Registrar was setup.");
+                return self;
+            }
+            self.runtime.dispatcher.tell(self, new RegisterNode(node), registrar);
             return self;
         }
 

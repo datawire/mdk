@@ -230,12 +230,18 @@ namespace mdk {
         static Logger logger = new Logger("mdk");
 
         Discovery _disco;
+        // XXX Shouldn't hardcode this here, will fix in followup branch when we
+        // have something else to actually swap in. Probably need to add concept
+        // of stopping an actor...
+        DiscoClient _discoClient;
         Tracer _tracer;
         String procUUID = Context.runtime().uuid();
 
         MDKImpl(MDKRuntime runtime) {
             runtime.dependencies.registerService("failurepolicy_factory", new CircuitBreakerFactory());
             _disco = new Discovery(runtime);
+            _discoClient = createClient(_disco, runtime);
+            runtime.dispatcher.startActor(_discoClient);
             String tracingURL = _get("MDK_TRACING_URL", "wss://tracing.datawire.io/ws/v1");
             String tracingQueryURL = _get("MDK_TRACING_API_URL", "https://tracing.datawire.io/api/v1/logs");
             _tracer = Tracer(runtime);
@@ -251,10 +257,12 @@ namespace mdk {
 
         void start() {
             _disco.start();
+            _discoClient.start();
         }
 
         void stop() {
             _disco.stop();
+            _discoClient.stop();
             _tracer.stop();
         }
 

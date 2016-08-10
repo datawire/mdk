@@ -186,8 +186,9 @@ class SerializableTest {
 
 class DiscoveryTest {
     MDKRuntime runtime;
+    DiscoClient client;
 
-    DiscoveryTest() {
+    void setup() {
         self.runtime = fakeRuntime();
     }
 
@@ -229,10 +230,18 @@ class DiscoveryTest {
         checkEqual(expected.properties, actual.properties);
     }
 
+    Discovery createDisco() {
+        Discovery disco = new Discovery(runtime);
+        self.client = mdk_discovery.protocol.createClient(disco, self.runtime);
+        return disco;
+    }
+
     FakeWSActor startDisco(Discovery disco) {
         disco.start();
+        self.runtime.dispatcher.startActor(self.client);
+        self.client.start();
         self.pump();
-        FakeWSActor sev = expectSocket(self.runtime, disco.client.url());
+        FakeWSActor sev = expectSocket(self.runtime, self.client.url());
         if (sev == null) {
             check(false, "No FakeWSActor returned.");
             return null;
@@ -246,7 +255,7 @@ class DiscoveryTest {
     // Tests
 
     void testStart() {
-        Discovery disco = new Discovery(runtime);
+        Discovery disco = self.createDisco();
         FakeWSActor sev = startDisco(disco);
         if (sev == null) {
             check(false, "No FakeWSActor created.");
@@ -259,7 +268,7 @@ class DiscoveryTest {
     }
 
     void testRegisterPreStart() {
-        Discovery disco = new Discovery(runtime);
+        Discovery disco = self.createDisco();
 
         Node node = new Node();
         node.service = "svc";
@@ -279,7 +288,7 @@ class DiscoveryTest {
     }
 
     void testRegisterPostStart() {
-        Discovery disco = new Discovery(runtime);
+        Discovery disco = self.createDisco();
         FakeWSActor sev = startDisco(disco);
 
         Node node = new Node();
@@ -296,7 +305,7 @@ class DiscoveryTest {
     }
 
     void testRegisterTheNiceWay() {
-        Discovery disco = new Discovery(runtime);
+        Discovery disco = self.createDisco();
         FakeWSActor sev = startDisco(disco);
 
         Node node = new Node();
@@ -323,7 +332,7 @@ class DiscoveryTest {
     }
 
     void testResolvePreStart() {
-        Discovery disco = new Discovery(runtime);
+        Discovery disco = self.createDisco();
 
         Promise promise = disco._resolve("svc", "1.0");
         checkEqual(false, promise.value().hasValue());
@@ -337,7 +346,7 @@ class DiscoveryTest {
     }
 
     void testResolvePostStart() {
-        Discovery disco = new Discovery(runtime);
+        Discovery disco = self.createDisco();
         FakeWSActor sev = startDisco(disco);
 
         Promise promise = disco._resolve("svc", "1.0");
@@ -349,7 +358,7 @@ class DiscoveryTest {
     }
 
     void testResolveAfterNotification() {
-        Discovery disco = new Discovery(runtime);
+        Discovery disco = self.createDisco();
         FakeWSActor sev = startDisco(disco);
 
         Node node = doActive(sev, "svc", "addr", "1.2.3");
@@ -361,7 +370,7 @@ class DiscoveryTest {
     // This variant caught a bug in the code, so it's useful to have all of
     // these even though they're seemingly similar.
     void testResolveBeforeAndBeforeNotification() {
-        Discovery disco = new Discovery(runtime);
+        Discovery disco = self.createDisco();
         FakeWSActor sev = startDisco(disco);
         Promise promise = disco._resolve("svc", "1.0");
         Promise promise2 = disco._resolve("svc", "1.0");
@@ -375,7 +384,7 @@ class DiscoveryTest {
     }
 
     void testResolveBeforeAndAfterNotification() {
-        Discovery disco = new Discovery(runtime);
+        Discovery disco = self.createDisco();
         FakeWSActor sev = startDisco(disco);
         Promise promise = disco._resolve("svc", "1.0");
 
@@ -387,7 +396,7 @@ class DiscoveryTest {
     }
 
     void testResolveDifferentActive() {
-        Discovery disco = new Discovery(runtime);
+        Discovery disco = self.createDisco();
         FakeWSActor sev = startDisco(disco);
 
         Node node = doActive(sev, "svc", "addr", "1.2.3");
@@ -398,7 +407,7 @@ class DiscoveryTest {
     }
 
     void testResolveVersionAfterActive() {
-        Discovery disco = new Discovery(runtime);
+        Discovery disco = self.createDisco();
         FakeWSActor sev = startDisco(disco);
 
         Node n1 = doActive(sev, "svc", "addr1.0", "1.0.0");
@@ -411,7 +420,7 @@ class DiscoveryTest {
     }
 
     void testResolveVersionBeforeActive() {
-        Discovery disco = new Discovery(runtime);
+        Discovery disco = self.createDisco();
         FakeWSActor sev = startDisco(disco);
 
         Promise p1 = disco._resolve("svc", "1.0");
@@ -425,7 +434,7 @@ class DiscoveryTest {
     }
 
     void testResolveBreaker() {
-        Discovery disco = new Discovery(runtime);
+        Discovery disco = self.createDisco();
         FakeWSActor sev = startDisco(disco);
 
         Node n1 = doActive(sev, "svc", "addr1", "1.0.0");
@@ -451,7 +460,7 @@ class DiscoveryTest {
     }
 
     void testLoadBalancing() {
-        Discovery disco = new Discovery(runtime);
+        Discovery disco = self.createDisco();
         FakeWSActor sev = startDisco(disco);
 
         Promise promise = disco._resolve("svc", "1.0");
@@ -484,7 +493,7 @@ class DiscoveryTest {
 
     // Unexpected messages are ignored.
     void testUnexpectedMessage() {
-        Discovery disco = new Discovery(runtime);
+        Discovery disco = self.createDisco();
         FakeWSActor sev = startDisco(disco);
         sev.send("{\"type\": \"UnknownMessage\"}");
         self.pump();
@@ -493,7 +502,7 @@ class DiscoveryTest {
 
     void testStop() {
         FakeTime timeService = ?runtime.getTimeService();
-        Discovery disco = new Discovery(runtime);
+        Discovery disco = self.createDisco();
         FakeWSActor sev = startDisco(disco);
 
         Node node = new Node();
@@ -508,6 +517,7 @@ class DiscoveryTest {
         if (active == null) { return; }
 
         disco.stop();
+        client.stop();
         // Might take some cleanup to stop everything:
         timeService.advance(15.0);
         self.pump();
