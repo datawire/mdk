@@ -19,6 +19,7 @@ Options:
 from docopt import docopt
 import mdk
 import threading
+import datetime
 
 
 # setInterval function
@@ -42,7 +43,8 @@ def heartbeater():
 # 
 def traceEvent(event):
     # how do i get the correct timeSinceStart? need the actual startTime to get timeSinceStart
-    timeSinceStart = event.timestamp
+    timestamp = event.timestamp/1000
+    date = datetime.datetime.fromtimestamp(timestamp).strftime("%Y/%m/%d %H:%M")
     clock = ""
     category = event.category
     level = event.level
@@ -54,7 +56,8 @@ def traceEvent(event):
         if lclock:
             clock = lclock.key()
 
-    eventStr = "" + clock + " " + category + " " + level + " " + text
+    eventStr = "" + date + " " + clock + " " + category + " " + level
+    # + " " + text
 
 
     print(eventStr)
