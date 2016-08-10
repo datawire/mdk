@@ -1,10 +1,11 @@
 quark 1.0;
 
-package datawire_mdk_discovery 3.1.0;
+package datawire_mdk_discovery 3.2.0;
 
 use util-1.0.q;
 include discovery-protocol-3.0.q;
 use mdk_runtime.q;
+use actors.q;
 
 import quark.concurrent;
 import quark.reflect;
@@ -12,6 +13,7 @@ import quark.reflect;
 import mdk_discovery.protocol;
 import mdk_util;  // bring in EnvironmentVariable, WaitForPromise
 import mdk_runtime;
+import actors.core;
 
 /*
   Context:
@@ -37,6 +39,50 @@ import mdk_runtime;
 
 namespace mdk_discovery {
 
+    @doc("A node has become active.")
+    class NodeActive {
+        Node node;
+
+        NodeActive(Node node) {
+            self.node = node;
+        }
+    }
+
+    @doc("A node has expired.")
+    class NodeExpired {
+        Node node;
+
+        NodeExpired(Node node) {
+            self.node = node;
+        }
+    }
+
+    @doc("""
+    A source of discovery information.
+
+    Sends NodeActive and NodeExpired messages to a subscriber. For now the
+    subscriber is presumed to be passed into implementation constructor somehow,
+    but will likely add a subscription incoming message in a future iteration.
+    """)
+    interface DiscoverySource extends Actor {}
+
+    @doc("Register a node.")
+    class RegisterNode {
+        Node node;
+
+        RegisterNode(Node node) {
+            self.node = node;
+        }
+    }
+
+    @doc("""
+    Allow registration of services.
+
+    Send this an actor a RegisterNode message to do so.
+    """)
+    interface DiscoveryRegistrar extends Actor {}
+
+
     class _Request {
 
         String version;
@@ -49,16 +95,26 @@ namespace mdk_discovery {
 
     }
 
+    @doc("A policy for choosing how to deal with failures.")
     interface FailurePolicy {
-
+        @doc("Record a success for the Node this policy is managing.")
         void success();
 
+        @doc("Record a failure for the Node this policy is managing.")
         void failure();
 
+        @doc("Return whether the Node should be accessed.")
         bool available();
 
     }
 
+    @doc("A factory for FailurePolicy.")
+    class FailurePolicyFactory {
+        @doc("Create a new FailurePolicy.")
+        FailurePolicy create(Node node);
+    }
+
+    @doc("Default circuit breaker policy.")
     class CircuitBreaker extends FailurePolicy {
         static Logger _log = new Logger("mdk.breaker");
 
@@ -110,7 +166,16 @@ namespace mdk_discovery {
                 return true;
             }
         }
+    }
 
+    @doc("Create CircuitBreaker instances.")
+    class CircuitBreakerFactory extends FailurePolicyFactory {
+        int threshold = 3;
+        float retestDelay = 30.0;
+
+        FailurePolicy create(Node node) {
+            return new CircuitBreaker(node, threshold, retestDelay);
+        }
     }
 
     @doc("A Cluster is a group of providers of (possibly different versions of)")
@@ -119,10 +184,10 @@ namespace mdk_discovery {
         List<Node> nodes = [];
         List<_Request> _waiting = [];
         int _counter = 0;
-        Discovery _disco;
+        FailurePolicyFactory _fpfactory;
 
-        Cluster(Discovery _disco) {
-            self._disco = _disco;
+        Cluster(FailurePolicyFactory fpfactory) {
+            self._fpfactory = fpfactory;
         }
 
         @doc("Choose a single Node to talk to. At present this is a simple round")
@@ -154,7 +219,8 @@ namespace mdk_discovery {
         @doc("update its properties).  At present, this involves a linear search, so")
         @doc("very large Clusters are unlikely to perform well.")
         void add(Node node) {
-            node._policy = new CircuitBreaker(node, _disco.threshold, _disco.retestDelay);
+            // XXX mutating like this is pretty bad, we should make Node immutable
+            node._policy = self._fpfactory.create(node);
 
             // Resolve waiting promises:
             if (self._waiting.size() > 0) {
@@ -308,20 +374,12 @@ namespace mdk_discovery {
         }
     }
 
-    @doc("The Discovery class functions as a conduit to the discovery service.")
+    @doc("The Discovery class functions as a conduit to a source of discovery information.")
     @doc("Using it, a provider can register itself as providing a particular service")
     @doc("(see the register method) and a consumer can locate a provider for a")
     @doc("particular service (see the resolve method).")
-    class Discovery {
-        String url;
-        String token;
-        int threshold = 3;
-        float retestDelay = 30.0;
-
+    class Discovery extends Actor {
         static Logger logger = new Logger("discovery");
-
-        // Clusters we advertise to the disco service.
-        Map<String, Cluster> registered = new Map<String, Cluster>();
 
         // Clusters the disco says are available, as well as clusters for
         // which we are awaiting resolution.
@@ -329,24 +387,21 @@ namespace mdk_discovery {
 
         bool started = false;
         Lock mutex = new Lock();
-        DiscoClient client;
         MDKRuntime runtime;
+        FailurePolicyFactory _fpfactory;
 
         @doc("Construct a Discovery object. You must set the token before doing")
         @doc("anything else; see the withToken() method.")
         Discovery(MDKRuntime runtime) {
             logger.info("Discovery created!");
             self.runtime = runtime;
+            self._fpfactory = ?runtime.dependencies.getService("failurepolicy_factory");
         }
 
         // XXX PRIVATE API.
-        @doc("Lock and make sure we have a client established.")
+        @doc("Lock.")
         void _lock() {
             mutex.acquire();
-
-            if (client == null) {
-                client = new DiscoClient(self, runtime);
-            }
         }
 
         // XXX PRIVATE API.
@@ -355,65 +410,16 @@ namespace mdk_discovery {
             mutex.release();
         }
 
-        @doc("Connect to a specific discovery server. Most callers will just want")
-        @doc("connect(). After connecting, you must start the uplink with the start()")
-        @doc("method.")
-        Discovery connectTo(String url) {
-            // Don't use self._lock() here -- manage the lock by hand since we're
-            // messing with the client by hand.
-            mutex.acquire();
-
-            logger.info("will connect to " + url);
-
-            self.url = url;
-            self.client = null;
-
-            mutex.release();
-
-            return self;
-        }
-
-        @doc("Connect to the default discovery server. If MDK_DISCOVERY_URL")
-        @doc("is in the environment, it specifies the default; if not, we'll talk to")
-        @doc("")
-        @doc("wss://discovery.datawire.io/ws/v1")
-        @doc("")
-        @doc("After connecting, you must start the uplink with the start() method.")
-        Discovery connect() {
-            EnvironmentVariable ddu = EnvironmentVariable("MDK_DISCOVERY_URL");
-            String url = ddu.orElseGet("wss://discovery.datawire.io/ws/v1");
-
-            return self.connectTo(url);
-        }
-
-        @doc("Set the token we'll use to talk to the server. After doing this,")
-        @doc("you must tell Discovery which discovery service to talk to using")
-        @doc("either connect() or connectTo().")
-        Discovery withToken(String token) {
-            self._lock();
-            logger.info("using token " + token);
-            self.token = token;
-            self._release();
-
-            return self;
-        }
-
         @doc("Start the uplink to the discovery service.")
         Discovery start() {
             self._lock();
 
             if (!started) {
                 started = true;
-                client.start();
             }
 
             self._release();
             return self;
-        }
-
-        @doc("Easy startup of a Discovery service with a given token and the default URL.")
-        static Discovery init(String token) {
-            return new Discovery(defaultRuntime()).withToken(token).connect().start();
         }
 
         @doc("Stop the uplink to the discovery service.")
@@ -422,28 +428,22 @@ namespace mdk_discovery {
 
             if (started) {
                 started = false;
-                client.stop();
             }
 
             self._release();
             return self;
         }
 
-        @doc("Register info about a service node with the discovery service. You must")
+        @doc("Register info about a service node with a discovery source of truth. You must")
         @doc("usually start the uplink before this will do much; see start().")
         Discovery register(Node node) {
-            self._lock();
-
-            String service = node.service;
-
-            if (!registered.contains(service)) {
-                registered[service] = new Cluster(self);
+            DiscoveryRegistrar registrar;
+            if (runtime.dependencies.hasService("discovery_registrar")) {
+                registrar = ?runtime.dependencies.getService("discovery_registrar");
+            } else {
+                panic("Registration not supported as no Discovery Registrar was setup.");
             }
-
-            registered[service].add(node);
-            client.register(node);
-
-            self._release();
+            self.runtime.dispatcher.tell(self, new RegisterNode(node), registrar);
             return self;
         }
 
@@ -466,7 +466,7 @@ namespace mdk_discovery {
             self._lock();
 
             if (!services.contains(service)) {
-                services[service] = new Cluster(self);
+                services[service] = new Cluster(self._fpfactory);
             }
 
             Node result = services[service].chooseVersion(version);
@@ -495,6 +495,23 @@ namespace mdk_discovery {
             return ?WaitForPromise.wait(self._resolve(service, version), timeout, "service " + service);
         }
 
+        // Actor interface:
+        void onStart(MessageDispatcher dispatcher) {}
+
+        void onMessage(Actor origin, Object message) {
+            String klass = message.getClass().id;
+            if (klass == "mdk_discovery.NodeActive") {
+                NodeActive active = ?message;
+                self._active(active.node);
+                return;
+            }
+            if (klass == "mdk_discovery.NodeExpired") {
+                NodeExpired expire = ?message;
+                self._expire(expire.node);
+                return;
+            }
+        }
+
         // XXX PRIVATE API -- needs to not be here.
         // @doc("Add a given node.")
         void _active(Node node) {
@@ -505,7 +522,7 @@ namespace mdk_discovery {
             logger.info("adding " + node.toString());
 
             if (!services.contains(service)) {
-                services[service] = new Cluster(self);
+                services[service] = new Cluster(self._fpfactory);
             }
 
             Cluster cluster = services[service];
