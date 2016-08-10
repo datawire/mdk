@@ -14,6 +14,7 @@ import mdk_discovery.protocol;
 import mdk_util;  // bring in EnvironmentVariable, WaitForPromise
 import mdk_runtime;
 import actors.core;
+import actors.promise;
 
 /*
   Context:
@@ -86,9 +87,9 @@ namespace mdk_discovery {
     class _Request {
 
         String version;
-        PromiseFactory factory;
+        PromiseResolver factory;
 
-        _Request(String version, PromiseFactory factory) {
+        _Request(String version, PromiseResolver factory) {
             self.version = version;
             self.factory = factory;
         }
@@ -253,8 +254,8 @@ namespace mdk_discovery {
             nodes.add(node);
         }
 
-        // Internal method, add PromiseFactory to fill in when a new Node is added.
-        void _addRequest(String version, PromiseFactory factory) {
+        // Internal method, add PromiseResolver to fill in when a new Node is added.
+        void _addRequest(String version, PromiseResolver factory) {
             _waiting.add(new _Request(version, factory));
         }
 
@@ -461,7 +462,7 @@ namespace mdk_discovery {
         @doc("usually start the uplink before this will do much; see start().")
         @doc("The returned Promise will end up with a Node as its value.")
         Promise _resolve(String service, String version) {
-            PromiseFactory factory = new PromiseFactory();
+            PromiseResolver factory = new PromiseResolver(runtime.dispatcher);
 
             self._lock();
 

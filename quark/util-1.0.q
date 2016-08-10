@@ -5,9 +5,11 @@ package datawire_mdk_util 1.0.0;
 use js bluebird 3.4.1;
 include mdk_promises.js;
 
+use actors.q;
 
 import quark.os;
 import quark.concurrent;
+import actors.promise;
 
 namespace mdk_util {
     @doc("A Supplier has a 'get' method that can return a value to anyone who needs it.")
