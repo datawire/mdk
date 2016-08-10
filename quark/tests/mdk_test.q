@@ -534,14 +534,6 @@ class DiscoveryTest {
 
 }
 
-
-class MDKHighLevelAPITest {
-    // It's possible to call the MDK init().
-    void testInit() {
-        mdk.init();
-    }
-}
-
 class UtilTest {
 
     void testVersionMatch() {
