@@ -374,7 +374,7 @@ namespace mdk_discovery {
         }
     }
 
-    @doc("The Discovery class functions as a conduit a source of discovery information.")
+    @doc("The Discovery class functions as a conduit to a source of discovery information.")
     @doc("Using it, a provider can register itself as providing a particular service")
     @doc("(see the register method) and a consumer can locate a provider for a")
     @doc("particular service (see the resolve method).")
