@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_discovery 3.1.0;
+package datawire_mdk_discovery 3.2.0;
 
 use util-1.0.q;
 include discovery-protocol-3.0.q;
