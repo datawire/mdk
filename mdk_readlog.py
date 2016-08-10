@@ -40,51 +40,48 @@ def heartbeat():
 def heartbeater():
     set_interval(heartbeat, 15000)
     
-# 
-def traceEvent(event):
-    # how do i get the correct timeSinceStart? need the actual startTime to get timeSinceStart
-    timestamp = event.timestamp/1000.0
-    date = datetime.datetime.fromtimestamp(timestamp).isoformat()
-    date = date[:-3]
-    clock = ""
-    category = event.category
-    level = event.level
-    text = event.text
-    traceId = event.context.traceId
+class TraceEventHandler (object):
+    def __init__(self, args):
+        """ Initialize a TraceEventHandler with a set of args from docopt. """
+        self.args = args
 
-    if event.context:
-        lclock = event.context.clock
+    def traceEvent(self, event):
+        # how do i get the correct timeSinceStart? need the actual startTime to get timeSinceStart
+        timestamp = event.timestamp/1000.0
+        date = datetime.datetime.fromtimestamp(timestamp).isoformat()
+        date = date[:-3]
+        clock = ""
+        category = event.category
+        level = event.level
+        text = event.text
+        traceId = event.context.traceId
 
-        if lclock:
-            clock = lclock.key()
+        if event.context:
+            lclock = event.context.clock
 
-    eventStr = date+ " " + traceId + " " + clock + " " + category + " " + level + " " + text
-    
+            if lclock:
+                clock = lclock.key()
 
-    print(eventStr)
+        eventStr = date+ " " + traceId + " " + clock + " " + category + " " + level + " " + text
+
+        print(eventStr)
 
 # Program we are running
 def main(docopt_args):
+    # Create a new Tracer
+    tracer = mdk.mdk_tracing.Tracer(mdk.mdk_runtime.defaultRuntime())
 
-    # This will print the help commands
-    if docopt_args:
-        print(docopt_args)
+    # Create a new TraceEventHandler
+    traceEventHandler = TraceEventHandler(docopt_args)
 
     if docopt_args["-f"]:
-        # mdk.start()
-        # 
-
-
-        # Created new tracer object?
-        tracer = mdk.mdk_tracing.Tracer(mdk.mdk_runtime.defaultRuntime())
-        # Subscribe: 
+        # ...and subscribe to receive log events as they come in over the wire.
             # takes only 1 parameter 
             # opens a connection if needed (_openIfNeeded())
             # runs _client.subscribe with a parameter
                 # locks in something, handler = patameter, start if needed, then release
                 # subscribe takes a function, which takes an event, which a log event
-        tracer.subscribe(traceEvent)
-
+        tracer.subscribe(traceEventHandler.traceEvent)
   
 # START OF SCRIPT
 if __name__ == "__main__":
