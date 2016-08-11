@@ -362,10 +362,10 @@ namespace mdk_protocol {
 
           # WSClient state machine
 
-          ## External entity calls subclass.start()
+          ## External entity calls subclass.onStart()
 
-          - subclass.start() or something else arranges for subclass.isStarted() to return true
-          - WSClient.start() schedules .onExecute()
+          - subclass.onStart() or something else arranges for subclass.isStarted() to return true
+          - WSClient.onStart() schedules .onExecute()
           - the Runtime delivers Hapenning message to .onMessage(), whihc calls .onScheduledEvent()
           - .onScheduledEvent() notices not .isConnected() and subclass.isStarted() so eventually calls .doOpen(),
             then schedules itself for execution again
@@ -443,14 +443,6 @@ namespace mdk_protocol {
             return sock != null;
         }
 
-        void start() {
-            schedule(0.0);
-        }
-
-        void stop() {
-            schedule(0.0);
-        }
-
         void schedule(float time) {
             self.dispatcher.tell(self, new Schedule("wakeup", time), self.schedulingActor);
         }
@@ -481,7 +473,14 @@ namespace mdk_protocol {
             }
         }
 
-        void onStart(MessageDispatcher dispatcher) {}
+        // Actor interface:
+        void onStart(MessageDispatcher dispatcher) {
+            schedule(0.0);
+        }
+
+        void onStop() {
+            schedule(0.0);
+        }
 
         void onMessage(Actor origin, Object message) {
             String typeId = message.getClass().id;

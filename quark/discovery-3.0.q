@@ -412,7 +412,7 @@ namespace mdk_discovery {
         }
 
         @doc("Start the uplink to the discovery service.")
-        Discovery start() {
+        void onStart(MessageDispatcher dispatcher) {
             self._lock();
 
             if (!started) {
@@ -420,11 +420,10 @@ namespace mdk_discovery {
             }
 
             self._release();
-            return self;
         }
 
         @doc("Stop the uplink to the discovery service.")
-        Discovery stop() {
+        void onStop() {
             self._lock();
 
             if (started) {
@@ -432,7 +431,6 @@ namespace mdk_discovery {
             }
 
             self._release();
-            return self;
         }
 
         @doc("Register info about a service node with a discovery source of truth. You must")
@@ -495,9 +493,6 @@ namespace mdk_discovery {
         Node resolve_until(String service, String version, float timeout) {
             return ?WaitForPromise.wait(self._resolve(service, version), timeout, "service " + service);
         }
-
-        // Actor interface:
-        void onStart(MessageDispatcher dispatcher) {}
 
         void onMessage(Actor origin, Object message) {
             String klass = message.getClass().id;
