@@ -442,6 +442,8 @@ class TestPolicyFakeWebSockets extends WebSockets {
     }
 }
 
+macro bool isPython() $py{true} $js{false} $java{false} $rb{false};
+
 @doc("""
 Run a series of actor-based tests. Receiving \"next\" triggers next test.
 
@@ -460,11 +462,15 @@ class TestRunner {
                       bind(self, "testRealRuntimeScheduling", []),
                       "fake runtime: time, scheduling":
                       bind(self, "testFakeRuntimeScheduling", []),
-                      "files": bind(self, "testFiles"),
                       "real runtime: websockets":
                       bind(self, "testRealRuntimeWebsockets", []),
                       "fake runtime: websockets":
                       bind(self, "testFakeRuntimeWebSockets", [])};
+        // Not bothering with other languages in this iteration, will add them
+        // later.
+        if (isPython()) {
+            self.tests["files"] = bind(self, "testFiles");
+        }
 	self.testNames = tests.keys();
     }
 
