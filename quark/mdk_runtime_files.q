@@ -3,6 +3,7 @@ quark 1.0;
 include mdk_runtime_files.py;
 use actors.q;
 import actors.core;
+import mdk_runtime;
 
 namespace mdk_runtime {
 namespace files {
@@ -118,11 +119,16 @@ namespace files {
         }
 
         void onMessage(Actor origin, Object message) {
-            if (message.getClass().id != "mdk_runtime.files.SubscribeChanges") {
+            String typeId = message.getClass().id;
+            if (typeId == "mdk_runtime.Happening") {
+                self._checkSubscriptions();
                 return;
             }
-            SubscribeChanges subscribe = ?message;
-            self.subscriptions.add(new _Subscription(self, origin, subscribe.path));
+            if  (typeId == "mdk_runtime.files.SubscribeChanges") {
+                SubscribeChanges subscribe = ?message;
+                self.subscriptions.add(new _Subscription(self, origin, subscribe.path));
+                return;
+            }
         }
 
         void _send(Object message, Actor destination) {
