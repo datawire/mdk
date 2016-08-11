@@ -461,7 +461,7 @@ namespace mdk_tracing {
 
             void _startIfNeeded() {
                 if (!_started) {
-                    self._dispatcher.startActor(self);
+                    super.runtime.dispatcher.startActor(self);
                     _started = true;
                 }
             }
