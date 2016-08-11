@@ -11,8 +11,11 @@ namespace core {
 
     @doc("A store of some state. Emits events and handles events.")
     interface Actor {
-	@doc("Called when the Actor is started.")
+	@doc("The Actor should start operating.")
 	void onStart(MessageDispatcher dispatcher);
+
+	@doc("The Actor should begin shutting down.")
+	void onStop() {}
 
 	@doc("Called on incoming one-way message from another actor sent via tell().")
 	void onMessage(Actor origin, Object message);
@@ -46,18 +49,32 @@ namespace core {
 	}
     }
 
-    @doc("Start an Actor.")
-    class _StartActor extends _QueuedMessage {
+    @doc("Start or stop an Actor.")
+    class _StartStopActor extends _QueuedMessage {
 	Actor actor;
 	MessageDispatcher dispatcher;
+	bool start;
 
-	_StartActor(Actor actor, MessageDispatcher dispatcher) {
+	_StartStopActor(Actor actor, MessageDispatcher dispatcher, bool start) {
 	    self.actor = actor;
 	    self.dispatcher = dispatcher;
+	    self.start = start;
+	}
+
+	String toString() {
+	    String result = "stopping";
+	    if (self.start) {
+		result = "starting";
+	    }
+	    return result + " " + self.actor.toString();
 	}
 
 	void deliver() {
-	    self.actor.onStart(self.dispatcher);
+	    if (self.start) {
+		self.actor.onStart(self.dispatcher);
+	    } else {
+		self.actor.onStop();
+	    }
 	}
     }
 
@@ -82,7 +99,12 @@ namespace core {
 
 	@doc("Start an Actor.")
 	void startActor(Actor actor) {
-	    self._queue(new _StartActor(actor, self));
+	    self._queue(new _StartStopActor(actor, self, true));
+	}
+
+	@doc("Stop an Actor.")
+	void stopActor(Actor actor) {
+	    self._queue(new _StartStopActor(actor, self, false));
 	}
 
 	@doc("Queue a message for delivery.")

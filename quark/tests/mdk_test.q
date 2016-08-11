@@ -237,9 +237,8 @@ class DiscoveryTest {
     }
 
     FakeWSActor startDisco(Discovery disco) {
-        disco.start();
+        self.runtime.dispatcher.startActor(disco);
         self.runtime.dispatcher.startActor(self.client);
-        self.client.start();
         self.pump();
         FakeWSActor sev = expectSocket(self.runtime, self.client.url());
         if (sev == null) {
@@ -516,8 +515,8 @@ class DiscoveryTest {
         Active active = expectActive(sev);
         if (active == null) { return; }
 
-        disco.stop();
-        client.stop();
+        runtime.dispatcher.stopActor(disco);
+        runtime.dispatcher.stopActor(client);
         // Might take some cleanup to stop everything:
         timeService.advance(15.0);
         self.pump();
@@ -533,14 +532,6 @@ class DiscoveryTest {
         checkEqual(0, timeService.scheduled());
     }
 
-}
-
-
-class MDKHighLevelAPITest {
-    // It's possible to call the MDK init().
-    void testInit() {
-        mdk.init();
-    }
 }
 
 class UtilTest {
