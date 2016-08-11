@@ -262,6 +262,14 @@ class WebSocketsTest extends TestActor {
     }
 }
 
+
+@doc("""
+Tests for FileActor.
+""")
+class FileActorTests extends Actor {
+
+}
+
 @doc("""
 Make sure we don't exit prematurely due to buggy tests.
 
