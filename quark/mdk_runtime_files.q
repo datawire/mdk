@@ -59,4 +59,13 @@ namespace files {
         @doc("Delete a file.")
         void delete(String path);
     }
+
+    @doc("Shim over native implementations. Need better way to do this.")
+    class FileActorImpl extends FileActor {
+        SchedulingActor scheduling;
+
+        FileActorImpl(MDKRuntime runtime) {
+            self.scheduling = runtime.getScheduleService();
+        }
+    }
 }}

@@ -266,8 +266,95 @@ class WebSocketsTest extends TestActor {
 @doc("""
 Tests for FileActor.
 """)
-class FileActorTests extends Actor {
+class FileActorTests extends TestActor {
+    FileActor actor;
+    MessageDispatcher dispatcher;
+    TestRunner runner;
+    String state = "initial";
+    String directory;
 
+    FileActorTests(FileActor actor) {
+	self.actor = actor;
+        self.directory = actor.mktempdir();
+    }
+
+    void onStart(MessageDispatcher dispatcher) {
+        self.dispatcher = dispatcher;
+    }
+
+    void start(TestRunner runner) {
+        self.testCreateNotification();
+    }
+
+    void testCreateNotification() {
+        self.state = "testCreateNotification";
+        self.dispatcher.tell(self, new SubscribeChanges(self.directory), self.actor);
+        self.actor.write("file1", "initial value");
+    }
+
+    void assertCreateNotification(FileContents contents) {
+        if (contents.path != self.directory + "/file1" ||
+            contents.contents != "initial value") {
+            panic("Unexpected results: " + contents.path + " " + contents.contents);
+        }
+        self.testChangeNotification();
+    }
+
+    void testChangeNotification() {
+        self.state = "testChangeNotification";
+        self.actor.write("file1", "changed value");
+    }
+
+    void assertChangeNotification(FileContents contents) {
+        if (contents.path == self.directory + "/file1") {
+            if (contents.contents == "initial value") {
+                // False positive hopefully just predating update, so continue
+                return;
+            }
+            if (contents.contents != "changed value") {
+                panic("Unexpected value: " + contents.contents);
+            }
+        }
+        self.testDeleteNotification();
+    }
+
+    void testDeleteNotification() {
+        self.actor.delete("file1");
+    }
+
+    void assertDeleteNotification(FileDeleted deleted) {
+        if (deleted.path != self.directory + "/file1") {
+            panic("Unexpected value: " + deleted.path);
+        }
+        self.state == "done";
+        runner.runNextTest();
+    }
+
+    void onMessage(Actor origin, Object message) {
+        String typeId = message.getClass().id;
+        if (self.state == "testCreateNotification") {
+            if (typeId != "mdk_runtime.files.FileContents") {
+                panic("Unexpected message: " + typeId);
+            }
+            self.assertCreateNotification(message);
+            return;
+        }
+        if (self.state == "testCreateNotification") {
+            if (typeId != "mdk_runtime.files.FileContents") {
+                panic("Unexpected message: " + typeId);
+            }
+            self.assertCreateNotification(message);
+            return;
+        }
+        if (self.state == "testDeleteNotification") {
+            if (typeId == "mdk_runtime.files.FileContents") {
+                return; // hopefully just spurious false positive
+            }
+            self.assertDeleteNotification(message);
+            return;
+        }
+        panic("Unexpected message: " + message.toString());
+    }
 }
 
 @doc("""
@@ -373,6 +460,7 @@ class TestRunner {
                       bind(self, "testRealRuntimeScheduling", []),
                       "fake runtime: time, scheduling":
                       bind(self, "testFakeRuntimeScheduling", []),
+                      "files": bind(self, "testFiles"),
                       "real runtime: websockets":
                       bind(self, "testRealRuntimeWebsockets", []),
                       "fake runtime: websockets":
@@ -402,6 +490,10 @@ class TestRunner {
     TestActor testFakeRuntimeWebSockets(MDKRuntime runtime) {
         return new WebSocketsTest(new TestPolicyFakeWebSockets(runtime.dispatcher),
                                   "wss://echo/", "wss://bad/");
+    }
+
+    TestActor testFiles(MDKRuntime runtime) {
+        return new FileActorTest(new FileActorImpl(runtime));
     }
 
     void runNextTest() {
