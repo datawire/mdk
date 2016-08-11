@@ -1,5 +1,6 @@
 quark 1.0;
 
+use mdk_runtime_files.py;
 use actors.q;
 import actors.core;
 
@@ -60,12 +61,124 @@ namespace files {
         void delete(String path);
     }
 
-    @doc("Shim over native implementations. Need better way to do this.")
+    }
+    @doc("""
+    Polling-based subscriptions.
+
+    Should switch to inotify later on.
+
+    Shim over native implementations. Need better way to do this.
+    """)
     class FileActorImpl extends FileActor {
         SchedulingActor scheduling;
+        MessageDispatcher dispatcher;
+        List<_Subscription> subscriptions = [];
 
         FileActorImpl(MDKRuntime runtime) {
             self.scheduling = runtime.getScheduleService();
+        }
+
+        macro String _mktempdir() $py{_mdk_mktempdir()} $js{""} $java{""} $rb{""};
+
+        String mktempdir() {
+            return _mktempdir();
+        }
+
+        macro void write(String path, String contents)
+            $py{_mdk_writefile($path, $contents)}
+            $java{do {} while (false);}
+            $js{}
+            $rb{};
+
+        macro void delete(String path)
+            $py{_mdk_deletefile($path)}
+            $java{do {} while (false);}
+            $js{}
+            $rb{};
+
+        void _checkSubscriptions() {
+            self.scheduling.tell(self, new Schedule("poll", 5.0), self.scheduling);
+            int idx = 0;
+            while (idx < self.subscriptions.size()) {
+                self.subscriptions[idx].poll();
+                idx = idx + 1;
+            }
+        }
+
+        void onStart(MessageDispatcher dispatcher) {
+            self.dispatcher = dispatcher;
+            self._checkSubscriptions();
+        }
+
+        void onMessage(Actor origin, Object message) {
+            if (message.getClass().id != "mdk_runtime.files.SubscribeChanges") {
+                return;
+            }
+            SubscribeChanges subscribe = ?message;
+            self.subscriptions.add(new _Subscription(origin, subscribe.path));
+        }
+
+        void _send(Object message, Actor destination) {
+            self.dispatcher.tell(self, message, destination);
+        }
+    }
+
+    @doc("A specific file notification subscription.")
+    class _Subscription {
+        String path;
+        FileActorImpl actor;
+        Actor subscriber;
+        List<String> previous_listing = [];
+
+        _Subscription(FileActorImpl actor, Actor subscriber, String path) {
+            self.subscriber = subscriber;
+            self.actor = actor;
+            self.path = path;
+        }
+
+        // Should return just the file path if it's a file, the contents if it's
+        // a directory.
+        macro List<String> contents(String path)
+            $python{_mdk_file_contents($path)}
+            $java{null} $js{null} $rb{[]};
+
+        macro String read(String path)
+            $python{_mdk_readfile($path)}
+            $java{null} $js{null} $rb{[]};
+
+        void poll() {
+            List<String> new_listing = contents(self.path);
+            // Anything that exists we read the contents, as if it's changed:
+            int idx = 0;
+            while (idx < new_listing.size()) {
+                self.actor._send(new FileContents(self.path + "/" + new_listing[idx],
+                                                  read(new_listing[idx])),
+                                 self.subscriber);
+                idx = idx + 1;
+            }
+            // Anything that is missing from new listing compared to old one we
+            // send a dlelete notification:
+            idx = 0;
+            int jdx;
+            bool found;
+            while (idx < previous_listing.size()) {
+                jdx = 0;
+                found = false;
+                while (jdx < new_listing.size()) {
+                    if (previous_listing[i] == new_listing[j]) {
+                        found = true;
+                        break;
+                    }
+                    jdx = jdx + 1;
+                }
+                if (!found) {
+                    self.actor._send(new FileDeleted(self.path + "/"
+                                                     + previous_listing[idx]),
+                                     self.subscriber);
+                }
+                idx = idx + 1;
+            }
+            self.previous_listing = new_listing;
         }
     }
 }}
