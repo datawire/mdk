@@ -279,8 +279,14 @@ class FileActorTests extends TestActor {
         self.directory = actor.mktempdir();
     }
 
+    void changeState(String state) {
+	print("State: " + state);
+	self.state = state;
+    }
+
     void onStart(MessageDispatcher dispatcher) {
         self.dispatcher = dispatcher;
+        self.dispatcher.startActor(self.actor);
     }
 
     void start(TestRunner runner) {
@@ -288,7 +294,7 @@ class FileActorTests extends TestActor {
     }
 
     void testCreateNotification() {
-        self.state = "testCreateNotification";
+        self.changeState("testCreateNotification");
         self.dispatcher.tell(self, new SubscribeChanges(self.directory), self.actor);
         self.actor.write("file1", "initial value");
     }
@@ -302,7 +308,7 @@ class FileActorTests extends TestActor {
     }
 
     void testChangeNotification() {
-        self.state = "testChangeNotification";
+        self.changeState("testChangeNotification");
         self.actor.write("file1", "changed value");
     }
 
@@ -320,6 +326,7 @@ class FileActorTests extends TestActor {
     }
 
     void testDeleteNotification() {
+        self.changeState("testDeleteNotification");
         self.actor.delete("file1");
     }
 
