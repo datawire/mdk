@@ -441,6 +441,7 @@ namespace mdk_tracing {
 
             TracingClient(Tracer tracer, MDKRuntime runtime) {
                 super(runtime);
+                self._dispatcher = runtime.dispatcher;
                 _tracer = tracer;
             }
 
@@ -461,7 +462,7 @@ namespace mdk_tracing {
 
             void _startIfNeeded() {
                 if (!_started) {
-                    super.runtime.dispatcher.startActor(self);
+                    self._dispatcher.startActor(self);
                     _started = true;
                 }
             }
@@ -474,7 +475,6 @@ namespace mdk_tracing {
             }
 
             void onStart(MessageDispatcher dispatcher) {
-                self._dispatcher = dispatcher;
                 super.onStart(dispatcher);
             }
 
