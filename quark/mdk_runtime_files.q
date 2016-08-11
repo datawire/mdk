@@ -1,6 +1,6 @@
 quark 1.0;
 
-use mdk_runtime_files.py;
+include mdk_runtime_files.py;
 use actors.q;
 import actors.core;
 
@@ -33,7 +33,7 @@ namespace files {
     class FileDeleted {
         String path;
 
-        FileContents(String path) {
+        FileDeleted(String path) {
             self.path = path;
         }
     }
@@ -61,7 +61,6 @@ namespace files {
         void delete(String path);
     }
 
-    }
     @doc("""
     Polling-based subscriptions.
 
@@ -70,7 +69,7 @@ namespace files {
     Shim over native implementations. Need better way to do this.
     """)
     class FileActorImpl extends FileActor {
-        SchedulingActor scheduling;
+        Actor scheduling;
         MessageDispatcher dispatcher;
         List<_Subscription> subscriptions = [];
 
@@ -78,26 +77,34 @@ namespace files {
             self.scheduling = runtime.getScheduleService();
         }
 
-        macro String _mktempdir() $py{_mdk_mktempdir()} $js{""} $java{""} $rb{""};
+        macro String _mktempdir() $py{__import__("mdk_runtime_files")._mdk_mktempdir()} $js{""} $java{""} $rb{""};
 
         String mktempdir() {
-            return _mktempdir();
+            return self._mktempdir();
         }
 
-        macro void write(String path, String contents)
-            $py{_mdk_writefile($path, $contents)}
+        macro void _write(String path, String contents)
+            $py{__import__("mdk_runtime_files")._mdk_writefile($path, $contents)}
             $java{do {} while (false);}
             $js{}
             $rb{};
 
-        macro void delete(String path)
-            $py{_mdk_deletefile($path)}
+        void write(String path, String contents) {
+            self._write(path, contents);
+        }
+
+        macro void _delete(String path)
+            $py{__import__("mdk_runtime_files")._mdk_deletefile($path)}
             $java{do {} while (false);}
             $js{}
             $rb{};
+
+        void delete(String path) {
+            self._delete(path);
+        }
 
         void _checkSubscriptions() {
-            self.scheduling.tell(self, new Schedule("poll", 5.0), self.scheduling);
+            self.dispatcher.tell(self, new Schedule("poll", 5.0), self.scheduling);
             int idx = 0;
             while (idx < self.subscriptions.size()) {
                 self.subscriptions[idx].poll();
@@ -115,7 +122,7 @@ namespace files {
                 return;
             }
             SubscribeChanges subscribe = ?message;
-            self.subscriptions.add(new _Subscription(origin, subscribe.path));
+            self.subscriptions.add(new _Subscription(self, origin, subscribe.path));
         }
 
         void _send(Object message, Actor destination) {
@@ -138,21 +145,19 @@ namespace files {
 
         // Should return just the file path if it's a file, the contents if it's
         // a directory.
-        macro List<String> contents(String path)
-            $python{_mdk_file_contents($path)}
-            $java{null} $js{null} $rb{[]};
+        macro List<String> contents(String path) $py{__import__("mdk_runtime_files")._mdk_file_contents($path)}
+                                                 $java{null} $js{null} $rb{[]};
 
-        macro String read(String path)
-            $python{_mdk_readfile($path)}
-            $java{null} $js{null} $rb{[]};
+        macro String read(String path) $py{__import__("mdk_runtime_files")._mdk_readfile($path)}
+                                       $java{null} $js{null} $rb{""};
 
         void poll() {
-            List<String> new_listing = contents(self.path);
+            List<String> new_listing = self.contents(self.path);
             // Anything that exists we read the contents, as if it's changed:
             int idx = 0;
             while (idx < new_listing.size()) {
                 self.actor._send(new FileContents(self.path + "/" + new_listing[idx],
-                                                  read(new_listing[idx])),
+                                                  self.read(new_listing[idx])),
                                  self.subscriber);
                 idx = idx + 1;
             }
@@ -165,7 +170,7 @@ namespace files {
                 jdx = 0;
                 found = false;
                 while (jdx < new_listing.size()) {
-                    if (previous_listing[i] == new_listing[j]) {
+                    if (previous_listing[idx] == new_listing[jdx]) {
                         found = true;
                         break;
                     }

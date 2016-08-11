@@ -12,6 +12,7 @@ use ../mdk_runtime.q;
 use ../actors.q;
 
 import mdk_runtime;
+import mdk_runtime.files;
 import actors.core;
 import actors.promise;
 
@@ -336,21 +337,21 @@ class FileActorTests extends TestActor {
             if (typeId != "mdk_runtime.files.FileContents") {
                 panic("Unexpected message: " + typeId);
             }
-            self.assertCreateNotification(message);
+            self.assertCreateNotification(?message);
             return;
         }
         if (self.state == "testCreateNotification") {
             if (typeId != "mdk_runtime.files.FileContents") {
                 panic("Unexpected message: " + typeId);
             }
-            self.assertCreateNotification(message);
+            self.assertCreateNotification(?message);
             return;
         }
         if (self.state == "testDeleteNotification") {
             if (typeId == "mdk_runtime.files.FileContents") {
                 return; // hopefully just spurious false positive
             }
-            self.assertDeleteNotification(message);
+            self.assertDeleteNotification(?message);
             return;
         }
         panic("Unexpected message: " + message.toString());
@@ -442,7 +443,7 @@ class TestPolicyFakeWebSockets extends WebSockets {
     }
 }
 
-macro bool isPython() $py{true} $js{false} $java{false} $rb{false};
+macro bool isPython() $py{True} $js{false} $java{false} $rb{false};
 
 @doc("""
 Run a series of actor-based tests. Receiving \"next\" triggers next test.
@@ -469,7 +470,7 @@ class TestRunner {
         // Not bothering with other languages in this iteration, will add them
         // later.
         if (isPython()) {
-            self.tests["files"] = bind(self, "testFiles");
+            self.tests["files"] = bind(self, "testFiles", []);
         }
 	self.testNames = tests.keys();
     }
@@ -499,7 +500,7 @@ class TestRunner {
     }
 
     TestActor testFiles(MDKRuntime runtime) {
-        return new FileActorTest(new FileActorImpl(runtime));
+        return new FileActorTests(new FileActorImpl(runtime));
     }
 
     void runNextTest() {
