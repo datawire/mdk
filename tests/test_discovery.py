@@ -6,9 +6,10 @@ Additional tests can be found in quark/tests/mdk_test.q.
 
 from unittest import TestCase
 
-from mdk_runtime import fakeRuntime
+from .common import fake_runtime
+
 from mdk_discovery import (
-    Discovery, Node, NodeActive, NodeExpired, ReplaceCluster, CircuitBreakerFactory,
+    Discovery, Node, NodeActive, NodeExpired, ReplaceCluster,
 )
 
 
@@ -19,9 +20,7 @@ class DiscoveryTests(TestCase):
         """
         Create a new Discovery instance.
         """
-        runtime = fakeRuntime()
-        runtime.dependencies.registerService(
-            "failurepolicy_factory", CircuitBreakerFactory())
+        runtime = fake_runtime()
         disco = Discovery(runtime)
         disco.onStart(runtime.dispatcher)
         return disco

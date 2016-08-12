@@ -39,7 +39,7 @@ namespace mdk_runtime {
 	}
 
         @doc("Return File service.")
-	mdk_runtime.files.FileActor getFileService
+        mdk_runtime.files.FileActor getFileService() {
 	    return ?self.dependencies.getService("files");
 	}
 
@@ -467,30 +467,28 @@ namespace mdk_runtime {
 	MDKRuntime runtime = new MDKRuntime();
         QuarkRuntimeTime timeService = new QuarkRuntimeTime();
         QuarkRuntimeWebSockets websockets = new QuarkRuntimeWebSockets(runtime.dispatcher);
-        mdk_runtime.files.FileActor files = new mdk_runtime.files.FileActorImpl(runtime);
         runtime.dependencies.registerService("time", timeService);
         runtime.dependencies.registerService("schedule", timeService);
         runtime.dependencies.registerService("websockets", websockets);
-        runtime.dependencies.registerService("files", files);
+        mdk_runtime.files.FileActor fileActor = new mdk_runtime.files.FileActorImpl(runtime);
+        runtime.dependencies.registerService("files", fileActor);
 	runtime.dispatcher.startActor(timeService);
-        runtime.dispatcher.startActor(websockets);
-        runtime.dispatcher.startActor(files);
+        runtime.dispatcher.startActor(fileActor);
 	return runtime;
     }
 
     MDKRuntime fakeRuntime() {
-        MDKRuntime result = new MDKRuntime();
+        MDKRuntime runtime = new MDKRuntime();
         FakeTime timeService = new FakeTime();
-        FakeWebSockets websockets = new FakeWebSockets(result.dispatcher);
-        mdk_runtime.files.FileActor files = new mdk_runtime.files.FileActorImpl(runtime);
-        result.dependencies.registerService("time", timeService);
-        result.dependencies.registerService("schedule", timeService);
-        result.dependencies.registerService("websockets", websockets);
-        runtime.dependencies.registerService("files", files);
-        result.dispatcher.startActor(timeService);
-        runtime.dispatcher.startActor(websockets);
-        runtime.dispatcher.startActor(files);
-        return result;
+        FakeWebSockets websockets = new FakeWebSockets(runtime.dispatcher);
+        runtime.dependencies.registerService("time", timeService);
+        runtime.dependencies.registerService("schedule", timeService);
+        runtime.dependencies.registerService("websockets", websockets);
+        mdk_runtime.files.FileActor fileActor = new mdk_runtime.files.FileActorImpl(runtime);
+        runtime.dependencies.registerService("files", fileActor);
+        runtime.dispatcher.startActor(timeService);
+        runtime.dispatcher.startActor(fileActor);
+        return runtime;
     }
 
 }
