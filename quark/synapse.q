@@ -81,6 +81,9 @@ namespace mdk_synapse {
                 // A file was modified or created, read the JSON and convert it
                 // to Node objects.
                 FileContents contents = ?message;
+                if (!contents.path.endsWith(".json")) {
+                    return;
+                }
                 service = self._pathToServiceName(contents.path);
                 JSONObject json = contents.contents.parseJSON();
                 List<Node> nodes = [];

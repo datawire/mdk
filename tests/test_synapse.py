@@ -2,7 +2,7 @@
 Tests for Synapse DiscoverySource support.
 """
 
-from unittest import TestCase
+from unittest import TestCase, SkipTest
 from shutil import rmtree
 from tempfile import mkdtemp
 from json import dumps
@@ -36,7 +36,7 @@ class SynapseTests(TestCase):
 
     def write(self, service, values):
         """Write a service as JSON to disk."""
-        with open(os.path.join(self.directory, service + ".json"), "w") as f:
+        with open(os.path.join(self.directory, service), "w") as f:
             values = [d.copy() for d in values]
             for d in values:
                 # There can be other values in the JSON:
@@ -45,7 +45,7 @@ class SynapseTests(TestCase):
 
     def remove(self, service):
         """Remove a service JSON file."""
-        os.remove(os.path.join(self.directory, service + ".json"))
+        os.remove(os.path.join(self.directory, service))
 
     def node(self, service, host, port):
         """Create a Node."""
@@ -67,9 +67,9 @@ class SynapseTests(TestCase):
 
     def test_newFile(self):
         """A new file in the correct format updates Discovery."""
-        self.write("service1", [{"host": "host1", "port": 123},
-                                {"host": "host2", "port": 124}])
-        self.write("service2", [])
+        self.write("service1.json", [{"host": "host1", "port": 123},
+                                     {"host": "host2", "port": 124}])
+        self.write("service2.json", [])
         self.pump()
         self.assertNodesEqual(
             self.disco.knownNodes("service1"),
@@ -78,11 +78,11 @@ class SynapseTests(TestCase):
 
     def test_changedFile(self):
         """A change to a file updates Discovery."""
-        self.write("service1", [{"host": "host1", "port": 123},
-                                {"host": "host2", "port": 124}])
+        self.write("service1.json", [{"host": "host1", "port": 123},
+                                     {"host": "host2", "port": 124}])
         self.pump()
-        self.write("service1", [{"host": "host3", "port": 125},
-                                {"host": "host4", "port": 126}])
+        self.write("service1.json", [{"host": "host3", "port": 125},
+                                     {"host": "host4", "port": 126}])
         self.pump()
         self.assertNodesEqual(
             self.disco.knownNodes("service1"),
@@ -91,15 +91,24 @@ class SynapseTests(TestCase):
 
     def test_removedFile(self):
         """A removed file updates Discovery."""
-        self.write("service1", [{"host": "host1", "port": 123},
-                                {"host": "host2", "port": 124}])
+        self.write("service1.json", [{"host": "host1", "port": 123},
+                                     {"host": "host2", "port": 124}])
         self.pump()
-        self.remove("service1")
+        self.remove("service1.json")
         self.pump()
         self.assertNodesEqual(self.disco.knownNodes("service1"), [])
 
     def test_badFormat(self):
         """An unreadable file leaves Discovery unchanged."""
+        raise SkipTest("Not possible until we fix https://github.com/datawire/quark/issues/246")
+        with open(os.path.join(self.directory, "service2.json"), "w") as f:
+            f.write("this is not json")
+        self.pump()
+        self.assertNodesEqual(self.disco.knownNodes("service2"), [])
 
     def test_unexpectedFilename(self):
         """Files that don't end with '.json' are ignored."""
+        self.write("service1.abcd", [{"host": "host1", "port": 123},
+                                     {"host": "host2", "port": 124}])
+        self.pump()
+        self.assertNodesEqual(self.disco.knownNodes("service1"), [])
