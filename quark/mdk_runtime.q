@@ -468,4 +468,16 @@ namespace mdk_runtime {
 	runtime.dispatcher.startActor(timeService);
 	return runtime;
     }
+
+    MDKRuntime fakeRuntime() {
+        MDKRuntime result = new MDKRuntime();
+        FakeTime timeService = new FakeTime();
+        result.dependencies.registerService("time", timeService);
+        result.dependencies.registerService("schedule", timeService);
+        result.dependencies.registerService("websockets",
+                                            new FakeWebSockets(result.dispatcher));
+        result.dispatcher.startActor(timeService);
+        return result;
+    }
+
 }

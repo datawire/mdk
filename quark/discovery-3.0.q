@@ -40,7 +40,7 @@ import actors.promise;
 
 namespace mdk_discovery {
 
-    @doc("A node has become active.")
+    @doc("Message from DiscoverySource: a node has become active.")
     class NodeActive {
         Node node;
 
@@ -49,7 +49,7 @@ namespace mdk_discovery {
         }
     }
 
-    @doc("A node has expired.")
+    @doc("Message from DiscoverySource: a node has expired.")
     class NodeExpired {
         Node node;
 
@@ -58,16 +58,26 @@ namespace mdk_discovery {
         }
     }
 
+    @doc("Message from DiscoverySource: replace all nodes in a particular Cluster.")
+    class ReplaceCluster {
+        List<Node> nodes;
+        String cluster;
+
+        ReplaceCluster(String cluster, List<Node> nodes) {
+            self.nodes = nodes;
+            self.cluster = cluster;
+        }
+    }
+
     @doc("""
     A source of discovery information.
 
-    Sends NodeActive and NodeExpired messages to a subscriber. For now the
-    subscriber is presumed to be passed into implementation constructor somehow,
-    but will likely add a subscription incoming message in a future iteration.
+    Sends ReplaceCluster, NodeActive and NodeExpired messages to a
+    subscriber.
     """)
     interface DiscoverySource extends Actor {}
 
-    @doc("A factory for DiscoverySource instances.");
+    @doc("A factory for DiscoverySource instances.")
     interface DiscoverySourceFactory {
         @doc("Create a new instance")
         DiscoverySource create(Actor subscriber, MDKRuntime runtime);
@@ -462,6 +472,14 @@ namespace mdk_discovery {
             return self.register(node);
         }
 
+        @doc("Return the current known Nodes for a service, if any.")
+        List<Node> knownNodes(String service) {
+            if (!services.contains(service)) {
+                return [];
+            }
+            return services[service].nodes;
+        }
+
         @doc("Resolve a service name into an available service node. You must")
         @doc("usually start the uplink before this will do much; see start().")
         @doc("The returned Promise will end up with a Node as its value.")
@@ -511,6 +529,34 @@ namespace mdk_discovery {
                 NodeExpired expire = ?message;
                 self._expire(expire.node);
                 return;
+            }
+            if (klass == "mdk_discovery.ReplaceCluster") {
+                ReplaceCluster replace = ?message;
+                self._replace(replace.cluster, replace.nodes);
+                return;
+            }
+        }
+
+        void _replace(String service, List<Node> nodes) {
+            self._lock();
+            logger.info("replacing all nodes for " + service + " with "
+                        + nodes.toString());
+            if (!services.contains(service)) {
+                services[service] = new Cluster(self._fpfactory);
+            }
+            Cluster cluster = services[service];
+            List<Node> currentNodes = new ListUtil<Node>().slice(cluster.nodes,
+                                                                 0,
+                                                                 cluster.nodes.size());
+            int idx = 0;
+            while (idx < currentNodes.size()) {
+                cluster.remove(currentNodes[idx]);
+                idx = idx + 1;
+            }
+            idx = 0;
+            while (idx < nodes.size()) {
+                cluster.add(nodes[idx]);
+                idx = idx + 1;
             }
         }
 
