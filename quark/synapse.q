@@ -76,11 +76,12 @@ namespace mdk_synapse {
 
         void onMessage(Actor origin, Object message) {
             String typeId = message.getClass().id;
+            String service;
             if (typeId == "mdk_runtime.files.FileContents") {
                 // A file was modified or created, read the JSON and convert it
                 // to Node objects.
                 FileContents contents = ?message;
-                String service = self._pathToServiceName(contents.path);
+                service = self._pathToServiceName(contents.path);
                 JSONObject json = contents.contents.parseJSON();
                 List<Node> nodes = [];
                 int idx = 0;
@@ -90,12 +91,19 @@ namespace mdk_synapse {
                     node.service = service;
                     node.version = "1.0";
                     String host = entry.getObjectItem("host").getString();
-                    node.address = (host + ":" +
-                                    entry.getObjectItem("port").getNumber().round().toString());
+                    String port = entry.getObjectItem("port").getNumber()
+                        .round().toString();
+                    node.address = host + ":" + port;
                     nodes.add(node);
                     idx = idx + 1;
                 }
                 self._update(service, nodes);
+                return;
+            }
+            if (typeId == "mdk_runtime.files.FileDeleted") {
+                FileDeleted deleted = ?message;
+                service = self._pathToServiceName(deleted.path);
+                self._update(service, []);
                 return;
             }
         }

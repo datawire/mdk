@@ -78,9 +78,25 @@ class SynapseTests(TestCase):
 
     def test_changedFile(self):
         """A change to a file updates Discovery."""
+        self.write("service1", [{"host": "host1", "port": 123},
+                                {"host": "host2", "port": 124}])
+        self.pump()
+        self.write("service1", [{"host": "host3", "port": 125},
+                                {"host": "host4", "port": 126}])
+        self.pump()
+        self.assertNodesEqual(
+            self.disco.knownNodes("service1"),
+            [self.node("service1", "host3", 125),
+             self.node("service1", "host4", 126)])
 
     def test_removedFile(self):
         """A removed file updates Discovery."""
+        self.write("service1", [{"host": "host1", "port": 123},
+                                {"host": "host2", "port": 124}])
+        self.pump()
+        self.remove("service1")
+        self.pump()
+        self.assertNodesEqual(self.disco.knownNodes("service1"), [])
 
     def test_badFormat(self):
         """An unreadable file leaves Discovery unchanged."""
