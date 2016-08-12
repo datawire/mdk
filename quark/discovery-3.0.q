@@ -67,6 +67,12 @@ namespace mdk_discovery {
     """)
     interface DiscoverySource extends Actor {}
 
+    @doc("A factory for DiscoverySource instances.");
+    interface DiscoverySourceFactory {
+        @doc("Create a new instance")
+        DiscoverySource create(Actor subscriber, MDKRuntime runtime);
+    }
+
     @doc("Register a node.")
     class RegisterNode {
         Node node;
