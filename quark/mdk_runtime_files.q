@@ -73,6 +73,7 @@ namespace files {
         Actor scheduling;
         MessageDispatcher dispatcher;
         List<_Subscription> subscriptions = [];
+        bool stopped = false;
 
         FileActorImpl(MDKRuntime runtime) {
             self.scheduling = runtime.getScheduleService();
@@ -105,6 +106,9 @@ namespace files {
         }
 
         void _checkSubscriptions() {
+            if (self.stopped) {
+                return;
+            }
             self.dispatcher.tell(self, new Schedule("poll", 5.0), self.scheduling);
             int idx = 0;
             while (idx < self.subscriptions.size()) {
@@ -116,6 +120,10 @@ namespace files {
         void onStart(MessageDispatcher dispatcher) {
             self.dispatcher = dispatcher;
             self._checkSubscriptions();
+        }
+
+        void onStop() {
+            self.stopped = true;
         }
 
         void onMessage(Actor origin, Object message) {
@@ -162,7 +170,7 @@ namespace files {
             // Anything that exists we read the contents, as if it's changed:
             int idx = 0;
             while (idx < new_listing.size()) {
-                self.actor._send(new FileContents(self.path + "/" + new_listing[idx],
+                self.actor._send(new FileContents(new_listing[idx],
                                                   self.read(new_listing[idx])),
                                  self.subscriber);
                 idx = idx + 1;
@@ -183,8 +191,7 @@ namespace files {
                     jdx = jdx + 1;
                 }
                 if (!found) {
-                    self.actor._send(new FileDeleted(self.path + "/"
-                                                     + previous_listing[idx]),
+                    self.actor._send(new FileDeleted(previous_listing[idx]),
                                      self.subscriber);
                 }
                 idx = idx + 1;

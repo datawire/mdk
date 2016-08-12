@@ -273,10 +273,12 @@ class FileActorTests extends TestActor {
     TestRunner runner;
     String state = "initial";
     String directory;
+    String file;
 
     FileActorTests(FileActor actor) {
 	self.actor = actor;
         self.directory = actor.mktempdir();
+        self.file = self.directory + "/file1";
     }
 
     void changeState(String state) {
@@ -290,18 +292,18 @@ class FileActorTests extends TestActor {
     }
 
     void start(TestRunner runner) {
+        self.runner = runner;
         self.testCreateNotification();
     }
 
     void testCreateNotification() {
         self.changeState("testCreateNotification");
         self.dispatcher.tell(self, new SubscribeChanges(self.directory), self.actor);
-        self.actor.write("file1", "initial value");
+        self.actor.write(self.file, "initial value");
     }
 
     void assertCreateNotification(FileContents contents) {
-        if (contents.path != self.directory + "/file1" ||
-            contents.contents != "initial value") {
+        if (contents.path != self.file || contents.contents != "initial value") {
             panic("Unexpected results: " + contents.path + " " + contents.contents);
         }
         self.testChangeNotification();
@@ -309,11 +311,11 @@ class FileActorTests extends TestActor {
 
     void testChangeNotification() {
         self.changeState("testChangeNotification");
-        self.actor.write("file1", "changed value");
+        self.actor.write(self.file, "changed value");
     }
 
     void assertChangeNotification(FileContents contents) {
-        if (contents.path == self.directory + "/file1") {
+        if (contents.path == self.file) {
             if (contents.contents == "initial value") {
                 // False positive hopefully just predating update, so continue
                 return;
@@ -321,20 +323,23 @@ class FileActorTests extends TestActor {
             if (contents.contents != "changed value") {
                 panic("Unexpected value: " + contents.contents);
             }
+        } else {
+            panic("Unexpected file: " + contents.path);
         }
         self.testDeleteNotification();
     }
 
     void testDeleteNotification() {
         self.changeState("testDeleteNotification");
-        self.actor.delete("file1");
+        self.actor.delete(self.file);
     }
 
     void assertDeleteNotification(FileDeleted deleted) {
-        if (deleted.path != self.directory + "/file1") {
+        if (deleted.path != self.file) {
             panic("Unexpected value: " + deleted.path);
         }
         self.state == "done";
+        self.dispatcher.stopActor(self.actor);
         runner.runNextTest();
     }
 
@@ -347,16 +352,19 @@ class FileActorTests extends TestActor {
             self.assertCreateNotification(?message);
             return;
         }
-        if (self.state == "testCreateNotification") {
+        if (self.state == "testChangeNotification") {
             if (typeId != "mdk_runtime.files.FileContents") {
                 panic("Unexpected message: " + typeId);
             }
-            self.assertCreateNotification(?message);
+            self.assertChangeNotification(?message);
             return;
         }
         if (self.state == "testDeleteNotification") {
             if (typeId == "mdk_runtime.files.FileContents") {
                 return; // hopefully just spurious false positive
+            }
+            if (typeId != "mdk_runtime.files.FileDeleted") {
+                panic("Unexpected message: " + typeId);
             }
             self.assertDeleteNotification(?message);
             return;

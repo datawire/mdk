@@ -25,7 +25,7 @@ def _mdk_readfile(path):
 
 def _mdk_deletefile(path):
     """Delete a file."""
-    os.path.remove(path)
+    os.remove(path)
 
 def _mdk_file_contents(path):
     """List contents of directory, or just the file if it's a file."""
