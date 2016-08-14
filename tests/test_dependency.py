@@ -24,3 +24,14 @@ class DependencyTests(TestCase):
         self.assertEqual(
             (a, b),
             (deps.getService("A"), deps.getService("B")))
+
+    def test_hasService(self):
+        """
+        It's possible to check whether a service exists.
+        """
+        deps = Dependencies()
+        deps.registerService("A", object())
+        self.assertEqual(
+            (True, False),
+            (deps.hasService("A"), deps.hasService("B")))
+
