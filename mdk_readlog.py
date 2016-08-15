@@ -1,9 +1,9 @@
-"""discowatch.py
+"""mdk_readlog.py
 
-Watch the disco's traces.
+Watch the MDK traces.
 
 Usage: 
-    discowatch.py [options]
+    mdk_readlog.py [options]
 
 Options:
     -l <minlevel>        set the minimum log level to output
@@ -12,15 +12,20 @@ Options:
     -t <traceId>         output only logs for this traceId
     --node-id <nodeId>   output only logs involving this nodeId
     --depth <depth>      output only the top <depth> levels of the causality tree
-    -f                   stay connected and continue watching
     -n <count>           output only <count> log messages
+    -f                   stay connected and continue watching
 """
 
-from docopt import docopt
-import mdk
+import sys
+
+import json
 import threading
 import datetime
+import types
 
+from docopt import docopt
+
+import mdk
 
 # setInterval function
 def set_interval(func, sec):
@@ -44,27 +49,38 @@ class TraceEventHandler (object):
     def __init__(self, args):
         """ Initialize a TraceEventHandler with a set of args from docopt. """
         self.args = args
+        self.outfile = None             # Assume no output file
+        self.shouldSubscribe = False    # Assume we should not subscribe
+
+        # Should we write to a file?
+        if self.args['-f']:
+            # Yes. Default to stdout for now.
+            self.outfile = sys.stdout
+            self.shouldSubscribe = True
 
     def traceEvent(self, event):
-        # how do i get the correct timeSinceStart? need the actual startTime to get timeSinceStart
-        timestamp = event.timestamp/1000.0
-        date = datetime.datetime.fromtimestamp(timestamp).isoformat()
-        date = date[:-3]
-        clock = ""
-        category = event.category
-        level = event.level
-        text = event.text
-        traceId = event.context.traceId
+        # We always need the time, both as an int and as ISO8601.
+        timestamp = event.timestamp
+        isoTime = datetime.datetime.fromtimestamp(timestamp/1000.0).isoformat()[:-3]
 
-        if event.context:
-            lclock = event.context.clock
+        if self.outfile:
+            # We want to write this event as plain text to outfile, so we need to format it for that purpose.
+            # how do i get the correct timeSinceStart? need the actual startTime to get timeSinceStart
+            clock = ""
+            category = event.category
+            level = event.level
+            text = event.text
+            traceId = event.context.traceId
 
-            if lclock:
-                clock = lclock.key()
+            if event.context:
+                lclock = event.context.clock
 
-        eventStr = date+ " " + traceId + " " + clock + " " + category + " " + level + " " + text
+                if lclock:
+                    clock = lclock.key()
 
-        print(eventStr)
+            eventStr = isoTime + " " + traceId + " " + clock + " " + category + " " + level + " " + text
+
+            print(eventStr)
 
 # Program we are running
 def main(docopt_args):
@@ -74,7 +90,8 @@ def main(docopt_args):
     # Create a new TraceEventHandler
     traceEventHandler = TraceEventHandler(docopt_args)
 
-    if docopt_args["-f"]:
+    # If we should subscribe, hit it.
+    if traceEventHandler.shouldSubscribe:
         # ...and subscribe to receive log events as they come in over the wire.
             # takes only 1 parameter 
             # opens a connection if needed (_openIfNeeded())
