@@ -522,6 +522,7 @@ class TestRunner {
         // If we're not the first test, cleanup:
 	if (self.nextTest > 0) {
 	    self.runtime.dispatcher.stopActor(self.keepalive);
+            self.runtime.stop();
 	    print("Test finished successfully.\n");
 	}
 

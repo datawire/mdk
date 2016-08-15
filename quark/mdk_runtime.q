@@ -43,6 +43,11 @@ namespace mdk_runtime {
 	    return ?self.dependencies.getService("files");
 	}
 
+        @doc("Stop all Actors that are started by default (i.e. files, schedule).")
+        void stop() {
+            self.dispatcher.stopActor(getFileService());
+            self.dispatcher.stopActor(self.getScheduleService());
+        }
     }
 
     @doc("""

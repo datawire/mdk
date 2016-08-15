@@ -310,6 +310,7 @@ namespace mdk {
             _runtime.dispatcher.stopActor(_disco);
             _runtime.dispatcher.stopActor(_discoSource);
             _tracer.stop();
+            _runtime.stop();
         }
 
         void register(String service, String version, String address) {
