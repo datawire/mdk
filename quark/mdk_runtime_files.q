@@ -62,6 +62,20 @@ namespace files {
         void delete(String path);
     }
 
+    macro void _write(String path, String contents)
+        $py{__import__("mdk_runtime_files")._mdk_writefile($path, $contents)}
+        $java{do {} while (false)}
+        $js{false}
+        $rb{false};
+
+    macro void _delete(String path)
+        $py{__import__("mdk_runtime_files")._mdk_deletefile($path)}
+        $java{do {} while (false)}
+        $rb{false}
+        $js{false};
+
+    macro String _mktempdir() $py{__import__("mdk_runtime_files")._mdk_mktempdir()} $js{""} $java{""} $rb{""};
+
     @doc("""
     Polling-based subscriptions.
 
@@ -79,30 +93,16 @@ namespace files {
             self.scheduling = runtime.getScheduleService();
         }
 
-        macro String _mktempdir() $py{__import__("mdk_runtime_files")._mdk_mktempdir()} $js{""} $java{""} $rb{""};
-
         String mktempdir() {
-            return self._mktempdir();
+            return _mktempdir();
         }
-
-        macro void _write(String path, String contents)
-            $py{__import__("mdk_runtime_files")._mdk_writefile($path, $contents)}
-            $java{do {} while (false);}
-            $js{}
-            $rb{};
 
         void write(String path, String contents) {
-            self._write(path, contents);
+            _write(path, contents);
         }
 
-        macro void _delete(String path)
-            $py{__import__("mdk_runtime_files")._mdk_deletefile($path)}
-            $java{do {} while (false);}
-            $js{}
-            $rb{};
-
         void delete(String path) {
-            self._delete(path);
+            _delete(path);
         }
 
         void _checkSubscriptions() {
