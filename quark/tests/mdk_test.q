@@ -508,6 +508,7 @@ class DiscoveryTest {
 
         runtime.dispatcher.stopActor(disco);
         runtime.dispatcher.stopActor(client);
+        runtime.stop();
         // Might take some cleanup to stop everything:
         timeService.advance(15.0);
         self.pump();
@@ -550,7 +551,7 @@ class CircuitBreakerTest {
 
     void testBreakerTrips() {
         Node node = new Node();
-        node._policy = new CircuitBreaker(node, 3, 1.0);
+        node._policy = new CircuitBreaker(3, 1.0);
         checkEqual(true, node.available());
         node.failure();
         checkEqual(true, node.available());
