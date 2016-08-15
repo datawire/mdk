@@ -34,12 +34,30 @@ class DiscoveryTests(TestCase):
         node.properties = {}
         return node
 
+    def resolve(self, disco, service, version):
+        """Resolve a service to a Node."""
+        return disco._resolve(service, version).value().getValue()
+
     def test_active(self):
         """NodeActive adds a Node to Discovery."""
         disco = self.create_disco()
         node = self.create_node("somewhere")
         disco.onMessage(None, NodeActive(node))
         self.assertEqual(disco.knownNodes("myservice"), [node])
+
+    def test_activeUpdates(self):
+        """NodeActive updates a Node with same address to new version and properties."""
+        disco = self.create_disco()
+        node = self.create_node("somewhere")
+        disco.onMessage(None, NodeActive(node))
+        node2 = self.create_node("somewhere")
+        node2.version = "1.7"
+        node2.properties = {"a": 123}
+        disco.onMessage(None, NodeActive(node2))
+        self.assertEqual(disco.knownNodes("myservice"), [node2])
+        resolved = self.resolve(disco, "myservice", "1.7")
+        self.assertEqual((resolved.version, resolved.properties),
+                         ("1.7", {"a": 123}))
 
     def test_activeTriggersWaitingPromises(self):
         """
@@ -108,3 +126,49 @@ class DiscoveryTests(TestCase):
         node = self.create_node("somewhere")
         disco.onMessage(None, ReplaceCluster("myservice", [node]))
         self.assertEqual(result, [node])
+
+    def test_activeDoesNotMutate(self):
+        """
+        A resolved Node is not mutated by a new NodeActive for same address.
+        """
+        disco = self.create_disco()
+        node = self.create_node("somewhere")
+        disco.onMessage(None, NodeActive(node))
+        resolved_node = self.resolve(disco, "myservice", "1.0")
+
+        node2 = self.create_node("somewhere")
+        node2.version = "1.3"
+        disco.onMessage(None, NodeActive(node2))
+        self.assertEqual(resolved_node.version, "1.0")
+
+    def test_replaceDoesNotMutate(self):
+        """
+        A resolved Node is not mutated by a new ReplaceCluster containing a Node
+        with the same address.
+        """
+        disco = self.create_disco()
+        node = self.create_node("somewhere")
+        disco.onMessage(None, NodeActive(node))
+        resolved_node = self.resolve(disco, "myservice", "1.0")
+
+        node2 = self.create_node("somewhere")
+        node2.version = "1.3"
+        disco.onMessage(None, ReplaceCluster("myservice", [node2]))
+        self.assertEqual(resolved_node.version, "1.0")
+
+    def test_activeDoesNotDisableCircuitBreaker(self):
+        """
+        If a Node has been disabled by a CircuitBreaker then NodeActive with same
+        Node doesn't re-enable it.
+        """
+
+    def test_replaceDoesNotDisableCircuitBreaker(self):
+        """
+        If a Node has been disabled by a CircuitBreaker then ReplaceCluster with
+        same Node doesn't re-enable it.
+        """
+        disco = self.create_disco()
+        node = self.create_node("somewhere")
+        disco.onMessage(None, NodeActive(node))
+        self.assertEqual(disco.knownNodes("myservice"), [node])
+

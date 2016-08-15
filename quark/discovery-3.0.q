@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_discovery 3.2.0;
+package datawire_mdk_discovery 3.3.0;
 
 use util-1.0.q;
 include discovery-protocol-3.0.q;
@@ -260,10 +260,9 @@ namespace mdk_discovery {
 
             while (idx < nodes.size()) {
                 if (nodes[idx].address == node.address) {
-                    nodes[idx].update(node);
+                    nodes[idx] = node;
                     return;
                 }
-
                 idx = idx + 1;
             }
 
@@ -335,7 +334,7 @@ namespace mdk_discovery {
         @doc("The address at which clients can reach the server.")
         String address;
         @doc("Additional metadata associated with this service instance.")
-        Map<String,Object> properties;
+        Map<String,Object> properties = {};
 
         FailurePolicy _policy = null;
 
@@ -349,11 +348,6 @@ namespace mdk_discovery {
 
         bool available() {
             return _policy.available();
-        }
-
-        void update(Node node) {
-            self.version = node.version;
-            self.properties = node.properties;
         }
 
         @doc("Return a string representation of the Node.")
