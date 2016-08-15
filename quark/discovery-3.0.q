@@ -128,14 +128,13 @@ namespace mdk_discovery {
     @doc("A factory for FailurePolicy.")
     class FailurePolicyFactory {
         @doc("Create a new FailurePolicy.")
-        FailurePolicy create(Node node);
+        FailurePolicy create();
     }
 
     @doc("Default circuit breaker policy.")
     class CircuitBreaker extends FailurePolicy {
         static Logger _log = new Logger("mdk.breaker");
 
-        Node _node;
         int _threshold;
         long _delay;
 
@@ -145,8 +144,7 @@ namespace mdk_discovery {
         long _lastFailure = 0L;
 
 
-        CircuitBreaker(Node node, int threshold, float retestDelay) {
-            _node = node;
+        CircuitBreaker(int threshold, float retestDelay) {
             _threshold = threshold;
             _delay = (retestDelay*1000.0).round();
         }
@@ -164,7 +162,7 @@ namespace mdk_discovery {
             _failures = _failures + 1;
             _lastFailure = now();
             if (_threshold != 0 && _failures >= _threshold) {
-                _log.info("BREAKER TRIPPED: " + _node.toString());
+                _log.info("BREAKER TRIPPED.");
                 _failed = true;
             }
             _mutex.release();
@@ -176,7 +174,7 @@ namespace mdk_discovery {
                 bool result = now() - _lastFailure > _delay;
                 _mutex.release();
                 if (result) {
-                    _log.info("BREAKER RETEST: " + _node.toString());
+                    _log.info("BREAKER RETEST.");
                 }
                 return result;
             } else {
@@ -190,8 +188,8 @@ namespace mdk_discovery {
         int threshold = 3;
         float retestDelay = 30.0;
 
-        FailurePolicy create(Node node) {
-            return new CircuitBreaker(node, threshold, retestDelay);
+        FailurePolicy create() {
+            return new CircuitBreaker(threshold, retestDelay);
         }
     }
 
@@ -200,6 +198,7 @@ namespace mdk_discovery {
     class Cluster {
         List<Node> nodes = [];
         List<_Request> _waiting = [];
+        Map<String,FailurePolicy> _failurepolicies = {}; // Maps address->FailurePolicy
         int _counter = 0;
         FailurePolicyFactory _fpfactory;
 
@@ -213,6 +212,18 @@ namespace mdk_discovery {
             return chooseVersion(null);
         }
 
+        @doc("Create a Node for external use.")
+        Node _copyNode(Node node) {
+            FailurePolicy policy = self._failurepolicies[node.address];
+            Node result = new Node();
+            result.address = node.address;
+            result.version = node.version;
+            result.service = node.service;
+            result.properties = node.properties;
+            result._policy = policy;
+            return result;
+        }
+
         @doc("Choose a compatible version of a service to talk to.")
         Node chooseVersion(String version) {
             if (nodes.size() == 0) { return null; }
@@ -223,8 +234,9 @@ namespace mdk_discovery {
             while (count < nodes.size()) {
                 int choice = (start + count) % nodes.size();
                 Node candidate = nodes[choice];
-                if (versionMatch(version, candidate.version) && candidate.available()) {
-                    return candidate;
+                FailurePolicy policy = self._failurepolicies[candidate.address];
+                if (versionMatch(version, candidate.version) && policy.available()) {
+                    return self._copyNode(candidate);
                 }
                 count = count + 1;
             }
@@ -236,8 +248,9 @@ namespace mdk_discovery {
         @doc("update its properties).  At present, this involves a linear search, so")
         @doc("very large Clusters are unlikely to perform well.")
         void add(Node node) {
-            // XXX mutating like this is pretty bad, we should make Node immutable
-            node._policy = self._fpfactory.create(node);
+            if (!_failurepolicies.contains(node.address)) {
+                _failurepolicies[node.address] = self._fpfactory.create();
+            }
 
             // Resolve waiting promises:
             if (self._waiting.size() > 0) {
@@ -247,7 +260,7 @@ namespace mdk_discovery {
                 while (jdx < waiting.size()) {
                     _Request req = waiting[jdx];
                     if (versionMatch(req.version, node.version)) {
-                        req.factory.resolve(node);
+                        req.factory.resolve(self._copyNode(node));
                     } else {
                         self._waiting.add(req);
                     }
@@ -257,7 +270,6 @@ namespace mdk_discovery {
 
             // Update stored values:
             int idx = 0;
-
             while (idx < nodes.size()) {
                 if (nodes[idx].address == node.address) {
                     nodes[idx] = node;
@@ -265,7 +277,6 @@ namespace mdk_discovery {
                 }
                 idx = idx + 1;
             }
-
             nodes.add(node);
         }
 

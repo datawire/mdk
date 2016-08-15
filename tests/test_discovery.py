@@ -34,6 +34,11 @@ class DiscoveryTests(TestCase):
         node.properties = {}
         return node
 
+    def assertNodesEqual(self, a, b):
+        """The two Nodes have the same values."""
+        self.assertEqual((a.version, a.address, a.service, a.properties),
+                         (b.version, b.address, b.service, b.properties))
+
     def resolve(self, disco, service, version):
         """Resolve a service to a Node."""
         return disco._resolve(service, version).value().getValue()
@@ -44,6 +49,17 @@ class DiscoveryTests(TestCase):
         node = self.create_node("somewhere")
         disco.onMessage(None, NodeActive(node))
         self.assertEqual(disco.knownNodes("myservice"), [node])
+
+    def test_resolve(self):
+        """resolve() returns a Node matching an active one."""
+        disco = self.create_disco()
+        node = self.create_node("somewhere")
+        node.properties = {"x": 1}
+        disco.onMessage(None, NodeActive(node))
+        resolved = self.resolve(disco, "myservice", "1.0")
+        self.assertEqual(
+            (resolved.version, resolved.address, resolved.service, resolved.properties),
+            ("1.0", "somewhere", "myservice", {"x": 1}))
 
     def test_activeUpdates(self):
         """NodeActive updates a Node with same address to new version and properties."""
@@ -71,7 +87,7 @@ class DiscoveryTests(TestCase):
 
         node = self.create_node("somewhere")
         disco.onMessage(None, NodeActive(node))
-        self.assertEqual(result, [node])
+        self.assertNodesEqual(result[0], node)
 
     def test_expired(self):
         """NodeExpired removes a Node from Discovery."""
@@ -125,7 +141,7 @@ class DiscoveryTests(TestCase):
 
         node = self.create_node("somewhere")
         disco.onMessage(None, ReplaceCluster("myservice", [node]))
-        self.assertEqual(result, [node])
+        self.assertNodesEqual(result[0], node)
 
     def test_activeDoesNotMutate(self):
         """
@@ -156,11 +172,42 @@ class DiscoveryTests(TestCase):
         disco.onMessage(None, ReplaceCluster("myservice", [node2]))
         self.assertEqual(resolved_node.version, "1.0")
 
+    def test_nodeCircuitBreaker(self):
+        """success()/failure() enable and disable the Node."""
+        disco = self.create_disco()
+        node = self.create_node("somewhere")
+        disco.onMessage(None, NodeActive(node))
+        resolved_node = self.resolve(disco, "myservice", "1.0")
+
+        avail1 = resolved_node.available()
+        # Default threshold in CircuitBreaker is three failures:
+        resolved_node.failure()
+        resolved_node.failure()
+        resolved_node.failure()
+        avail2 = resolved_node.available()
+        resolved_node.success()
+        avail3 = resolved_node.available()
+        self.assertEqual((avail1, avail2, avail3), (True, False, True))
+
     def test_activeDoesNotDisableCircuitBreaker(self):
         """
         If a Node has been disabled by a CircuitBreaker then NodeActive with same
         Node doesn't re-enable it.
         """
+        disco = self.create_disco()
+        node = self.create_node("somewhere")
+        disco.onMessage(None, NodeActive(node))
+        resolved_node = self.resolve(disco, "myservice", "1.0")
+        # Uh-oh it's a pretty broken node:
+        for i in range(10):
+            resolved_node.failure()
+
+        node = self.create_node("somewhere")
+        disco.onMessage(None, NodeActive(node))
+        resolved_node2 = self.resolve(disco, "myservice", "1.0")
+        self.assertEqual(resolved_node2, None)
+        resolved_node.success()
+        self.assertNodesEqual(self.resolve(disco, "myservice", "1.0"), node)
 
     def test_replaceDoesNotDisableCircuitBreaker(self):
         """
@@ -170,5 +217,14 @@ class DiscoveryTests(TestCase):
         disco = self.create_disco()
         node = self.create_node("somewhere")
         disco.onMessage(None, NodeActive(node))
-        self.assertEqual(disco.knownNodes("myservice"), [node])
+        resolved_node = self.resolve(disco, "myservice", "1.0")
+        # Uh-oh it's a pretty broken node:
+        for i in range(10):
+            resolved_node.failure()
 
+        node = self.create_node("somewhere")
+        disco.onMessage(None, ReplaceCluster("myservice", [node]))
+        resolved_node2 = self.resolve(disco, "myservice", "1.0")
+        self.assertEqual(resolved_node2, None)
+        resolved_node.success()
+        self.assertNodesEqual(self.resolve(disco, "myservice", "1.0"), node)
