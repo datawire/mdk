@@ -338,7 +338,7 @@ class FileActorTests extends TestActor {
         if (deleted.path != self.file) {
             panic("Unexpected value: " + deleted.path);
         }
-        self.state == "done";
+        self.state = "done";
         self.dispatcher.stopActor(self.actor);
         runner.runNextTest();
     }

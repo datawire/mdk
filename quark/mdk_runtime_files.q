@@ -64,13 +64,13 @@ namespace files {
 
     macro void _write(String path, String contents)
         $py{__import__("mdk_runtime_files")._mdk_writefile($path, $contents)}
-        $java{do {} while (false)}
+        $java{do {} while (false);}
         $js{false}
         $rb{false};
 
     macro void _delete(String path)
         $py{__import__("mdk_runtime_files")._mdk_deletefile($path)}
-        $java{do {} while (false)}
+        $java{do {} while (false);}
         $rb{false}
         $js{false};
 
