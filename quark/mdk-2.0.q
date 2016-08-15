@@ -10,6 +10,7 @@ use introspection-1.0.q;
 use util-1.0.q;
 use dependency.q;
 use mdk_runtime.q;
+use synapse.q;
 
 import mdk_discovery;
 import mdk_tracing;
