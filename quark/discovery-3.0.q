@@ -558,6 +558,7 @@ namespace mdk_discovery {
                 cluster.add(nodes[idx]);
                 idx = idx + 1;
             }
+            self._release();
         }
 
         // XXX PRIVATE API -- needs to not be here.
