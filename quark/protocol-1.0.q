@@ -431,8 +431,6 @@ namespace mdk_protocol {
             self.timeService = runtime.getTimeService();
             self.schedulingActor = runtime.getScheduleService();
             self.websockets = runtime.getWebSocketsService();
-            // Definitely the wrong place to do this, but this works for now:
-            runtime.dispatcher.startActor(self);
         }
 
         String url();
