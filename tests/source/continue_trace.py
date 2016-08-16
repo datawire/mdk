@@ -20,8 +20,6 @@ def got_logs(log_events, context):
     if expected == results:
         print("Got expected messages!")
         mdk.stop()
-        # XXX working around Quark/MDK issue where Python runtime isn't exiting:
-        os._exit(0)
     else:
         print("No full results yet, will try again. Specifically got: " + repr(results))
         read_logs(context)
@@ -29,12 +27,12 @@ def got_logs(log_events, context):
 def got_error(error):
     print("ERROR: " + error.toString())
     mdk.stop()
-    os._exit(1)
+    os.exit(1)
 
 def read_logs(context):
     if time.time() - start > 60:
         print("Took more than 60 seconds, giving up.")
-        os._exit(1)
+        os.exit(1)
     tracer = mdk._tracer
     now = int(start * 1000)
     tracer.query(now - 60000, now + 120000).andEither(
