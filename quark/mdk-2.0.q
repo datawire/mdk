@@ -10,6 +10,7 @@ use introspection-1.0.q;
 use util-1.0.q;
 use dependency.q;
 use mdk_runtime.q;
+use synapse.q;
 
 import mdk_discovery;
 import mdk_tracing;
@@ -61,6 +62,17 @@ namespace mdk {
 
         @doc("This header is used to propogate shared context for distributed traces.")
         static String CONTEXT_HEADER = "X-MDK-Context";
+
+        @doc("""
+        Register an alternative source for discovering services.
+
+        By default the MDK talks to Datawire's Discovery implementation. You can
+        use this API to register a different source for service discovery.
+
+        You should run this immediately after init(), not on a started MDK
+        instance.
+        """)
+        void registerDiscoverySource(DiscoverySourceFactory source);
 
         @doc("""
              Start the MDK. An MDK instance will not communicate with
@@ -253,6 +265,7 @@ namespace mdk {
         DiscoverySource _discoSource;
         Tracer _tracer;
         String procUUID = Context.runtime().uuid();
+        bool _running = false;
 
         MDKImpl(MDKRuntime runtime) {
             _runtime = runtime;
@@ -270,20 +283,34 @@ namespace mdk {
             _tracer.initContext();
         }
 
+        void registerDiscoverySource(DiscoverySourceFactory source) {
+            if (self._running) {
+                panic("Can't register once the MDK has started.");
+            }
+            // XXX This will still leave the registration aspect of DiscoClient
+            // intact. OK for now since we have no alternative registration
+            // implementations, so people just won't call register() if they're
+            // using pluggable source.
+            self._discoSource = source.create(_disco, _runtime);
+        }
+
         float _timeout() {
             return 10.0;
         }
 
         void start() {
+            self._running = true;
             _runtime.dispatcher.startActor(_disco);
             _runtime.dispatcher.startActor(_discoSource);
             // Tracer starts up automatically as needed
         }
 
         void stop() {
+            self._running = false;
             _runtime.dispatcher.stopActor(_disco);
             _runtime.dispatcher.stopActor(_discoSource);
             _tracer.stop();
+            _runtime.stop();
         }
 
         void register(String service, String version, String address) {

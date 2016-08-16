@@ -74,6 +74,11 @@ namespace mdk_util {
         }
 
         static Object wait(Promise p, float timeout, String description) {
+            PromiseValue snapshot = p.value();
+            if (snapshot.hasValue()) {
+                return snapshot.getValue();
+            }
+
             Condition done = new Condition();
             WaitForPromise waiter = new WaitForPromise();
             p.andThen(bind(waiter, "_finished", [done]));
@@ -85,7 +90,7 @@ namespace mdk_util {
             done.waitWakeup(msTimeout);
             done.release();
 
-            PromiseValue snapshot = p.value();
+            snapshot = p.value();
             if (!snapshot.hasValue()) {
                 // XXX when we port this to Quark itself we should use a custom timeout
                 // exception class.

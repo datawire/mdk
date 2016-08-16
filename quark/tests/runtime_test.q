@@ -12,6 +12,7 @@ use ../mdk_runtime.q;
 use ../actors.q;
 
 import mdk_runtime;
+import mdk_runtime.files;
 import actors.core;
 import actors.promise;
 
@@ -262,6 +263,116 @@ class WebSocketsTest extends TestActor {
     }
 }
 
+
+@doc("""
+Tests for FileActor.
+""")
+class FileActorTests extends TestActor {
+    FileActor actor;
+    MessageDispatcher dispatcher;
+    TestRunner runner;
+    String state = "initial";
+    String directory;
+    String file;
+
+    FileActorTests(FileActor actor) {
+	self.actor = actor;
+        self.directory = actor.mktempdir();
+        self.file = self.directory + "/file1";
+    }
+
+    void changeState(String state) {
+	print("State: " + state);
+	self.state = state;
+    }
+
+    void onStart(MessageDispatcher dispatcher) {
+        self.dispatcher = dispatcher;
+        self.dispatcher.startActor(self.actor);
+    }
+
+    void start(TestRunner runner) {
+        self.runner = runner;
+        self.testCreateNotification();
+    }
+
+    void testCreateNotification() {
+        self.changeState("testCreateNotification");
+        self.dispatcher.tell(self, new SubscribeChanges(self.directory), self.actor);
+        self.actor.write(self.file, "initial value");
+    }
+
+    void assertCreateNotification(FileContents contents) {
+        if (contents.path != self.file || contents.contents != "initial value") {
+            panic("Unexpected results: " + contents.path + " " + contents.contents);
+        }
+        self.testChangeNotification();
+    }
+
+    void testChangeNotification() {
+        self.changeState("testChangeNotification");
+        self.actor.write(self.file, "changed value");
+    }
+
+    void assertChangeNotification(FileContents contents) {
+        if (contents.path == self.file) {
+            if (contents.contents == "initial value") {
+                // False positive hopefully just predating update, so continue
+                return;
+            }
+            if (contents.contents != "changed value") {
+                panic("Unexpected value: " + contents.contents);
+            }
+        } else {
+            panic("Unexpected file: " + contents.path);
+        }
+        self.testDeleteNotification();
+    }
+
+    void testDeleteNotification() {
+        self.changeState("testDeleteNotification");
+        self.actor.delete(self.file);
+    }
+
+    void assertDeleteNotification(FileDeleted deleted) {
+        if (deleted.path != self.file) {
+            panic("Unexpected value: " + deleted.path);
+        }
+        self.state = "done";
+        self.dispatcher.stopActor(self.actor);
+        runner.runNextTest();
+    }
+
+    void onMessage(Actor origin, Object message) {
+        String typeId = message.getClass().id;
+        if (self.state == "testCreateNotification") {
+            if (typeId != "mdk_runtime.files.FileContents") {
+                panic("Unexpected message: " + typeId);
+            }
+            self.assertCreateNotification(?message);
+            return;
+        }
+        if (self.state == "testChangeNotification") {
+            if (typeId != "mdk_runtime.files.FileContents") {
+                panic("Unexpected message: " + typeId);
+            }
+            self.assertChangeNotification(?message);
+            return;
+        }
+        if (self.state == "testDeleteNotification") {
+            if (typeId == "mdk_runtime.files.FileContents") {
+                return; // hopefully just spurious false positive
+            }
+            if (typeId != "mdk_runtime.files.FileDeleted") {
+                panic("Unexpected message: " + typeId);
+            }
+            self.assertDeleteNotification(?message);
+            return;
+        }
+        panic("Unexpected message: " + message.toString());
+    }
+}
+
 @doc("""
 Make sure we don't exit prematurely due to buggy tests.
 
@@ -347,6 +458,8 @@ class TestPolicyFakeWebSockets extends WebSockets {
     }
 }
 
+macro bool isPython() $py{True} $js{false} $java{false} $rb{false};
+
 @doc("""
 Run a series of actor-based tests. Receiving \"next\" triggers next test.
 
@@ -369,6 +482,11 @@ class TestRunner {
                       bind(self, "testRealRuntimeWebsockets", []),
                       "fake runtime: websockets":
                       bind(self, "testFakeRuntimeWebSockets", [])};
+        // Not bothering with other languages in this iteration, will add them
+        // later.
+        if (isPython()) {
+            self.tests["files"] = bind(self, "testFiles", []);
+        }
 	self.testNames = tests.keys();
     }
 
@@ -396,10 +514,15 @@ class TestRunner {
                                   "wss://echo/", "wss://bad/");
     }
 
+    TestActor testFiles(MDKRuntime runtime) {
+        return new FileActorTests(new FileActorImpl(runtime));
+    }
+
     void runNextTest() {
         // If we're not the first test, cleanup:
 	if (self.nextTest > 0) {
 	    self.runtime.dispatcher.stopActor(self.keepalive);
+            self.runtime.stop();
 	    print("Test finished successfully.\n");
 	}
 

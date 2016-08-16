@@ -2,6 +2,8 @@ quark 1.0;
 
 package datawire_mdk_runtime 1.0.0;
 
+include mdk_runtime_files.q;
+
 use actors.q;
 use dependency.q;
 import actors.core;
@@ -36,6 +38,16 @@ namespace mdk_runtime {
 	    return ?self.dependencies.getService("websockets");
 	}
 
+        @doc("Return File service.")
+        mdk_runtime.files.FileActor getFileService() {
+	    return ?self.dependencies.getService("files");
+	}
+
+        @doc("Stop all Actors that are started by default (i.e. files, schedule).")
+        void stop() {
+            self.dispatcher.stopActor(getFileService());
+            self.dispatcher.stopActor(self.getScheduleService());
+        }
     }
 
     @doc("""
@@ -459,11 +471,29 @@ namespace mdk_runtime {
     MDKRuntime defaultRuntime() {
 	MDKRuntime runtime = new MDKRuntime();
         QuarkRuntimeTime timeService = new QuarkRuntimeTime();
+        QuarkRuntimeWebSockets websockets = new QuarkRuntimeWebSockets(runtime.dispatcher);
         runtime.dependencies.registerService("time", timeService);
         runtime.dependencies.registerService("schedule", timeService);
-	runtime.dependencies.registerService("websockets",
-					     new QuarkRuntimeWebSockets(runtime.dispatcher));
+        runtime.dependencies.registerService("websockets", websockets);
+        mdk_runtime.files.FileActor fileActor = new mdk_runtime.files.FileActorImpl(runtime);
+        runtime.dependencies.registerService("files", fileActor);
 	runtime.dispatcher.startActor(timeService);
+        runtime.dispatcher.startActor(fileActor);
 	return runtime;
     }
+
+    MDKRuntime fakeRuntime() {
+        MDKRuntime runtime = new MDKRuntime();
+        FakeTime timeService = new FakeTime();
+        FakeWebSockets websockets = new FakeWebSockets(runtime.dispatcher);
+        runtime.dependencies.registerService("time", timeService);
+        runtime.dependencies.registerService("schedule", timeService);
+        runtime.dependencies.registerService("websockets", websockets);
+        mdk_runtime.files.FileActor fileActor = new mdk_runtime.files.FileActorImpl(runtime);
+        runtime.dependencies.registerService("files", fileActor);
+        runtime.dispatcher.startActor(timeService);
+        runtime.dispatcher.startActor(fileActor);
+        return runtime;
+    }
+
 }

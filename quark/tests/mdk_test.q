@@ -2,6 +2,8 @@ quark 1.0;
 
 package datawire_mdk_test 1.0.0;
 
+/* There are more tests in tests/test_discovery.py. */
+
 use ../mdk-2.0.q;
 
 import quark.test;
@@ -15,19 +17,6 @@ import mdk_tracing;
 import mdk_tracing.protocol;
 import mdk_runtime;
 import mdk_discovery;
-
-MDKRuntime fakeRuntime() {
-    MDKRuntime result = new MDKRuntime();
-    FakeTime timeService = new FakeTime();
-    result.dependencies.registerService("time", timeService);
-    result.dependencies.registerService("schedule", timeService);
-    result.dependencies.registerService("websockets",
-                                        new FakeWebSockets(result.dispatcher));
-    result.dispatcher.startActor(timeService);
-    result.dependencies.registerService("failurepolicy_factory",
-                                        new CircuitBreakerFactory());
-    return result;
-}
 
 FakeWSActor expectSocket(MDKRuntime runtime, String url) {
     FakeWebSockets ws = ?runtime.getWebSocketsService();
@@ -190,6 +179,8 @@ class DiscoveryTest {
 
     void setup() {
         self.runtime = fakeRuntime();
+        self.runtime.dependencies.registerService("failurepolicy_factory",
+                                                  new CircuitBreakerFactory());
     }
 
     void pump() {
@@ -517,6 +508,7 @@ class DiscoveryTest {
 
         runtime.dispatcher.stopActor(disco);
         runtime.dispatcher.stopActor(client);
+        runtime.stop();
         // Might take some cleanup to stop everything:
         timeService.advance(15.0);
         self.pump();
@@ -559,7 +551,7 @@ class CircuitBreakerTest {
 
     void testBreakerTrips() {
         Node node = new Node();
-        node._policy = new CircuitBreaker(node, 3, 1.0);
+        node._policy = new CircuitBreaker(3, 1.0);
         checkEqual(true, node.available());
         node.failure();
         checkEqual(true, node.available());
