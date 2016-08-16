@@ -479,7 +479,6 @@ namespace mdk_protocol {
         void onStop() {
             if (isConnected()) {
                 shutdown();
-                print("telling websocket actor to close this socket.");
                 self.dispatcher.tell(self, new WSClose(), sock);
                 sock = null;
             }
