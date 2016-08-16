@@ -38,6 +38,10 @@ namespace mdk_synapse {
         DiscoverySource create(Actor subscriber, MDKRuntime runtime) {
             return new _SynapseSource(subscriber, self._directory_path, runtime);
         }
+
+        bool isRegistrar() {
+            return false;
+        }
     }
 
     @doc("Implementation of the Synapse discovery source.")

@@ -389,12 +389,20 @@ namespace mdk_runtime {
     """)
     class QuarkRuntimeTime extends Time, SchedulingActor {
 	MessageDispatcher dispatcher;
+        bool stopped = false;
 
 	void onStart(MessageDispatcher dispatcher) {
 	    self.dispatcher = dispatcher;
 	}
 
+        void onStop() {
+            self.stopped = true;
+        }
+
 	void onMessage(Actor origin, Object msg) {
+            if (self.stopped) {
+                return;
+            }
 	    Schedule sched = ?msg;
             float seconds = sched.seconds;
             if (seconds == 0.0) {

@@ -479,7 +479,12 @@ namespace mdk_protocol {
         }
 
         void onStop() {
-            schedule(0.0);
+            if (isConnected()) {
+                shutdown();
+                print("telling websocket actor to close this socket.");
+                self.dispatcher.tell(self, new WSClose(), sock);
+                sock = null;
+            }
         }
 
         void onMessage(Actor origin, Object message) {
@@ -526,10 +531,6 @@ namespace mdk_protocol {
                     if (rightNow - lastHeartbeat >= heartbeatInterval) {
                         doHeartbeat();
                     }
-                } else {
-                    shutdown();
-                    self.dispatcher.tell(self, new WSClose(), sock);
-                    sock = null;
                 }
             } else {
                 if (isStarted() && (rightNow - lastConnectAttempt) >= reconnectInterval) {
