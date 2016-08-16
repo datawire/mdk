@@ -436,7 +436,7 @@ class TestPolicyFakeWebSockets extends WebSockets {
     FakeWebSockets fake;
 
     TestPolicyFakeWebSockets(MessageDispatcher dispatcher) {
-        self.fake = new FakeWebSockets(dispatcher);
+        self.fake = new FakeWebSockets();
     }
 
     EchoFakeWSActor wrapFakeWSActor(FakeWSActor actor) {
@@ -456,6 +456,16 @@ class TestPolicyFakeWebSockets extends WebSockets {
         }
         return result;
     }
+
+    void onStart(MessageDispatcher dispatcher) {
+        self.fake.onStart(dispatcher);
+    }
+
+    void onStop() {
+        self.fake.onStop();
+    }
+
+    void onMessage(Actor origin, Object message) {}
 }
 
 macro bool isPython() $py{True} $js{false} $java{false} $rb{false};
@@ -505,13 +515,17 @@ class TestRunner {
 
     TestActor testRealRuntimeWebsockets(MDKRuntime runtime) {
         // XXX should really use local server, not server on Internet
-        return new WebSocketsTest(new QuarkRuntimeWebSockets(runtime.dispatcher),
-                                  "wss://echo.websocket.org/", "wss://localhost:1/");
+        WebSocketsTest result = new WebSocketsTest(new QuarkRuntimeWebSockets(),
+                                                   "wss://echo.websocket.org/", "wss://localhost:1/");
+        runtime.dispatcher.startActor(result.websockets);
+        return result;
     }
 
     TestActor testFakeRuntimeWebSockets(MDKRuntime runtime) {
-        return new WebSocketsTest(new TestPolicyFakeWebSockets(runtime.dispatcher),
-                                  "wss://echo/", "wss://bad/");
+        WebSocketsTest result = new WebSocketsTest(new TestPolicyFakeWebSockets(runtime.dispatcher),
+                                                   "wss://echo/", "wss://bad/");
+        runtime.dispatcher.startActor(result.websockets);
+        return result;
     }
 
     TestActor testFiles(MDKRuntime runtime) {
