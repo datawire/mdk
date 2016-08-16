@@ -14,12 +14,22 @@ namespace mdk_discovery {
         Create a Discovery service client using standard MDK env variables and
         register it with the MDK.
         """)
-        DiscoClient createClient(Actor subscriber, String token, MDKRuntime runtime) {
-            EnvironmentVariable ddu = EnvironmentVariable("MDK_DISCOVERY_URL");
-            String url = ddu.orElseGet("wss://discovery.datawire.io/ws/v1");
-            DiscoClient client = new DiscoClient(subscriber, token, url, runtime);
-            runtime.dependencies.registerService("discovery_registrar", client);
-            return client;
+        class DiscoClientFactory extends DiscoverySourceFactory {
+            String token;
+
+            DiscoClientFactory(String token) {
+                self.token = token;
+            }
+
+            DiscoverySource create(Actor subscriber, MDKRuntime runtime) {
+                EnvironmentVariable ddu = EnvironmentVariable("MDK_DISCOVERY_URL");
+                String url = ddu.orElseGet("wss://discovery.datawire.io/ws/v1");
+                return new DiscoClient(subscriber, token, url, runtime);
+            }
+
+            bool isRegistrar() {
+                return true;
+            }
         }
 
         @doc("""

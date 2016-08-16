@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_discovery 3.3.0;
+package datawire_mdk_discovery 3.4.0;
 
 use util-1.0.q;
 include discovery-protocol-3.0.q;
@@ -81,9 +81,14 @@ namespace mdk_discovery {
     interface DiscoverySourceFactory {
         @doc("Create a new instance")
         DiscoverySource create(Actor subscriber, MDKRuntime runtime);
+
+        @doc("""
+        If true, the returned DiscoverySource is also a DiscoveryRegistrar.
+        """)
+        bool isRegistrar();
     }
 
-    @doc("Register a node.")
+    @doc("Message sent to DiscoveryRegistrar Actor to register a node.")
     class RegisterNode {
         Node node;
 
