@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_protocol 1.3.0;
+package datawire_mdk_protocol 1.3.1;
 
 import quark.concurrent;
 import quark.reflect;
