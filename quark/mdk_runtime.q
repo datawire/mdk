@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_runtime 1.0.0;
+package datawire_mdk_runtime 1.1.0;
 
 include mdk_runtime_files.q;
 
@@ -47,6 +47,7 @@ namespace mdk_runtime {
         void stop() {
             self.dispatcher.stopActor(getFileService());
             self.dispatcher.stopActor(self.getScheduleService());
+            self.dispatcher.stopActor(self.getWebSocketsService());
         }
     }
 
@@ -70,8 +71,10 @@ namespace mdk_runtime {
 
     @doc("""
     Service that can open new WebSocket connections.
+
+    When stopped it should close all connections.
     """)
-    interface WebSockets {
+    interface WebSockets extends Actor {
 	@doc("""
         The Promise resolves to a WSActor or WSConnectError. The originator will
         receive messages.
@@ -202,20 +205,32 @@ namespace mdk_runtime {
 	static Logger logger = new Logger("protocol");
 
 	MessageDispatcher dispatcher;
-
-	QuarkRuntimeWebSockets(MessageDispatcher dispatcher) {
-	    self.dispatcher = dispatcher;
-	}
+        List<WSActor> connections = [];
 
 	actors.promise.Promise connect(String url, Actor originator) {
 	    logger.debug(originator.toString() + "requested connection to "
 			 + url);
 	    PromiseResolver factory =  new PromiseResolver(self.dispatcher);
 	    QuarkRuntimeWSActor actor = new QuarkRuntimeWSActor(originator, factory);
+            connections.add(actor);
 	    self.dispatcher.startActor(actor);
 	    Context.runtime().open(url, actor);
 	    return factory.promise;
 	}
+
+        void onStart(MessageDispatcher dispatcher) {
+            self.dispatcher = dispatcher;
+        }
+
+        void onMessage(Actor origin, Object message) {}
+
+        void onStop() {
+            int idx = 0;
+            while (idx < connections.size()) {
+                self.dispatcher.tell(self, new WSClose(), self.connections[idx]);
+                idx = idx + 1;
+            }
+        }
     }
 
     @doc("WSActor implementation for testing purposes.")
@@ -324,10 +339,6 @@ namespace mdk_runtime {
         MessageDispatcher dispatcher;
         List<FakeWSActor> fakeActors = [];
 
-	FakeWebSockets(MessageDispatcher dispatcher) {
-	    self.dispatcher = dispatcher;
-	}
-
         actors.promise.Promise connect(String url, Actor originator) {
             PromiseResolver factory =  new PromiseResolver(self.dispatcher);
 	    FakeWSActor actor = new FakeWSActor(originator, factory, url);
@@ -339,6 +350,12 @@ namespace mdk_runtime {
         FakeWSActor lastConnection() {
             return self.fakeActors[self.fakeActors.size() - 1];
         }
+
+        void onStart(MessageDispatcher dispatcher) {
+	    self.dispatcher = dispatcher;
+	}
+
+        void onMessage(Actor origin, Object message) {}
     }
 
     @doc("""
@@ -389,12 +406,20 @@ namespace mdk_runtime {
     """)
     class QuarkRuntimeTime extends Time, SchedulingActor {
 	MessageDispatcher dispatcher;
+        bool stopped = false;
 
 	void onStart(MessageDispatcher dispatcher) {
 	    self.dispatcher = dispatcher;
 	}
 
+        void onStop() {
+            self.stopped = true;
+        }
+
 	void onMessage(Actor origin, Object msg) {
+            if (self.stopped) {
+                return;
+            }
 	    Schedule sched = ?msg;
             float seconds = sched.seconds;
             if (seconds == 0.0) {
@@ -471,13 +496,14 @@ namespace mdk_runtime {
     MDKRuntime defaultRuntime() {
 	MDKRuntime runtime = new MDKRuntime();
         QuarkRuntimeTime timeService = new QuarkRuntimeTime();
-        QuarkRuntimeWebSockets websockets = new QuarkRuntimeWebSockets(runtime.dispatcher);
+        QuarkRuntimeWebSockets websockets = new QuarkRuntimeWebSockets();
         runtime.dependencies.registerService("time", timeService);
         runtime.dependencies.registerService("schedule", timeService);
         runtime.dependencies.registerService("websockets", websockets);
         mdk_runtime.files.FileActor fileActor = new mdk_runtime.files.FileActorImpl(runtime);
         runtime.dependencies.registerService("files", fileActor);
 	runtime.dispatcher.startActor(timeService);
+        runtime.dispatcher.startActor(websockets);
         runtime.dispatcher.startActor(fileActor);
 	return runtime;
     }
@@ -485,13 +511,14 @@ namespace mdk_runtime {
     MDKRuntime fakeRuntime() {
         MDKRuntime runtime = new MDKRuntime();
         FakeTime timeService = new FakeTime();
-        FakeWebSockets websockets = new FakeWebSockets(runtime.dispatcher);
+        FakeWebSockets websockets = new FakeWebSockets();
         runtime.dependencies.registerService("time", timeService);
         runtime.dependencies.registerService("schedule", timeService);
         runtime.dependencies.registerService("websockets", websockets);
         mdk_runtime.files.FileActor fileActor = new mdk_runtime.files.FileActorImpl(runtime);
         runtime.dependencies.registerService("files", fileActor);
         runtime.dispatcher.startActor(timeService);
+        runtime.dispatcher.startActor(websockets);
         runtime.dispatcher.startActor(fileActor);
         return runtime;
     }

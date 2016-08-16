@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_protocol 1.3.0;
+package datawire_mdk_protocol 1.3.1;
 
 import quark.concurrent;
 import quark.reflect;
@@ -431,8 +431,6 @@ namespace mdk_protocol {
             self.timeService = runtime.getTimeService();
             self.schedulingActor = runtime.getScheduleService();
             self.websockets = runtime.getWebSocketsService();
-            // Definitely the wrong place to do this, but this works for now:
-            runtime.dispatcher.startActor(self);
         }
 
         String url();
@@ -479,7 +477,11 @@ namespace mdk_protocol {
         }
 
         void onStop() {
-            schedule(0.0);
+            if (isConnected()) {
+                shutdown();
+                self.dispatcher.tell(self, new WSClose(), sock);
+                sock = null;
+            }
         }
 
         void onMessage(Actor origin, Object message) {
@@ -526,10 +528,6 @@ namespace mdk_protocol {
                     if (rightNow - lastHeartbeat >= heartbeatInterval) {
                         doHeartbeat();
                     }
-                } else {
-                    shutdown();
-                    self.dispatcher.tell(self, new WSClose(), sock);
-                    sock = null;
                 }
             } else {
                 if (isStarted() && (rightNow - lastConnectAttempt) >= reconnectInterval) {
