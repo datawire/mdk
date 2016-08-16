@@ -4,6 +4,8 @@ Tests for Discovery.
 Additional tests can be found in quark/tests/mdk_test.q.
 """
 
+from __future__ import absolute_import
+
 from unittest import TestCase
 
 from .common import fake_runtime
