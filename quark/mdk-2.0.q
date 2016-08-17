@@ -259,7 +259,10 @@ namespace mdk {
         @doc("Choose DiscoverySource based on environment variables.")
         DiscoverySourceFactory getDiscoveryFactory() {
             EnvironmentVariable env = new EnvironmentVariable("MDK_DISCOVERY_SOURCE");
-            String config = env.orElseGet("datawire:" + DatawireToken.getToken());
+            String config = env.orElseGet("");
+            if (config == "") {
+                config = "datawire:" + DatawireToken.getToken();
+            }
             DiscoverySourceFactory result = null;
             if (config.startsWith("datawire:")) {
                 result = new DiscoClientFactory(config.substring(9, config.size()));
@@ -277,7 +280,10 @@ namespace mdk {
             _runtime = runtime;
             runtime.dependencies.registerService("failurepolicy_factory", new CircuitBreakerFactory());
             _disco = new Discovery(runtime);
-            String token = DatawireToken.getToken();
+            // Tracing won't work if there's no DATAWIRE_TOKEN, but will try
+            // anyway. A later branch will make this better.
+            EnvironmentVariable env = new EnvironmentVariable("DATAWIRE_TOKEN");
+            String token = env.orElseGet("");
             DiscoverySourceFactory discoFactory = getDiscoveryFactory();
             _discoSource = discoFactory.create(_disco, runtime);
             if (discoFactory.isRegistrar()) {
