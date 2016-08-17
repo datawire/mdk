@@ -38,7 +38,7 @@ namespace mdk_introspection
         String token = EnvironmentVariable(TOKEN_VARIABLE_NAME).get();
         if (token == null)
         {
-            panic("Environment variable 'DATAWIRE_TOKEN' is not set. The MDK needs a token to access Datawire cloud services. Please visit https://app.datawire.io/#/signup to create a free account and get a token.");
+            panic("Neither 'MDK_DISCOVERY_SOURCE' nor 'DATAWIRE_TOKEN' are set. Either set the former to an existing discovery source (e.g. 'synapse:path=/synapse/output_files/'), or use the Datawire cloud services. For the latter please visit https://app.datawire.io/#/signup to create a free account and get a token.");
         }
 
         return token;

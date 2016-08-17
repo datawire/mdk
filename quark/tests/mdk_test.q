@@ -223,7 +223,8 @@ class DiscoveryTest {
 
     Discovery createDisco() {
         Discovery disco = new Discovery(runtime);
-        self.client = mdk_discovery.protocol.createClient(disco, "", self.runtime);
+        self.client = ?new mdk_discovery.protocol.DiscoClientFactory("").create(disco, self.runtime);
+        runtime.dependencies.registerService("discovery_registrar", self.client);
         return disco;
     }
 

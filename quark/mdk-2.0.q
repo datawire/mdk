@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk 2.0.2;
+package datawire_mdk 2.0.3;
 
 // DATAWIRE MDK
 
@@ -62,17 +62,6 @@ namespace mdk {
 
         @doc("This header is used to propogate shared context for distributed traces.")
         static String CONTEXT_HEADER = "X-MDK-Context";
-
-        @doc("""
-        Register an alternative source for discovering services.
-
-        By default the MDK talks to Datawire's Discovery implementation. You can
-        use this API to register a different source for service discovery.
-
-        You should run this immediately after init(), not on a started MDK
-        instance.
-        """)
-        void registerDiscoverySource(DiscoverySourceFactory source);
 
         @doc("""
              Start the MDK. An MDK instance will not communicate with
@@ -267,13 +256,39 @@ namespace mdk {
         String procUUID = Context.runtime().uuid();
         bool _running = false;
 
+        @doc("Choose DiscoverySource based on environment variables.")
+        DiscoverySourceFactory getDiscoveryFactory() {
+            EnvironmentVariable env = new EnvironmentVariable("MDK_DISCOVERY_SOURCE");
+            String config = env.orElseGet("");
+            if (config == "") {
+                config = "datawire:" + DatawireToken.getToken();
+            }
+            DiscoverySourceFactory result = null;
+            if (config.startsWith("datawire:")) {
+                result = new DiscoClientFactory(config.substring(9, config.size()));
+            } else {
+                if (config.startsWith("synapse:path=")) {
+                    result = mdk_synapse.Synapse(config.substring(13, config.size()));
+                } else {
+                    panic("Unknown MDK discovery source: " + config);
+                }
+            }
+            return result;
+        }
+
         MDKImpl(MDKRuntime runtime) {
             _runtime = runtime;
             runtime.dependencies.registerService("failurepolicy_factory", new CircuitBreakerFactory());
             _disco = new Discovery(runtime);
-            String token = DatawireToken.getToken();
-            // In later branch this will become more pluggable:
-            _discoSource = createClient(_disco, token, runtime);
+            // Tracing won't work if there's no DATAWIRE_TOKEN, but will try
+            // anyway. A later branch will make this better.
+            EnvironmentVariable env = new EnvironmentVariable("DATAWIRE_TOKEN");
+            String token = env.orElseGet("");
+            DiscoverySourceFactory discoFactory = getDiscoveryFactory();
+            _discoSource = discoFactory.create(_disco, runtime);
+            if (discoFactory.isRegistrar()) {
+                runtime.dependencies.registerService("discovery_registrar", _discoSource);
+            }
             String tracingURL = _get("MDK_TRACING_URL", "wss://tracing.datawire.io/ws/v1");
             String tracingQueryURL = _get("MDK_TRACING_API_URL", "https://tracing.datawire.io/api/v1/logs");
             _tracer = Tracer(runtime);
@@ -281,17 +296,6 @@ namespace mdk {
             _tracer.queryURL = tracingQueryURL;
             _tracer.token = token;
             _tracer.initContext();
-        }
-
-        void registerDiscoverySource(DiscoverySourceFactory source) {
-            if (self._running) {
-                panic("Can't register once the MDK has started.");
-            }
-            // XXX This will still leave the registration aspect of DiscoClient
-            // intact. OK for now since we have no alternative registration
-            // implementations, so people just won't call register() if they're
-            // using pluggable source.
-            self._discoSource = source.create(_disco, _runtime);
         }
 
         float _timeout() {
