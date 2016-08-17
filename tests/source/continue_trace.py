@@ -2,7 +2,6 @@
 
 import sys
 import time
-import os
 
 from mdk import start
 mdk = start()
@@ -27,12 +26,12 @@ def got_logs(log_events, context):
 def got_error(error):
     print("ERROR: " + error.toString())
     mdk.stop()
-    os.exit(1)
+    sys.exit(1)
 
 def read_logs(context):
     if time.time() - start > 60:
         print("Took more than 60 seconds, giving up.")
-        os.exit(1)
+        sys.exit(1)
     tracer = mdk._tracer
     now = int(start * 1000)
     tracer.query(now - 60000, now + 120000).andEither(
