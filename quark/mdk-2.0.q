@@ -253,7 +253,7 @@ namespace mdk {
         MDKRuntime _runtime;
         Discovery _disco;
         DiscoverySource _discoSource;
-        Tracer _tracer;
+        Tracer _tracer = null;
         String procUUID = Context.runtime().uuid();
         bool _running = false;
 
@@ -289,13 +289,15 @@ namespace mdk {
             if (discoFactory.isRegistrar()) {
                 runtime.dependencies.registerService("discovery_registrar", _discoSource);
             }
-            String tracingURL = _get(env, "MDK_TRACING_URL", "wss://tracing.datawire.io/ws/v1");
-            String tracingQueryURL = _get(env, "MDK_TRACING_API_URL", "https://tracing.datawire.io/api/v1/logs");
-            _tracer = Tracer(runtime);
-            _tracer.url = tracingURL;
-            _tracer.queryURL = tracingQueryURL;
-            _tracer.token = token;
-            _tracer.initContext();
+            if (token) {
+                String tracingURL = _get(env, "MDK_TRACING_URL", "wss://tracing.datawire.io/ws/v1");
+                String tracingQueryURL = _get(env, "MDK_TRACING_API_URL", "https://tracing.datawire.io/api/v1/logs");
+                _tracer = Tracer(runtime);
+                _tracer.url = tracingURL;
+                _tracer.queryURL = tracingQueryURL;
+                _tracer.token = token;
+                _tracer.initContext();
+            }
         }
 
         float _timeout() {
@@ -420,8 +422,10 @@ namespace mdk {
         }
 
         void _log(String level, String category, String text) {
-            _mdk._tracer.setContext(_context);
-            _mdk._tracer.log(_mdk.procUUID, level, category, text);
+            if (_mdk._tracer != null) {
+                _mdk._tracer.setContext(_context);
+                _mdk._tracer.log(_mdk.procUUID, level, category, text);
+            }
         }
 
         void critical(String category, String text) {
