@@ -289,7 +289,7 @@ namespace mdk {
             if (discoFactory.isRegistrar()) {
                 runtime.dependencies.registerService("discovery_registrar", _discoSource);
             }
-            if (token) {
+            if (token != "") {
                 String tracingURL = _get(env, "MDK_TRACING_URL", "wss://tracing.datawire.io/ws/v1");
                 String tracingQueryURL = _get(env, "MDK_TRACING_API_URL", "https://tracing.datawire.io/api/v1/logs");
                 _tracer = Tracer(runtime);
