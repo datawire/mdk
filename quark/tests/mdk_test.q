@@ -35,6 +35,8 @@ class TracingTest {
 
     TracingTest() {
         self.runtime = fakeRuntime();
+        FakeEnvVars env = ?self.runtime.getEnvVarsService();
+        env.set("DATAWIRE_TOKEN", "");
     }
 
     void pump() {
