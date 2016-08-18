@@ -18,8 +18,8 @@ quark 1.0;
 
 import quark.os;
 
-use util-1.0.q;
-import mdk_util;  // bring in EnvironmentVariable
+use mdk_runtime.q;
+import mdk_runtime;  // bring in EnvironmentVariables
 
 namespace mdk_introspection
 {
@@ -32,13 +32,14 @@ namespace mdk_introspection
       //static String METADATA_HOST = EnvironmentVariable("DATAWIRE_METADATA_HOST_OVERRIDE").orElseGet("169.254.169.254");
       
       String scope;
+      EnvironmentVariables env;
 
-      Ec2Host(String scope) {
+      Ec2Host(EnvironmentVariables env, String scope) {
         self.scope = scope.toUpper();
       }
 
       static String metadataHost() {
-        return EnvironmentVariable("DATAWIRE_METADATA_HOST_OVERRIDE").orElseGet("169.254.169.254");
+        return env.var("DATAWIRE_METADATA_HOST_OVERRIDE").orElseGet("169.254.169.254");
       }
 
       String get() 

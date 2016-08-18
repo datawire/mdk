@@ -9,6 +9,7 @@ use dependency.q;
 import actors.core;
 import actors.promise;
 import dependency;
+import quark.os;
 
 namespace mdk_runtime {
     @doc("""
@@ -41,6 +42,11 @@ namespace mdk_runtime {
         @doc("Return File service.")
         mdk_runtime.files.FileActor getFileService() {
 	    return ?self.dependencies.getService("files");
+	}
+
+        @doc("Return EnvironmentVariables service.")
+        EnvironmentVariables getEnvVarsService() {
+	    return ?self.dependencies.getService("envvar");
 	}
 
         @doc("Stop all Actors that are started by default (i.e. files, schedule).")
@@ -492,9 +498,70 @@ namespace mdk_runtime {
         }
     }
 
+    @doc("EnvironmentVariable is a Supplier of Strings that come from the environment.")
+    class EnvironmentVariable {
+        String variableName;
+        String _value;
+
+        EnvironmentVariable(String variableName, String value) {
+            self.variableName = variableName;
+            self._value = value;
+        }
+
+        bool isDefined() {
+            return get() != null;
+        }
+
+        String get() {
+            return self._value;
+        }
+
+        String orElseGet(String alternative) {
+            String result = get();
+            if (result != null) {
+                return result;
+            }
+            else {
+                return alternative;
+            }
+        }
+    }
+
+    @doc("Inspect process environment variables.")
+    interface EnvironmentVariables {
+        @doc("Return an EnvironmentVariable instance for the given var.")
+        EnvironmentVariable var(String name);
+    }
+
+    @doc("Use real environment variables.")
+    class RealEnvVars extends EnvironmentVariables {
+        EnvironmentVariable var(String name) {
+            return new EnvironmentVariable(name,
+                                           Environment.getEnvironment()[name]);
+        }
+    }
+
+    @doc("Testing fake for EnvironmentVariables.")
+    class FakeEnvVars extends EnvironmentVariables {
+        Map<String,String> env = {};
+
+        void set(String name, String value) {
+            self.env[name] = value;
+        }
+
+        EnvironmentVariable var(String name) {
+            String value = null;
+            if (self.env.contains(name)) {
+                value = self.env[name];
+            }
+            return new EnvironmentVariable(name, value);
+        }
+    }
+
     @doc("Create a MDKRuntime with the default configuration and start its actors.")
     MDKRuntime defaultRuntime() {
 	MDKRuntime runtime = new MDKRuntime();
+        runtime.dependencies.registerService("envvar", new RealEnvVars());
         QuarkRuntimeTime timeService = new QuarkRuntimeTime();
         QuarkRuntimeWebSockets websockets = new QuarkRuntimeWebSockets();
         runtime.dependencies.registerService("time", timeService);
@@ -510,6 +577,7 @@ namespace mdk_runtime {
 
     MDKRuntime fakeRuntime() {
         MDKRuntime runtime = new MDKRuntime();
+        runtime.dependencies.registerService("envvar", new FakeEnvVars());
         FakeTime timeService = new FakeTime();
         FakeWebSockets websockets = new FakeWebSockets();
         runtime.dependencies.registerService("time", timeService);
