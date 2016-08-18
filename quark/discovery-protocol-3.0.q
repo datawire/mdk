@@ -22,7 +22,7 @@ namespace mdk_discovery {
             }
 
             DiscoverySource create(Actor subscriber, MDKRuntime runtime) {
-                EnvironmentVariable ddu = EnvironmentVariable("MDK_DISCOVERY_URL");
+                EnvironmentVariable ddu = runtime.getEnvVarsService().var("MDK_DISCOVERY_URL");
                 String url = ddu.orElseGet("wss://discovery.datawire.io/ws/v1");
                 return new DiscoClient(subscriber, token, url, runtime);
             }

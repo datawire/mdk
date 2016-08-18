@@ -96,7 +96,7 @@ namespace mdk_tracing {
             }
 
             if (token == null) {
-                token = DatawireToken.getToken();
+                token = DatawireToken.getToken(runtime.getEnvVarsService());
             }
         }
 

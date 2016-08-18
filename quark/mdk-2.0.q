@@ -16,14 +16,15 @@ import mdk_discovery;
 import mdk_tracing;
 import mdk_introspection;
 import mdk_util;
+import mdk_runtime;
 import quark.concurrent;
 import actors.promise;
 
 @doc("Microservices Development Kit -- obtain a reference using MDK.init()")
 namespace mdk {
 
-    String _get(String name, String value) {
-        return os.Environment.ENV.get(name, value);
+    String _get(EnvironmentVariables env, String name, String value) {
+        return env.var(name).orElseGet(value);
     }
 
     @doc("Create an unstarted instance of the MDK.")
@@ -252,16 +253,15 @@ namespace mdk {
         MDKRuntime _runtime;
         Discovery _disco;
         DiscoverySource _discoSource;
-        Tracer _tracer;
+        Tracer _tracer = null;
         String procUUID = Context.runtime().uuid();
         bool _running = false;
 
         @doc("Choose DiscoverySource based on environment variables.")
-        DiscoverySourceFactory getDiscoveryFactory() {
-            EnvironmentVariable env = new EnvironmentVariable("MDK_DISCOVERY_SOURCE");
-            String config = env.orElseGet("");
+        DiscoverySourceFactory getDiscoveryFactory(EnvironmentVariables env) {
+            String config = env.var("MDK_DISCOVERY_SOURCE").orElseGet("");
             if (config == "") {
-                config = "datawire:" + DatawireToken.getToken();
+                config = "datawire:" + DatawireToken.getToken(env);
             }
             DiscoverySourceFactory result = null;
             if (config.startsWith("datawire:")) {
@@ -282,20 +282,22 @@ namespace mdk {
             _disco = new Discovery(runtime);
             // Tracing won't work if there's no DATAWIRE_TOKEN, but will try
             // anyway. A later branch will make this better.
-            EnvironmentVariable env = new EnvironmentVariable("DATAWIRE_TOKEN");
-            String token = env.orElseGet("");
-            DiscoverySourceFactory discoFactory = getDiscoveryFactory();
+            EnvironmentVariables env = runtime.getEnvVarsService();
+            String token = env.var("DATAWIRE_TOKEN").orElseGet("");
+            DiscoverySourceFactory discoFactory = getDiscoveryFactory(env);
             _discoSource = discoFactory.create(_disco, runtime);
             if (discoFactory.isRegistrar()) {
                 runtime.dependencies.registerService("discovery_registrar", _discoSource);
             }
-            String tracingURL = _get("MDK_TRACING_URL", "wss://tracing.datawire.io/ws/v1");
-            String tracingQueryURL = _get("MDK_TRACING_API_URL", "https://tracing.datawire.io/api/v1/logs");
-            _tracer = Tracer(runtime);
-            _tracer.url = tracingURL;
-            _tracer.queryURL = tracingQueryURL;
-            _tracer.token = token;
-            _tracer.initContext();
+            if (token != "") {
+                String tracingURL = _get(env, "MDK_TRACING_URL", "wss://tracing.datawire.io/ws/v1");
+                String tracingQueryURL = _get(env, "MDK_TRACING_API_URL", "https://tracing.datawire.io/api/v1/logs");
+                _tracer = Tracer(runtime);
+                _tracer.url = tracingURL;
+                _tracer.queryURL = tracingQueryURL;
+                _tracer.token = token;
+                _tracer.initContext();
+            }
         }
 
         float _timeout() {
@@ -420,8 +422,10 @@ namespace mdk {
         }
 
         void _log(String level, String category, String text) {
-            _mdk._tracer.setContext(_context);
-            _mdk._tracer.log(_mdk.procUUID, level, category, text);
+            if (_mdk._tracer != null) {
+                _mdk._tracer.setContext(_context);
+                _mdk._tracer.log(_mdk.procUUID, level, category, text);
+            }
         }
 
         void critical(String category, String text) {

@@ -18,8 +18,8 @@ quark 1.0;
 
 import quark.os;
 
-use util-1.0.q;
-import mdk_util;  // bring in EnvironmentVariable
+use mdk_runtime.q;
+import mdk_runtime;  // bring in EnvironmentVariables
 
 namespace mdk_introspection
 {
@@ -28,29 +28,28 @@ namespace mdk_introspection
   {
     class Ec2Host extends Supplier<String>
     {
-
-      //static String METADATA_HOST = EnvironmentVariable("DATAWIRE_METADATA_HOST_OVERRIDE").orElseGet("169.254.169.254");
-      
       String scope;
+      EnvironmentVariables env;
 
-      Ec2Host(String scope) {
+      Ec2Host(EnvironmentVariables env, String scope) {
         self.scope = scope.toUpper();
+        self.env = env;
       }
 
-      static String metadataHost() {
-        return EnvironmentVariable("DATAWIRE_METADATA_HOST_OVERRIDE").orElseGet("169.254.169.254");
+      static String metadataHost(EnvironmentVariables env) {
+        return env.var("DATAWIRE_METADATA_HOST_OVERRIDE").orElseGet("169.254.169.254");
       }
 
-      String get() 
+      String get()
       {
         if (scope == "INTERNAL")
         {
-          return url_get("http://" + metadataHost() + "/latest/meta-data/local-hostname");
+          return url_get("http://" + metadataHost(env) + "/latest/meta-data/local-hostname");
         }
         
         if (scope == "PUBLIC")
         {
-          return url_get("http://" + metadataHost() + "/latest/meta-data/public-hostname");
+          return url_get("http://" + metadataHost(env) + "/latest/meta-data/public-hostname");
         }
 
         return null;
