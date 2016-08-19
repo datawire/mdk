@@ -10,10 +10,9 @@ from tempfile import mkdtemp
 from json import dumps
 import os
 
-from mdk_synapse import Synapse
 from .common import fake_runtime
 from mdk_discovery import Discovery, Node
-
+from mdk_discovery.synapse import Synapse
 
 class SynapseTests(TestCase):
     """Tests for Synapse."""

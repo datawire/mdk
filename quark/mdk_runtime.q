@@ -1,17 +1,44 @@
 quark 1.0;
 
-package datawire_mdk_runtime 1.1.0;
+package datawire_mdk_runtime 1.2.0;
 
+include actors_core.q;
+include actors_promise.q;
 include mdk_runtime_files.q;
 
-use actors.q;
-use dependency.q;
-import actors.core;
-import actors.promise;
-import dependency;
 import quark.os;
+import mdk_runtime.actors;
+import mdk_runtime.promise;
+
 
 namespace mdk_runtime {
+    @doc("Trivial dependency injection setup.")
+    class Dependencies {
+	Map<String,Object> _services = {};
+
+	@doc("Register a service object.")
+	void registerService(String name, Object service) {
+	    if (self._services.contains(name)) {
+		panic("Can't register service '" + name + "' twice.");
+	    }
+	    self._services[name] = service;
+	}
+
+	@doc("Look up a service by name.")
+	Object getService(String name) {
+	    if (!self._services.contains(name)) {
+		panic("Service '" + name + "' not found!");
+	    }
+	    return self._services[name];
+	}
+
+	@doc("Return whether the service exists.")
+	bool hasService(String name) {
+	    return self._services.contains(name);
+	}
+
+    }
+
     @doc("""
     Runtime environment for a particular MDK instance.
 
@@ -85,7 +112,7 @@ namespace mdk_runtime {
         The Promise resolves to a WSActor or WSConnectError. The originator will
         receive messages.
         """)
-	actors.promise.Promise connect(String url, Actor originator);
+	mdk_runtime.promise.Promise connect(String url, Actor originator);
     }
 
     @doc("Connection failed.")
@@ -213,7 +240,7 @@ namespace mdk_runtime {
 	MessageDispatcher dispatcher;
         List<WSActor> connections = [];
 
-	actors.promise.Promise connect(String url, Actor originator) {
+	mdk_runtime.promise.Promise connect(String url, Actor originator) {
 	    logger.debug(originator.toString() + "requested connection to "
 			 + url);
 	    PromiseResolver factory =  new PromiseResolver(self.dispatcher);
@@ -345,7 +372,7 @@ namespace mdk_runtime {
         MessageDispatcher dispatcher;
         List<FakeWSActor> fakeActors = [];
 
-        actors.promise.Promise connect(String url, Actor originator) {
+        mdk_runtime.promise.Promise connect(String url, Actor originator) {
             PromiseResolver factory =  new PromiseResolver(self.dispatcher);
 	    FakeWSActor actor = new FakeWSActor(originator, factory, url);
 	    self.dispatcher.startActor(actor);

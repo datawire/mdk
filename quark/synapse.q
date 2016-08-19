@@ -1,16 +1,14 @@
 quark 1.0;
 
-package datawire_mdk_synapse 1.0.0;
-
-use discovery-3.0.q;
 use mdk_runtime.q;
 
 import mdk_discovery;
 import mdk_runtime;
-import actors.core;
+import mdk_runtime.actors;
 import mdk_runtime.files;
 
-namespace mdk_synapse {
+namespace mdk_discovery {
+namespace synapse {
     @doc("""
     AirBnB Synapse discovery source.
 
@@ -115,4 +113,4 @@ namespace mdk_synapse {
             }
         }
     }
-}
+}}

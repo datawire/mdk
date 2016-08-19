@@ -8,9 +8,7 @@ use discovery-3.0.q;
 use tracing-2.0.q;
 use introspection-1.0.q;
 use util-1.0.q;
-use dependency.q;
 use mdk_runtime.q;
-use synapse.q;
 
 import mdk_discovery;
 import mdk_tracing;
@@ -18,7 +16,7 @@ import mdk_introspection;
 import mdk_util;
 import mdk_runtime;
 import quark.concurrent;
-import actors.promise;
+import mdk_runtime.promise;
 
 @doc("Microservices Development Kit -- obtain a reference using MDK.init()")
 namespace mdk {
@@ -268,7 +266,7 @@ namespace mdk {
                 result = new DiscoClientFactory(config.substring(9, config.size()));
             } else {
                 if (config.startsWith("synapse:path=")) {
-                    result = mdk_synapse.Synapse(config.substring(13, config.size()));
+                    result = mdk_discovery.synapse.Synapse(config.substring(13, config.size()));
                 } else {
                     panic("Unknown MDK discovery source: " + config);
                 }

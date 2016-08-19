@@ -1,8 +1,8 @@
 quark 1.0;
 
-import actors.core;
+import mdk_runtime.actors;
 
-namespace actors {
+namespace mdk_runtime {
 namespace promise {
 
     @doc("Resolve a Promise with a result.")
@@ -45,7 +45,7 @@ namespace promise {
 
         void deliver() {
             Object result = self._callable.__call__(self._value);
-            if (reflect.Class.get("actors.promise.Promise").hasInstance(result)) {
+            if (reflect.Class.get("mdk_runtime.promise.Promise").hasInstance(result)) {
                 // We got a promise as result of callback, so chain it to the
                 // promise that we're supposed to be fulfilling:
                 Promise toChain = ?result;

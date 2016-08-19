@@ -1,13 +1,13 @@
 """
-Tests for actors.q.
+Tests for actors implementation.
 """
 
 from __future__ import absolute_import
 
 from unittest import TestCase
 
-from actors.core import MessageDispatcher
-from actors.promise import PromiseResolver
+from mdk_runtime.actors import MessageDispatcher
+from mdk_runtime.promise import PromiseResolver
 
 
 class RecordingActor(object):
