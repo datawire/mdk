@@ -3,7 +3,7 @@ quark 1.0;
 use protocol-1.0.q;
 use util-1.0.q;
 
-import actors.core;
+import mdk_runtime.actors;
 import mdk_protocol;
 import mdk_util;
 

@@ -5,9 +5,9 @@ import quark.mock;
 import quark.error;
 import quark.reflect;
 
-use ../actors.q;
-import actors.core;
-import actors.promise;
+use ../mdk_runtime.q;
+import mdk_runtime.actors;
+import mdk_runtime.promise;
 
 void main(List<String> args) {
     test.run(args);

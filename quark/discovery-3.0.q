@@ -2,10 +2,10 @@ quark 1.0;
 
 package datawire_mdk_discovery 3.4.0;
 
-use util-1.0.q;
 include discovery-protocol-3.0.q;
+include synapse.q;
+use util-1.0.q;
 use mdk_runtime.q;
-use actors.q;
 
 import quark.concurrent;
 import quark.reflect;
@@ -13,8 +13,8 @@ import quark.reflect;
 import mdk_discovery.protocol;
 import mdk_util;  // bring in EnvironmentVariable, WaitForPromise
 import mdk_runtime;
-import actors.core;
-import actors.promise;
+import mdk_runtime.actors;
+import mdk_runtime.promise;
 
 /*
   Context:

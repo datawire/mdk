@@ -1,12 +1,12 @@
 """
-Tests for dependency.q.
+Tests for mdk_runtime.Dependencies.
 """
 
 from __future__ import absolute_import
 
 from unittest import TestCase
 
-from dependency import Dependencies
+from mdk_runtime import Dependencies
 
 
 class DependencyTests(TestCase):

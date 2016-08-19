@@ -8,7 +8,7 @@ import quark.reflect;
 use mdk_runtime.q;
 
 import mdk_runtime;
-import actors.core;
+import mdk_runtime.actors;
 
 namespace mdk_protocol {
 

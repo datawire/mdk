@@ -10,7 +10,7 @@ from tempfile import mkdtemp
 from json import dumps
 import os
 
-from mdk_synapse import Synapse
+from mdk_runtime.synapse import Synapse
 from .common import fake_runtime
 from mdk_discovery import Discovery, Node
 

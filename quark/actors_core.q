@@ -6,8 +6,8 @@ import quark.concurrent;
 Core implementation of actors.
 */
 
+namespace mdk_runtime {
 namespace actors {
-namespace core {
 
     @doc("A store of some state. Emits events and handles events.")
     interface Actor {

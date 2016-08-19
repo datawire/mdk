@@ -1,9 +1,9 @@
 quark 1.0;
 
 include mdk_runtime_files.py;
-use actors.q;
-import actors.core;
+
 import mdk_runtime;
+import mdk_runtime.actors;
 
 namespace mdk_runtime {
 namespace files {

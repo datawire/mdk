@@ -9,12 +9,11 @@ in target languages as needed.
 */
 
 use ../mdk_runtime.q;
-use ../actors.q;
 
 import mdk_runtime;
 import mdk_runtime.files;
-import actors.core;
-import actors.promise;
+import mdk_runtime.actors;
+import mdk_runtime.promise;
 
 @doc("""
 An Actor that runs some tests.
@@ -187,7 +186,7 @@ class WebSocketsTest extends TestActor {
     @doc("Bad URLs result in Promise rejected with WSError.")
     void testBadURL() {
 	self.changeState("testBadURL");
-	actors.promise.Promise p = self.websockets.connect(badURL, self);
+	mdk_runtime.promise.Promise p = self.websockets.connect(badURL, self);
 	p.andEither(bind(self, "failure", ["unexpected successful connection"]),
 		    bind(self, "_gotError", []));
     }
@@ -201,7 +200,7 @@ class WebSocketsTest extends TestActor {
     @doc("A good URL results in a Promise resolved with a WSActor.")
     void testGoodURL() {
 	self.changeState("testGoodURL");
-	actors.promise.Promise p = self.websockets.connect(serverURL, self);
+	mdk_runtime.promise.Promise p = self.websockets.connect(serverURL, self);
 	p.andEither(bind(self, "_gotWebSocket", []),
 		    bind(self, "failure", ["unexpected connect error"]));
     }
@@ -443,7 +442,7 @@ class TestPolicyFakeWebSockets extends WebSockets {
         return new EchoFakeWSActor(actor);
     }
 
-    actors.promise.Promise connect(String url, Actor originator) {
+    mdk_runtime.promise.Promise connect(String url, Actor originator) {
         Promise result = self.fake.connect(url, originator);
         FakeWSActor actor = self.fake.lastConnection();
         if (url == "wss://echo/") {

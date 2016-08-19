@@ -5,11 +5,11 @@ package datawire_mdk_util 1.0.0;
 use js bluebird 3.4.1;
 include mdk_promises.js;
 
-use actors.q;
+use mdk_runtime.q;
 
 import quark.os;
 import quark.concurrent;
-import actors.promise;
+import mdk_runtime.promise;
 
 namespace mdk_util {
     // This should be moved into Quark at some point:
