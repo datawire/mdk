@@ -1,7 +1,5 @@
 quark 1.0;
 
-package datawire_mdk_synapse 1.0.0;
-
 use mdk_runtime.q;
 
 import mdk_discovery;
