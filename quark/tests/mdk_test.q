@@ -182,7 +182,7 @@ class DiscoveryTest {
     void setup() {
         self.runtime = fakeRuntime();
         self.runtime.dependencies.registerService("failurepolicy_factory",
-                                                  new CircuitBreakerFactory());
+                                                  new CircuitBreakerFactory(runtime));
     }
 
     void pump() {
@@ -546,22 +546,6 @@ class UtilTest {
         checkEqual(false, versionMatch("1.2", "1.1.0"));
         checkEqual(false, versionMatch("2.0", "1.1.0"));
         checkEqual(false, versionMatch("1.3", "1.2"));
-    }
-
-}
-
-class CircuitBreakerTest {
-
-    void testBreakerTrips() {
-        Node node = new Node();
-        node._policy = new CircuitBreaker(3, 1.0);
-        checkEqual(true, node.available());
-        node.failure();
-        checkEqual(true, node.available());
-        node.failure();
-        checkEqual(true, node.available());
-        node.failure();
-        checkEqual(false, node.available());
     }
 
 }

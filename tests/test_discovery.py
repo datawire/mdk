@@ -15,6 +15,7 @@ from .common import fake_runtime
 
 from mdk_discovery import (
     Discovery, Node, NodeActive, NodeExpired, ReplaceCluster,
+    CircuitBreakerFactory,
 )
 
 
@@ -236,6 +237,62 @@ class DiscoveryTests(TestCase):
         resolved_node.success()
         self.assertNodesEqual(self.resolve(disco, "myservice", "1.0"), node)
 
+
+class CircuitBreakerTests(TestCase):
+    """
+    Tests for CircuitBreaker.
+    """
+    def setUp(self):
+        runtime = fake_runtime()
+        self.time = runtime.getTimeService()
+        self.circuit_breaker = CircuitBreakerFactory(runtime).create();
+
+    def test_noFailure(self):
+        """If not failures occur the node is available."""
+        for i in range(10):
+            self.assertTrue(self.circuit_breaker.available())
+
+    def test_break(self):
+        """If threshold number of failures happen the node becomes unavailable."""
+        self.circuit_breaker.failure()
+        available1 = self.circuit_breaker.available()
+        self.circuit_breaker.failure()
+        available2 = self.circuit_breaker.available()
+        self.circuit_breaker.failure()
+        available3 = self.circuit_breaker.available()
+        available4 = self.circuit_breaker.available()
+        self.assertEqual((available1, available2, available3, available4),
+                         (True, True, False, False))
+
+    def test_timeoutReset(self):
+        """After enough time has passed the CircuitBreaker resets to available."""
+        for i in range(3):
+            self.circuit_breaker.failure()
+        self.time.advance(29.0)
+        available29sec = self.circuit_breaker.available()
+        self.time.advance(1.1)
+        available30sec = self.circuit_breaker.available()
+        self.assertEqual((available29sec, available30sec),
+                         (False, True))
+
+    def test_successReset(self):
+        """
+        A successful connection resets the threshold for a Node becoming
+        unavailable.
+        """
+        for i in range(3):
+            self.circuit_breaker.failure()
+        self.circuit_breaker.success()
+        available0 = self.circuit_breaker.available()
+        self.circuit_breaker.failure()
+        available1 = self.circuit_breaker.available()
+        self.circuit_breaker.failure()
+        available2 = self.circuit_breaker.available()
+        self.circuit_breaker.failure()
+        available3 = self.circuit_breaker.available()
+        available4 = self.circuit_breaker.available()
+        self.assertEqual((available0, available1, available2, available3, available4),
+                         (True, True, True, False, False))
 
 class FakeDiscovery(object):
     """Parallel, simplified Discovery state tracking implementation."""
