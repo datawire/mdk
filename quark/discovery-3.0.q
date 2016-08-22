@@ -226,14 +226,18 @@ namespace mdk_discovery {
 
         @doc("Create a Node for external use.")
         Node _copyNode(Node node) {
-            FailurePolicy policy = self._failurepolicies[node.address];
             Node result = new Node();
             result.address = node.address;
             result.version = node.version;
             result.service = node.service;
             result.properties = node.properties;
-            result._policy = policy;
+            result._policy = self.failurePolicy(node);
             return result;
+        }
+
+        @doc("Get the FailurePolicy for a Node.")
+        FailurePolicy failurePolicy(Node node) {
+            return self._failurepolicies[node.address];
         }
 
         @doc("Choose a compatible version of a service to talk to.")
@@ -495,6 +499,11 @@ namespace mdk_discovery {
                 return [];
             }
             return services[service].nodes;
+        }
+
+        @doc("Get the FailurePolicy for a Node.")
+        FailurePolicy failurePolicy(Node node) {
+            return services[node.service].failurePolicy(node);
         }
 
         @doc("Resolve a service name into an available service node. You must")
