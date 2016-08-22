@@ -101,7 +101,6 @@ class SynapseTests(TestCase):
 
     def test_badFormat(self):
         """An unreadable file leaves Discovery unchanged."""
-        raise SkipTest("Not possible until we fix https://github.com/datawire/quark/issues/246")
         with open(os.path.join(self.directory, "service2.json"), "w") as f:
             f.write("this is not json")
         self.pump()
