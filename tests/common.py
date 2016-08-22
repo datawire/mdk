@@ -12,6 +12,6 @@ def fake_runtime():
     """
     runtime = fakeRuntime()
     runtime.dependencies.registerService(
-            "failurepolicy_factory", CircuitBreakerFactory())
+            "failurepolicy_factory", CircuitBreakerFactory(runtime))
     return runtime
 

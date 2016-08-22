@@ -141,31 +141,33 @@ namespace mdk_discovery {
         static Logger _log = new Logger("mdk.breaker");
 
         int _threshold;
-        long _delay;
+        float _delay;
+        Time _time;
 
         Lock _mutex = new Lock();
         bool _failed = false;
         int _failures = 0;
-        long _lastFailure = 0L;
+        float _lastFailure = 0.0;
 
 
-        CircuitBreaker(int threshold, float retestDelay) {
+        CircuitBreaker(Time time, int threshold, float retestDelay) {
             _threshold = threshold;
-            _delay = (retestDelay*1000.0).round();
+            _delay = retestDelay;
+            _time = time;
         }
 
         void success() {
             _mutex.acquire();
             _failed = false;
             _failures = 0;
-            _lastFailure = 0;
+            _lastFailure = 0.0;
             _mutex.release();
         }
 
         void failure() {
             _mutex.acquire();
             _failures = _failures + 1;
-            _lastFailure = now();
+            _lastFailure = _time.time();
             if (_threshold != 0 && _failures >= _threshold) {
                 _log.info("BREAKER TRIPPED.");
                 _failed = true;
@@ -176,7 +178,7 @@ namespace mdk_discovery {
         bool available() {
             if (_failed) {
                 _mutex.acquire();
-                bool result = now() - _lastFailure > _delay;
+                bool result = _time.time() - _lastFailure > _delay;
                 _mutex.release();
                 if (result) {
                     _log.info("BREAKER RETEST.");
@@ -192,9 +194,14 @@ namespace mdk_discovery {
     class CircuitBreakerFactory extends FailurePolicyFactory {
         int threshold = 3;
         float retestDelay = 30.0;
+        Time time;
+
+        CircuitBreakerFactory(MDKRuntime runtime) {
+            self.time = runtime.getTimeService();
+        }
 
         FailurePolicy create() {
-            return new CircuitBreaker(threshold, retestDelay);
+            return new CircuitBreaker(time, threshold, retestDelay);
         }
     }
 
@@ -219,14 +226,18 @@ namespace mdk_discovery {
 
         @doc("Create a Node for external use.")
         Node _copyNode(Node node) {
-            FailurePolicy policy = self._failurepolicies[node.address];
             Node result = new Node();
             result.address = node.address;
             result.version = node.version;
             result.service = node.service;
             result.properties = node.properties;
-            result._policy = policy;
+            result._policy = self.failurePolicy(node);
             return result;
+        }
+
+        @doc("Get the FailurePolicy for a Node.")
+        FailurePolicy failurePolicy(Node node) {
+            return self._failurepolicies[node.address];
         }
 
         @doc("Choose a compatible version of a service to talk to.")
@@ -488,6 +499,11 @@ namespace mdk_discovery {
                 return [];
             }
             return services[service].nodes;
+        }
+
+        @doc("Get the FailurePolicy for a Node.")
+        FailurePolicy failurePolicy(Node node) {
+            return services[node.service].failurePolicy(node);
         }
 
         @doc("Resolve a service name into an available service node. You must")

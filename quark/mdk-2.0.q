@@ -276,7 +276,10 @@ namespace mdk {
 
         MDKImpl(MDKRuntime runtime) {
             _runtime = runtime;
-            runtime.dependencies.registerService("failurepolicy_factory", new CircuitBreakerFactory());
+            if (!runtime.dependencies.hasService("failurepolicy_factory")) {
+                runtime.dependencies.registerService("failurepolicy_factory",
+                                                     new CircuitBreakerFactory(runtime));
+            }
             _disco = new Discovery(runtime);
             // Tracing won't work if there's no DATAWIRE_TOKEN, but will try
             // anyway. A later branch will make this better.

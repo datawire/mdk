@@ -14,4 +14,5 @@ for CODE_LANG in --python --ruby --java --javascript ; do
 done
 
 # Run the tests:
+make setup
 make test
