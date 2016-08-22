@@ -7,7 +7,7 @@
 set -e
 
 LANGUAGE=$1
-BRANCH=${2:-master}
+BRANCH=${2:-v1.0.322}
 
 fromStr=
 
