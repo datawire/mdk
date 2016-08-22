@@ -107,6 +107,11 @@ namespace actors {
 	    self._queue(new _StartStopActor(actor, self, false));
 	}
 
+	bool _callQueuedMessage(Object ignore, _QueuedMessage message) {
+	    message.deliver();
+	    return true;
+	}
+
 	@doc("Queue a message for delivery.")
 	void _queue(_QueuedMessage inFlight) {
 	    logger.debug("Queued " + inFlight.toString());
@@ -128,7 +133,8 @@ namespace actors {
 		int idx = 0;
 		while (idx < toDeliver.size()) {
 		    logger.debug("Delivering " + toDeliver[idx].toString());
-		    toDeliver[idx].deliver();
+		    UnaryCallable deliver = bind(self, "_callQueuedMessage", [toDeliver[idx]]);
+		    Context.runtime().callSafely(deliver, false);
 		    idx = idx + 1;
 		}
 		self._lock.acquire();
