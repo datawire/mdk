@@ -108,6 +108,25 @@ class PromiseActor(object):
         self.record.append("end")
 
 
+class BrokenActor(object):
+    """
+    An actor that raises an exception after receiving its first message.
+    """
+    def __init__(self):
+        self.record = []
+
+    def onStart(self, dispatcher):
+        pass
+
+    def onStop(self):
+        pass
+
+    def onMessage(self, origin, message):
+        self.record.append(message)
+        if len(self.record) == 1:
+            raise Exception("oh no!")
+
+
 class MessageDispatcherTests(TestCase):
     """
     Tests for MessageDispatcher.
@@ -185,3 +204,15 @@ class MessageDispatcherTests(TestCase):
         dispatcher.tell(actor, "hello", actor)
         # Promise callback should only happen *after* message delivery is done:
         self.assertEqual(actor.record, ["start", "end", "callback: hello"])
+
+    def test_handle_delivery_errors(self):
+        """
+        An exception from delivering a message does not prevent future message
+        delivery; instead it is caught by the MessageDispatcher.
+        """
+        dispatcher = MessageDispatcher()
+        actor = BrokenActor()
+        dispatcher.startActor(actor)
+        dispatcher.tell(None, "hello", actor)
+        dispatcher.tell(None, "world", actor)
+        self.assertEqual(actor.record, ["hello", "world"])
