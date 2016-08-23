@@ -109,7 +109,7 @@ namespace files {
             if (self.stopped) {
                 return;
             }
-            self.dispatcher.tell(self, new Schedule("poll", 5.0), self.scheduling);
+            self.dispatcher.tell(self, new Schedule("poll", 1.0), self.scheduling);
             int idx = 0;
             while (idx < self.subscriptions.size()) {
                 self.subscriptions[idx].poll();
