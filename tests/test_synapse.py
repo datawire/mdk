@@ -29,10 +29,10 @@ class SynapseTests(TestCase):
 
     def pump(self):
         """Deliver file-change events to Synapse."""
-        # Current implementation polls every 5 seconds; later implementation may
+        # Current implementation polls every second; later implementation may
         # switch to inotify in which case this will have to change.
         sched = self.runtime.getScheduleService()
-        sched.advance(5.0)
+        sched.advance(1.0)
         sched.pump()
 
     def write(self, service, values):
