@@ -27,3 +27,6 @@ build-tools
 *.pkcs12
 *.jks
 *.jceks
+
+.cache
+npm-debug.log
