@@ -5,62 +5,13 @@ package datawire_mdk_util 1.0.0;
 use js bluebird 3.4.1;
 include mdk_promises.js;
 
+use mdk_runtime.q;
 
 import quark.os;
 import quark.concurrent;
+import mdk_runtime.promise;
 
 namespace mdk_util {
-    @doc("A Supplier has a 'get' method that can return a value to anyone who needs it.")
-    interface Supplier<T> {
-    
-        @doc("Gets a value")
-        T get();
-     
-        /* BUG (compiler) -- Issue # --> https://github.com/datawire/quark/issues/143
-           @doc("Gets a value or if null returns the given alternative.")
-           T orElseGet(T alternative) 
-           {
-           T result = get();
-           if (result != null) 
-           {
-           return result;
-           }
-           else
-           {
-           return alternative;
-           }
-           }
-        */
-    }
-
-    @doc("EnvironmentVariable is a Supplier of Strings that come from the environment.")
-    class EnvironmentVariable extends Supplier<String> {
-        String variableName;
-
-        EnvironmentVariable(String variableName) {
-            self.variableName = variableName;
-        }
-
-        bool isDefined() {
-            return get() != null;
-        }
-
-        String get() {
-            return Environment.getEnvironment()[variableName];
-        }
-
-        // TODO: Remove once Issue #143 --> https://github.com/datawire/quark/issues/143 is resolved.
-        String orElseGet(String alternative) {
-            String result = get();
-            if (result != null) {
-                return result;
-            }
-            else {
-                return alternative;
-            }
-        }
-    }
-
     // This should be moved into Quark at some point:
     @doc("Utility to blockingly wait for a Promise to get a value.")
     class WaitForPromise {
@@ -72,6 +23,11 @@ namespace mdk_util {
         }
 
         static Object wait(Promise p, float timeout, String description) {
+            PromiseValue snapshot = p.value();
+            if (snapshot.hasValue()) {
+                return snapshot.getValue();
+            }
+
             Condition done = new Condition();
             WaitForPromise waiter = new WaitForPromise();
             p.andThen(bind(waiter, "_finished", [done]));
@@ -83,7 +39,7 @@ namespace mdk_util {
             done.waitWakeup(msTimeout);
             done.release();
 
-            PromiseValue snapshot = p.value();
+            snapshot = p.value();
             if (!snapshot.hasValue()) {
                 // XXX when we port this to Quark itself we should use a custom timeout
                 // exception class.

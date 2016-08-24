@@ -1,40 +1,108 @@
 quark 1.0;
 
 use protocol-1.0.q;
+use util-1.0.q;
 
+import mdk_runtime.actors;
 import mdk_protocol;
+import mdk_util;
 
 namespace mdk_discovery {
     namespace protocol {
 
-        @doc("The protocol machinery that wires together the public disco API to a server.")
-        class DiscoClient extends WSClient, DiscoHandler {
+        @doc("""
+        Create a Discovery service client using standard MDK env variables and
+        register it with the MDK.
+        """)
+        class DiscoClientFactory extends DiscoverySourceFactory {
+            String token;
+
+            DiscoClientFactory(String token) {
+                self.token = token;
+            }
+
+            DiscoverySource create(Actor subscriber, MDKRuntime runtime) {
+                EnvironmentVariable ddu = runtime.getEnvVarsService().var("MDK_DISCOVERY_URL");
+                String url = ddu.orElseGet("wss://discovery.datawire.io/ws/v1");
+                return new DiscoClient(subscriber, token, url, runtime);
+            }
+
+            bool isRegistrar() {
+                return true;
+            }
+        }
+
+        @doc("""
+        A source of discovery information that talks to Datawire Discovery server.
+
+        Also supports registering discovery information with the server.
+        """)
+        class DiscoClient extends WSClient, DiscoHandler, DiscoverySource, DiscoveryRegistrar {
+            bool _started = false;
+            String _token;
+            String _url;
+            FailurePolicyFactory _failurePolicyFactory;
+            MessageDispatcher _dispatcher;
+            Actor _subscriber;  // We will send discovery events here
+
+            // Clusters we advertise to the disco service.
+            Map<String, Cluster> registered = new Map<String, Cluster>();
 
             static Logger dlog = new Logger("discovery");
 
-            Discovery disco;
+            DiscoClient(Actor subscriber, String token, String url, MDKRuntime runtime) {
+                super(runtime);
+                self._subscriber = subscriber;
+                self._failurePolicyFactory = ?runtime.dependencies.getService("failurepolicy_factory");
+                self._token = token;
+                self._url = url;
+            }
 
-            DiscoClient(Discovery discovery) {
-                disco = discovery;
+            // Actor interface; placeholder for when we stop using WSClient as
+            // a superclass.
+            void onStart(MessageDispatcher dispatcher) {
+                self._dispatcher = dispatcher;
+                self._started = true;
+                super.onStart(dispatcher);
+            }
+
+            void onStop() {
+                self._started = false;
+                super.onStop();
+            }
+
+            void onMessage(Actor origin, Object message) {
+                if (message.getClass().id == "mdk_discovery.RegisterNode") {
+                    RegisterNode register = ?message;
+                    _register(register.node);
+                    return;
+                }
+                super.onMessage(origin, message);
             }
 
             String url() {
-                return disco.url;
+                return self._url;
             }
 
             String token() {
-                return disco.token;
+                return self._token;
             }
 
             bool isStarted() {
-                return disco.started;
+                return self._started;
             }
 
-            void register(Node node) {
+            @doc("Register a node with the remote Discovery server.")
+            void _register(Node node) {
+                String service = node.service;
+                if (!registered.contains(service)) {
+                    registered[service] = new Cluster(self._failurePolicyFactory);
+                }
+                registered[service].add(node);
+
                 // Trigger send of delta if we are connected, otherwise do
                 // nothing because the full set of nodes will be resent
                 // when we connect/reconnect.
-
                 if (self.isConnected()) {
                     active(node);
                 }
@@ -44,14 +112,14 @@ namespace mdk_discovery {
                 Active active = new Active();
                 active.node = node;
                 active.ttl = self.ttl;
-                self.sock.send(active.encode());
+                self.dispatcher.tell(self, active.encode(), self.sock);
                 dlog.info("active " + node.toString());
             }
 
             void expire(Node node) {
                 Expire expire = new Expire();
                 expire.node = node;
-                self.sock.send(expire.encode());
+                self.dispatcher.tell(self, expire.encode(), self.sock);
                 dlog.info("expire " + node.toString());
             }
 
@@ -65,18 +133,12 @@ namespace mdk_discovery {
 
             void onActive(Active active) {
                 // Stick the node in the available set.
-                disco._active(active.node);
+                self._dispatcher.tell(self, new NodeActive(active.node), self._subscriber);
             }
 
             void onExpire(Expire expire) {
                 // Remove the node from our available set.
-
-                // hmm, we could make all Node objects we hand out be
-                // continually updated until they expire...
-
-                Node node = expire.node;
-
-                disco._expire(node);
+                self._dispatcher.tell(self, new NodeExpired(expire.node), self._subscriber);
             }
 
             void onClear(Clear reset) {
@@ -88,11 +150,11 @@ namespace mdk_discovery {
             }
 
             void heartbeat() {
-                List<String> services = disco.registered.keys();
+                List<String> services = self.registered.keys();
                 int idx = 0;
                 while (idx < services.size()) {
                     int jdx = 0;
-                    List<Node> nodes = disco.registered[services[idx]].nodes;
+                    List<Node> nodes = self.registered[services[idx]].nodes;
                     while (jdx < nodes.size()) {
                         active(nodes[jdx]);
                         jdx = jdx + 1;
@@ -102,11 +164,11 @@ namespace mdk_discovery {
             }
 
             void shutdown() {
-                List<String> services = disco.registered.keys();
+                List<String> services = self.registered.keys();
                 int idx = 0;
                 while (idx < services.size()) {
                     int jdx = 0;
-                    List<Node> nodes = disco.registered[services[idx]].nodes;
+                    List<Node> nodes = self.registered[services[idx]].nodes;
                     while (jdx < nodes.size()) {
                         expire(nodes[jdx]);
                         jdx = jdx + 1;
@@ -115,7 +177,7 @@ namespace mdk_discovery {
                 }
             }
 
-            void onWSMessage(WebSocket socket, String message) {
+            void onWSMessage(String message) {
                 // Decode and dispatch incoming messages.
                 ProtocolEvent event = DiscoveryEvent.decode(message);
                 if (event == null) {
@@ -124,9 +186,7 @@ namespace mdk_discovery {
                     return;
                 }
 
-                // disco.mutex.acquire();
                 event.dispatch(self);
-                // disco.mutex.release();
             }
 
         }

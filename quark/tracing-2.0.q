@@ -57,11 +57,14 @@ namespace mdk_tracing {
 
         TLS<SharedContext> _context = new TLS<SharedContext>(new SharedContextInitializer());
         protocol.TracingClient _client;
+        MDKRuntime runtime;
 
-        Tracer() { }
+        Tracer(MDKRuntime runtime) {
+            self.runtime = runtime;
+        }
 
         static Tracer withURLsAndToken(String url, String queryURL, String token) {
-            Tracer newTracer = new Tracer();
+            Tracer newTracer = new Tracer(defaultRuntime());
 
             newTracer.url = url;
 
@@ -89,17 +92,17 @@ namespace mdk_tracing {
 
         void _openIfNeeded() {
             if (_client == null) {
-                _client = new protocol.TracingClient(self);
+                _client = new protocol.TracingClient(self, runtime);
             }
 
             if (token == null) {
-                token = DatawireToken.getToken();
+                token = DatawireToken.getToken(runtime.getEnvVarsService());
             }
         }
 
         void stop() {
             if (_client != null) {
-                _client.stop();
+                runtime.dispatcher.stopActor(_client);
             }
         }
 
@@ -417,6 +420,7 @@ namespace mdk_tracing {
             bool _started = false;
             Lock _mutex = new Lock();
             UnaryCallable _handler = null;
+            MessageDispatcher _dispatcher;
 
             long _syncRequestPeriod = 5000L;  // how often (in ms) sync requests should be sent
             int  _syncInFlightMax = 50;       // max size of the in-flight buffer before sending a sync request
@@ -435,7 +439,9 @@ namespace mdk_tracing {
                 _myLog.debug(s + message);
             }
 
-            TracingClient(Tracer tracer) {
+            TracingClient(Tracer tracer, MDKRuntime runtime) {
+                super(runtime);
+                self._dispatcher = runtime.dispatcher;
                 _tracer = tracer;
             }
 
@@ -456,7 +462,7 @@ namespace mdk_tracing {
 
             void _startIfNeeded() {
                 if (!_started) {
-                    self.start();
+                    self._dispatcher.startActor(self);
                     _started = true;
                 }
             }
@@ -468,9 +474,13 @@ namespace mdk_tracing {
                 _mutex.release();
             }
 
-            void stop() {
+            void onStart(MessageDispatcher dispatcher) {
+                super.onStart(dispatcher);
+            }
+
+            void onStop() {
                 _started = false;
-                super.stop();
+                super.onStop();
             }
 
             void startup() {
@@ -482,8 +492,9 @@ namespace mdk_tracing {
                     _failedSends = _failedSends + 1;
                     _debug("no ack for #" + evt.sequence.toString());
                 }
+                _debug("Starting up! with connection " + self.sock.toString());
                 if (_handler != null) {
-                    self.sock.send(new Subscribe().encode());
+                    self.dispatcher.tell(self, new Subscribe().encode(), self.sock);
                 }
                 _mutex.release();
             }
@@ -502,15 +513,16 @@ namespace mdk_tracing {
                         _lastSyncTime = evt.timestamp;
                         debugSuffix = " with sync set";
                     }
-                    self.sock.send(evt.encode());
+                    self.dispatcher.tell(self, evt.encode(), self.sock);
                     evt.sync = 0;
                     _sent = _sent + 1;
-                    _debug("sent #" + evt.sequence.toString() + debugSuffix);
+                    _debug("sent #" + evt.sequence.toString() + debugSuffix +
+                           " to " + self.sock.toString());
                 }
                 _mutex.release();
             }
 
-            void onWSMessage(WebSocket socket, String message) {
+            void onWSMessage(String message) {
                 // Decode and dispatch incoming messages.
                 ProtocolEvent event = TracingEvent.decode(message);
                 if (event == null) {

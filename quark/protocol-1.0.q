@@ -1,9 +1,14 @@
 quark 1.0;
 
-package datawire_mdk_protocol 1.2.0;
+package datawire_mdk_protocol 1.3.1;
 
 import quark.concurrent;
 import quark.reflect;
+
+use mdk_runtime.q;
+
+import mdk_runtime;
+import mdk_runtime.actors;
 
 namespace mdk_protocol {
 
@@ -351,26 +356,26 @@ namespace mdk_protocol {
     }
 
     @doc("Common protocol machinery for web socket based protocol clients.")
-    class WSClient extends ProtocolHandler, WSHandler, Task {
+    class WSClient extends ProtocolHandler, Actor {
 
         /*
 
           # WSClient state machine
 
-          ## External entity calls subclass.start()
+          ## External entity calls subclass.onStart()
 
-          - subclass.start() or something else arranges for subclass.isStarted() to return true
-          - WSClient.start() schedules .onExecute()
-          - the Runtime calls .onExecute()
-          - .onExecute() notices not .isConnected() and subclass.isStarted() so eventually calls .doOpen(),
+          - subclass.onStart() or something else arranges for subclass.isStarted() to return true
+          - WSClient.onStart() schedules .onExecute()
+          - the Runtime delivers Hapenning message to .onMessage(), whihc calls .onScheduledEvent()
+          - .onScheduledEvent() notices not .isConnected() and subclass.isStarted() so eventually calls .doOpen(),
             then schedules itself for execution again
           - .doOpen() calls .open() using subclass.url() and manages retries/backoff
-          - .open() calls subclass.token() and constructs a real URL, then calls Runtime.open()
-          - the Runtime calls .onWSConnected()
+          - .open() calls subclass.token() and constructs a real URL, then calls WebSockets.connect()
+          - the resulting promise calls .onWSConnected()
           - .onWSConnected() saves the socket for .isConnected() to check,
             then sends an Open protocol oevent, calls subclass.startup(), calls subclass.pump()
-          - the Runtime calls .onExecute()
-          - .onExecute() notices .isConnected() and subclass.isStarted() so
+          - the ScheduleActor send a Happening message to .onMessage(), which calls onScheduledEvent
+          - .onScheduledEvent() notices .isConnected() and subclass.isStarted() so
             calls subclass.pump() and maybe .doHeartbeat()
             then schedules itself for execution again
           - .doHeartbeat() calls subclass.heartbeat() and tracks heartbeat timing
@@ -383,22 +388,22 @@ namespace mdk_protocol {
           - the Runtime maybe calls .onWSClosed(), which does nothing
           - the Runtime calls .onWSFinal()
           - .onWSFinal() nulls out the saved socket so .isConnected() will return false
-          - the Runtime calls .onExecute()
-          - .onExecute() notices not .isConnected() and subclass.isStarted() so eventually calls .doOpen(),
+          - the ScheduleActor sends message to .onMessage(), which calls .onScheduledEvent()
+          - .onScheduledEvent() notices not .isConnected() and subclass.isStarted() so eventually calls .doOpen(),
             then schedules itself for execution again -- see above
 
           Note that subclass.shutdown() is not called in this case, but subclass.startup() is called.
 
           ## Something arranges for subclass.isStarted() to return false
 
-          - the Runtime calls .onExecute()
-          - onExecute() notices .isConnected() and not .isStarted() so
+          - the ScheduleActor sends message to .onMessage(), which calls onScheduledEvent()
+          - onScheduledEvent() notices .isConnected() and not .isStarted() so
             it calls subclass.shutdown(), closes the socket, and
             nulls out the saved socket so .isConnected() will return false
             then does not schedule itself for execution again
 
           Must override: .isStarted(), .url(), .token()
-          May Override: .startup(), .pump(), .heartbeat(), .onWSMessage(), .onWSBinary()
+          May Override: .startup(), .pump(), .heartbeat(), .onWSMessage()
 
         */
 
@@ -410,11 +415,23 @@ namespace mdk_protocol {
         float ttl = 30.0;
         float tick = 1.0;
 
-        WebSocket sock = null;
+        WSActor sock = null;
         String sockUrl = null;
 
         long lastConnectAttempt = 0L;
         long lastHeartbeat = 0L;
+
+        Time timeService;
+        Actor schedulingActor;
+        WebSockets websockets;
+        MessageDispatcher dispatcher;
+
+        WSClient(MDKRuntime runtime) {
+            self.dispatcher = runtime.dispatcher;
+            self.timeService = runtime.getTimeService();
+            self.schedulingActor = runtime.getScheduleService();
+            self.websockets = runtime.getWebSocketsService();
+        }
 
         String url();
         String token();
@@ -424,16 +441,8 @@ namespace mdk_protocol {
             return sock != null;
         }
 
-        void start() {
-            schedule(0.0);
-        }
-
-        void stop() {
-            schedule(0.0);
-        }
-
         void schedule(float time) {
-            Context.runtime().schedule(self, time);
+            self.dispatcher.tell(self, new Schedule("wakeup", time), self.schedulingActor);
         }
 
         void scheduleReconnect() {
@@ -462,7 +471,37 @@ namespace mdk_protocol {
             }
         }
 
-        void onExecute(Runtime runtime) {
+        // Actor interface:
+        void onStart(MessageDispatcher dispatcher) {
+            schedule(0.0);
+        }
+
+        void onStop() {
+            if (isConnected()) {
+                shutdown();
+                self.dispatcher.tell(self, new WSClose(), sock);
+                sock = null;
+            }
+        }
+
+        void onMessage(Actor origin, Object message) {
+            String typeId = message.getClass().id;
+            if (typeId == "mdk_runtime.Happening") {
+                self.onScheduledEvent();
+                return;
+            }
+            if (typeId == "mdk_runtime.WSClosed") {
+                self.onWSClosed();
+                return;
+            }
+            if (typeId == "mdk_runtime.WSMessage") {
+                WSMessage wsmessage = ?message;
+                self.onWSMessage(wsmessage.body);
+                return;
+            }
+        }
+
+        void onScheduledEvent() {
             /*
               Do our periodic chores here, this will involve checking
               the desired state held by disco against our actual
@@ -479,7 +518,7 @@ namespace mdk_protocol {
               do that.
             */
 
-            long rightNow = now();
+            long rightNow = (self.timeService.time()*1000.0).round();
             long heartbeatInterval = ((ttl/2.0)*1000.0).round();
             long reconnectInterval = (reconnectDelay*1000.0).round();
 
@@ -489,10 +528,6 @@ namespace mdk_protocol {
                     if (rightNow - lastHeartbeat >= heartbeatInterval) {
                         doHeartbeat();
                     }
-                } else {
-                    shutdown();
-                    sock.close();
-                    sock = null;
                 }
             } else {
                 if (isStarted() && (rightNow - lastConnectAttempt) >= reconnectInterval) {
@@ -507,12 +542,12 @@ namespace mdk_protocol {
 
         void doOpen() {
             open(url());
-            lastConnectAttempt = now();
+            lastConnectAttempt = (self.timeService.time()*1000.0).round();
         }
 
         void doHeartbeat() {
             heartbeat();
-            lastHeartbeat = now();
+            lastHeartbeat = (self.timeService.time()*1000.0).round();
         }
 
         void open(String url) {
@@ -524,7 +559,9 @@ namespace mdk_protocol {
 
             logger.info("opening " + sockUrl);
 
-            Context.runtime().open(url, self);
+            self.websockets.connect(url, self)
+                .andEither(bind(self, "onWSConnected", []),
+                           bind(self, "onWSError", []));
         }
 
         void startup() {}
@@ -535,34 +572,32 @@ namespace mdk_protocol {
 
         void shutdown() {}
 
-        void onWSInit(WebSocket socket) {/* unused */ }
+        void onWSMessage(String message) {
+            // Override in subclasses
+        }
 
-        void onWSConnected(WebSocket socket) {
+        void onWSConnected(WSActor socket) {
             // Whenever we (re)connect, notify the server of any
             // nodes we have registered.
-            logger.info("connected to " + sockUrl);
+            logger.info("connected to " + sockUrl + " via " + socket.toString());
 
             reconnectDelay = firstDelay;
             sock = socket;
 
-            sock.send(new Open().encode());
+            self.dispatcher.tell(self, new Open().encode(), sock);
 
             startup();
             pump();
         }
 
-        void onWSBinary(WebSocket socket, Buffer message) { /* unused */ }
-
-        void onWSClosed(WebSocket socket) { /* unused */ }
-
-        void onWSError(WebSocket socket, WSError error) {
-            logger.error(error.toString());
+        void onWSError(Error error) {
+            logger.error("onWSError in protocol! " + error.toString());
             // Any non-transient errors should be reported back to the
             // user via any Nodes they have requested.
             doBackoff();
         }
 
-        void onWSFinal(WebSocket socket) {
+        void onWSClosed() {
             logger.info("closed " + sockUrl);
             sock = null;
         }

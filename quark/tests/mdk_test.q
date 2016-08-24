@@ -2,10 +2,11 @@ quark 1.0;
 
 package datawire_mdk_test 1.0.0;
 
-use mdk-2.0.q;
+/* There are more tests in tests/test_discovery.py. */
+
+use ../mdk-2.0.q;
 
 import quark.test;
-import quark.mock;
 import quark.reflect;
 
 void main(List<String> args) {
@@ -14,16 +15,45 @@ void main(List<String> args) {
 
 import mdk_tracing;
 import mdk_tracing.protocol;
+import mdk_runtime;
+import mdk_discovery;
 
-class TracingTest extends MockRuntimeTest {
+FakeWSActor expectSocket(MDKRuntime runtime, String url) {
+    FakeWebSockets ws = ?runtime.getWebSocketsService();
+    FakeWSActor actor = ws.lastConnection();
+    // May or may not have token appended depending on env variables...
+    if (!actor.url.startsWith(url)) {
+        checkEqual(url, actor.url);
+        return null;
+    } else {
+        return actor;
+    }
+}
+
+class TracingTest {
+    MDKRuntime runtime;
+
+    TracingTest() {
+        self.runtime = fakeRuntime();
+        FakeEnvVars env = ?self.runtime.getEnvVarsService();
+        env.set("DATAWIRE_TOKEN", "");
+    }
+
+    void pump() {
+        FakeTime timeService = ?runtime.getTimeService();
+        timeService.pump();
+    }
 
     /////////////////
     // Helpers
 
-    ProtocolEvent expectTracingEvent(SocketEvent sev, String expectedType) {
-        TextMessage msg = sev.expectTextMessage();
-        if (msg == null) { return null; }
-        ProtocolEvent evt = TracingEvent.decode(msg.text);
+    ProtocolEvent expectTracingEvent(FakeWSActor sev, String expectedType) {
+        String msg = sev.expectTextMessage();
+        if (msg == null) {
+            check(false, "No message sent.");
+            return null;
+        }
+        ProtocolEvent evt = TracingEvent.decode(msg);
         String type = evt.getClass().getName();
         if (check(type == expectedType, "expected " + expectedType + " event, got " + type)) {
             return ?evt;
@@ -32,15 +62,15 @@ class TracingTest extends MockRuntimeTest {
         }
     }
 
-    Open expectOpen(SocketEvent evt) {
+    Open expectOpen(FakeWSActor evt) {
         return ?expectTracingEvent(evt, "mdk_protocol.Open");
     }
 
-    LogEvent expectLogEvent(SocketEvent evt) {
+    LogEvent expectLogEvent(FakeWSActor evt) {
         return ?expectTracingEvent(evt, "mdk_tracing.protocol.LogEvent");
     }
 
-    Subscribe expectSubscribe(SocketEvent evt) {
+    Subscribe expectSubscribe(FakeWSActor evt) {
         return ?expectTracingEvent(evt, "mdk_tracing.protocol.Subscribe");
     }
 
@@ -55,12 +85,15 @@ class TracingTest extends MockRuntimeTest {
         doTestLog("custom");
     }
 
-    SocketEvent startTracer(Tracer tracer) {
+    FakeWSActor startTracer(Tracer tracer) {
         tracer.initContext();
         tracer.log("procUUID", "DEBUG", "blah", "testing...");
         self.pump();
-        SocketEvent sev = self.expectSocket(tracer.url + "?token=" + tracer.token);
-        if (sev == null) { return null; }
+        FakeWSActor sev = expectSocket(self.runtime, tracer.url + "?token=" + tracer.token);
+        if (sev == null) {
+            check(false, "No FakeWSActor returned.");
+            return null;
+        }
         sev.accept();
         self.pump();
         Open open = expectOpen(sev);
@@ -70,13 +103,14 @@ class TracingTest extends MockRuntimeTest {
     }
 
     void doTestLog(String url) {
-        Tracer tracer = new Tracer();
+        Tracer tracer = new Tracer(runtime);
         if (url != null) {
             tracer.url = url;
         } else {
             url = tracer.url;
         }
-        SocketEvent sev = startTracer(tracer);
+        FakeWSActor sev = startTracer(tracer);
+        if (sev == null) { return; }
         LogEvent evt = expectLogEvent(sev);
         if (evt == null) { return; }
         checkEqual("DEBUG", evt.level);
@@ -86,11 +120,12 @@ class TracingTest extends MockRuntimeTest {
 
     // Unexpected messages are ignored.
     void testUnexpectedMessage() {
-        Tracer tracer = new Tracer();
-        SocketEvent sev = startTracer(tracer);
+        Tracer tracer = new Tracer(runtime);
+        FakeWSActor sev = startTracer(tracer);
+        if (sev == null) { return; }
         sev.send("{\"type\": \"UnknownMessage\"}");
         self.pump();
-        checkEqual(false, sev.sock.closed);
+        checkEqual("CONNECTED", sev.state);
     }
 
     void _subhandler(LogEvent evt, List<LogEvent> events) {
@@ -98,11 +133,11 @@ class TracingTest extends MockRuntimeTest {
     }
 
     void testSubscribe() {
-        Tracer tracer = new Tracer();
+        Tracer tracer = new Tracer(runtime);
         List<LogEvent> events = [];
         tracer.subscribe(bind(self, "_subhandler", [events]));
         self.pump();
-        SocketEvent sev = self.expectSocket(tracer.url + "?token=" + tracer.token);
+        FakeWSActor sev = expectSocket(self.runtime, tracer.url + "?token=" + tracer.token);
         if (sev == null) { return; }
         sev.accept();
         self.pump();
@@ -140,15 +175,31 @@ class SerializableTest {
     }
 }
 
-class DiscoveryTest extends MockRuntimeTest {
+class DiscoveryTest {
+    MDKRuntime runtime;
+    DiscoClient client;
+
+    void setup() {
+        self.runtime = fakeRuntime();
+        self.runtime.dependencies.registerService("failurepolicy_factory",
+                                                  new CircuitBreakerFactory(runtime));
+    }
+
+    void pump() {
+        FakeTime timeService = ?runtime.getTimeService();
+        timeService.pump();
+    }
 
     /////////////////
     // Helpers
 
-    ProtocolEvent expectDiscoveryEvent(SocketEvent sev, String expectedType) {
-        TextMessage msg = sev.expectTextMessage();
-        if (msg == null) { return null; }
-        ProtocolEvent evt = DiscoveryEvent.decode(msg.text);
+    ProtocolEvent expectDiscoveryEvent(FakeWSActor sev, String expectedType) {
+        String msg = sev.expectTextMessage();
+        if (msg == null) {
+            check(false, "No discovery event sent at all.");
+            return null;
+        }
+        ProtocolEvent evt = DiscoveryEvent.decode(msg);
         String type = evt.getClass().getName();
         if (check(type == expectedType, "expected " + expectedType + " event, got " + type)) {
             return ?evt;
@@ -157,11 +208,11 @@ class DiscoveryTest extends MockRuntimeTest {
         }
     }
 
-    Open expectOpen(SocketEvent evt) {
+    Open expectOpen(FakeWSActor evt) {
         return ?expectDiscoveryEvent(evt, "mdk_protocol.Open");
     }
 
-    Active expectActive(SocketEvent evt) {
+    Active expectActive(FakeWSActor evt) {
         return ?expectDiscoveryEvent(evt, "mdk_discovery.protocol.Active");
     }
 
@@ -172,11 +223,22 @@ class DiscoveryTest extends MockRuntimeTest {
         checkEqual(expected.properties, actual.properties);
     }
 
-    SocketEvent startDisco(Discovery disco) {
-        disco.start();
+    Discovery createDisco() {
+        Discovery disco = new Discovery(runtime);
+        self.client = ?new mdk_discovery.protocol.DiscoClientFactory("").create(disco, self.runtime);
+        runtime.dependencies.registerService("discovery_registrar", self.client);
+        return disco;
+    }
+
+    FakeWSActor startDisco(Discovery disco) {
+        self.runtime.dispatcher.startActor(disco);
+        self.runtime.dispatcher.startActor(self.client);
         self.pump();
-        SocketEvent sev = self.expectSocket(disco.url);
-        if (sev == null) { return null; }
+        FakeWSActor sev = expectSocket(self.runtime, self.client.url());
+        if (sev == null) {
+            check(false, "No FakeWSActor returned.");
+            return null;
+        }
         sev.accept();
         sev.send(new Open().encode());
         return sev;
@@ -186,9 +248,12 @@ class DiscoveryTest extends MockRuntimeTest {
     // Tests
 
     void testStart() {
-        Discovery disco = new Discovery().connect();
-        SocketEvent sev = startDisco(disco);
-        if (sev == null) { return; }
+        Discovery disco = self.createDisco();
+        FakeWSActor sev = startDisco(disco);
+        if (sev == null) {
+            check(false, "No FakeWSActor created.");
+            return;
+        }
     }
 
     void testFailedStart() {
@@ -196,7 +261,7 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testRegisterPreStart() {
-        Discovery disco = new Discovery().connect();
+        Discovery disco = self.createDisco();
 
         Node node = new Node();
         node.service = "svc";
@@ -204,7 +269,7 @@ class DiscoveryTest extends MockRuntimeTest {
         node.version = "1.2.3";
         disco.register(node);
 
-        SocketEvent sev = startDisco(disco);
+        FakeWSActor sev = startDisco(disco);
         if (sev == null) { return; }
 
         Open open = expectOpen(sev);
@@ -216,8 +281,8 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testRegisterPostStart() {
-        Discovery disco = new Discovery().connect();
-        SocketEvent sev = startDisco(disco);
+        Discovery disco = self.createDisco();
+        FakeWSActor sev = startDisco(disco);
 
         Node node = new Node();
         node.service = "svc";
@@ -233,8 +298,8 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testRegisterTheNiceWay() {
-        Discovery disco = new Discovery().connect();
-        SocketEvent sev = startDisco(disco);
+        Discovery disco = self.createDisco();
+        FakeWSActor sev = startDisco(disco);
 
         Node node = new Node();
         node.service = "svc";
@@ -249,7 +314,7 @@ class DiscoveryTest extends MockRuntimeTest {
         checkEqualNodes(node, active.node);
     }
 
-    Node doActive(SocketEvent sev, String svc, String addr, String version) {
+    Node doActive(FakeWSActor sev, String svc, String addr, String version) {
         Active active = new Active();
         active.node = new Node();
         active.node.service = svc;
@@ -260,12 +325,12 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testResolvePreStart() {
-        Discovery disco = new Discovery().connect();
+        Discovery disco = self.createDisco();
 
         Promise promise = disco._resolve("svc", "1.0");
         checkEqual(false, promise.value().hasValue());
 
-        SocketEvent sev = startDisco(disco);
+        FakeWSActor sev = startDisco(disco);
         if (sev == null) { return; }
 
         Node node = doActive(sev, "svc", "addr", "1.2.3");
@@ -274,8 +339,8 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testResolvePostStart() {
-        Discovery disco = new Discovery().connect();
-        SocketEvent sev = startDisco(disco);
+        Discovery disco = self.createDisco();
+        FakeWSActor sev = startDisco(disco);
 
         Promise promise = disco._resolve("svc", "1.0");
         checkEqual(false, promise.value().hasValue());
@@ -286,8 +351,8 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testResolveAfterNotification() {
-        Discovery disco = new Discovery().connect();
-        SocketEvent sev = startDisco(disco);
+        Discovery disco = self.createDisco();
+        FakeWSActor sev = startDisco(disco);
 
         Node node = doActive(sev, "svc", "addr", "1.2.3");
 
@@ -298,8 +363,8 @@ class DiscoveryTest extends MockRuntimeTest {
     // This variant caught a bug in the code, so it's useful to have all of
     // these even though they're seemingly similar.
     void testResolveBeforeAndBeforeNotification() {
-        Discovery disco = new Discovery().connect();
-        SocketEvent sev = startDisco(disco);
+        Discovery disco = self.createDisco();
+        FakeWSActor sev = startDisco(disco);
         Promise promise = disco._resolve("svc", "1.0");
         Promise promise2 = disco._resolve("svc", "1.0");
         checkEqual(false, promise.value().hasValue());
@@ -312,8 +377,8 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testResolveBeforeAndAfterNotification() {
-        Discovery disco = new Discovery().connect();
-        SocketEvent sev = startDisco(disco);
+        Discovery disco = self.createDisco();
+        FakeWSActor sev = startDisco(disco);
         Promise promise = disco._resolve("svc", "1.0");
 
         Node node = doActive(sev, "svc", "addr", "1.2.3");
@@ -324,8 +389,8 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testResolveDifferentActive() {
-        Discovery disco = new Discovery().connect();
-        SocketEvent sev = startDisco(disco);
+        Discovery disco = self.createDisco();
+        FakeWSActor sev = startDisco(disco);
 
         Node node = doActive(sev, "svc", "addr", "1.2.3");
         doActive(sev, "svc2", "addr", "1.2.3");
@@ -335,8 +400,8 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testResolveVersionAfterActive() {
-        Discovery disco = new Discovery().connect();
-        SocketEvent sev = startDisco(disco);
+        Discovery disco = self.createDisco();
+        FakeWSActor sev = startDisco(disco);
 
         Node n1 = doActive(sev, "svc", "addr1.0", "1.0.0");
         Node n2 = doActive(sev, "svc", "addr1.2.3", "1.2.3");
@@ -348,8 +413,8 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testResolveVersionBeforeActive() {
-        Discovery disco = new Discovery().connect();
-        SocketEvent sev = startDisco(disco);
+        Discovery disco = self.createDisco();
+        FakeWSActor sev = startDisco(disco);
 
         Promise p1 = disco._resolve("svc", "1.0");
         Promise p2 = disco._resolve("svc", "1.1");
@@ -362,8 +427,8 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testResolveBreaker() {
-        Discovery disco = new Discovery().connect();
-        SocketEvent sev = startDisco(disco);
+        Discovery disco = self.createDisco();
+        FakeWSActor sev = startDisco(disco);
 
         Node n1 = doActive(sev, "svc", "addr1", "1.0.0");
         Node n2 = doActive(sev, "svc", "addr2", "1.0.0");
@@ -375,7 +440,8 @@ class DiscoveryTest extends MockRuntimeTest {
 
         Node failed = ?p.value().getValue();
         int idx = 0;
-        while (idx < disco.threshold) {
+        CircuitBreakerFactory fpfactory = ?disco._fpfactory;
+        while (idx < fpfactory.threshold) {
             failed.failure();
             idx = idx + 1;
         }
@@ -387,8 +453,8 @@ class DiscoveryTest extends MockRuntimeTest {
     }
 
     void testLoadBalancing() {
-        Discovery disco = new Discovery().connect();
-        SocketEvent sev = startDisco(disco);
+        Discovery disco = self.createDisco();
+        FakeWSActor sev = startDisco(disco);
 
         Promise promise = disco._resolve("svc", "1.0");
         checkEqual(false, promise.value().hasValue());
@@ -414,30 +480,23 @@ class DiscoveryTest extends MockRuntimeTest {
         }
     }
 
-    // Discovery.init() connects to the server, and sends the token:
-    void testInit() {
-        String token = "1234";
-        Discovery disco = Discovery.init(token);
-        self.pump();
-        self.expectSocket(disco.url + "?token=" + token);
-    }
-
     void testReconnect() {
         // ...
     }
 
     // Unexpected messages are ignored.
     void testUnexpectedMessage() {
-        Discovery disco = new Discovery().connect();
-        SocketEvent sev = startDisco(disco);
+        Discovery disco = self.createDisco();
+        FakeWSActor sev = startDisco(disco);
         sev.send("{\"type\": \"UnknownMessage\"}");
         self.pump();
-        checkEqual(false, sev.sock.closed);
+        checkEqual("CONNECTED", sev.state);
     }
 
     void testStop() {
-        Discovery disco = new Discovery().connect();
-        SocketEvent sev = startDisco(disco);
+        FakeTime timeService = ?runtime.getTimeService();
+        Discovery disco = self.createDisco();
+        FakeWSActor sev = startDisco(disco);
 
         Node node = new Node();
         node.service = "svc";
@@ -450,29 +509,24 @@ class DiscoveryTest extends MockRuntimeTest {
         Active active = expectActive(sev);
         if (active == null) { return; }
 
-        disco.stop();
+        runtime.dispatcher.stopActor(disco);
+        runtime.dispatcher.stopActor(client);
+        runtime.stop();
         // Might take some cleanup to stop everything:
-        self.mock.advanceClock(15000);
-        self.mock.pump();
-        self.mock.pump();
-        self.mock.pump();
-        self.mock.pump();
+        timeService.advance(15.0);
+        self.pump();
+        self.pump();
+        self.pump();
+        self.pump();
 
         // At this point we should have nothing scheduled and socket should be
         // closed:
-        checkEqual([sev], self.mock.events);
-        checkEqual(true, sev.sock.closed);
-        checkEqual(self.mock.executed, self.mock.tasks.size());
+        FakeWebSockets ws = ?runtime.getWebSocketsService();
+        checkEqual([sev], ws.fakeActors); // Only the one connection
+        checkEqual("DISCONNECTED", sev.state);
+        checkEqual(0, timeService.scheduled());
     }
 
-}
-
-
-class MDKHighLevelAPITest {
-    // It's possible to call the MDK init().
-    void testInit() {
-        mdk.init();
-    }
 }
 
 class UtilTest {
@@ -492,22 +546,6 @@ class UtilTest {
         checkEqual(false, versionMatch("1.2", "1.1.0"));
         checkEqual(false, versionMatch("2.0", "1.1.0"));
         checkEqual(false, versionMatch("1.3", "1.2"));
-    }
-
-}
-
-class CircuitBreakerTest {
-
-    void testBreakerTrips() {
-        Node node = new Node();
-        node._policy = new CircuitBreaker(node, 3, 1.0);
-        checkEqual(true, node.available());
-        node.failure();
-        checkEqual(true, node.available());
-        node.failure();
-        checkEqual(true, node.available());
-        node.failure();
-        checkEqual(false, node.available());
     }
 
 }

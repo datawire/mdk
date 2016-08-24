@@ -18,13 +18,35 @@ package datawire_mdk_introspection 1.0.1;
  * limitations under the License.
  */
 
-use util-1.0.q;
+use mdk_runtime.q;
 include introspection-internals-1.0.q;
 
-import mdk_util;  // bring in EnvironmentVariable
+import mdk_runtime;
 
 namespace mdk_introspection 
 {
+    @doc("A Supplier has a 'get' method that can return a value to anyone who needs it.")
+    interface Supplier<T> {
+    
+        @doc("Gets a value")
+        T get();
+     
+        /* BUG (compiler) -- Issue # --> https://github.com/datawire/quark/issues/143
+           @doc("Gets a value or if null returns the given alternative.")
+           T orElseGet(T alternative) 
+           {
+           T result = get();
+           if (result != null) 
+           {
+           return result;
+           }
+           else
+           {
+           return alternative;
+           }
+           }
+        */
+    }
 
   // XXX: How should this relate to Datawire Connect's DatawireState class?
   class DatawireToken
@@ -33,12 +55,12 @@ namespace mdk_introspection
     static String TOKEN_VARIABLE_NAME = "DATAWIRE_TOKEN";
   
     @doc("Returns the Datawire Access Token by reading the environment variable DATAWIRE_TOKEN.")
-    static String getToken()
+    static String getToken(EnvironmentVariables env)
     {
-        String token = EnvironmentVariable(TOKEN_VARIABLE_NAME).get();
+        String token = env.var(TOKEN_VARIABLE_NAME).get();
         if (token == null)
         {
-            panic("Environment variable 'DATAWIRE_TOKEN' is not set. The MDK needs a token to access Datawire cloud services. Please visit https://app.datawire.io/#/signup to create a free account and get a token.");
+            panic("Neither 'MDK_DISCOVERY_SOURCE' nor 'DATAWIRE_TOKEN' are set. Either set the former to an existing discovery source (e.g. 'synapse:path=/synapse/output_files/'), or use the Datawire cloud services. For the latter please visit https://app.datawire.io/#/signup to create a free account and get a token.");
         }
 
         return token;
@@ -58,9 +80,9 @@ namespace mdk_introspection
     static String ROUTABLE_HOST_VARIABLE_NAME    = "DATAWIRE_ROUTABLE_HOST";
     static String ROUTABLE_PORT_VARIABLE_NAME    = "DATAWIRE_ROUTABLE_PORT";
 
-    static String platformType()
+    static String platformType(EnvironmentVariables env)
     {
-      String result = EnvironmentVariable(PLATFORM_TYPE_VARIABLE_NAME).get();
+      String result = env.var(PLATFORM_TYPE_VARIABLE_NAME).get();
       if (result != null)
       {
         result = result.toUpper();
@@ -71,33 +93,33 @@ namespace mdk_introspection
 
     @doc("Returns the routable hostname or IP for this service instance.")
     @doc("This method always returns the value of the environment variable DATAWIRE_ROUTABLE_HOST if it is defined.")
-    static String getRoutableHost()
+    static String getRoutableHost(EnvironmentVariables env)
     {
       String result = null;
 
-      if (EnvironmentVariable(ROUTABLE_HOST_VARIABLE_NAME).isDefined())
+      if (env.var(ROUTABLE_HOST_VARIABLE_NAME).isDefined())
       {
         logger.debug("Using value in environment variable '" + ROUTABLE_HOST_VARIABLE_NAME + "'");
-        result = EnvironmentVariable(ROUTABLE_HOST_VARIABLE_NAME).get();
+        result = env.var(ROUTABLE_HOST_VARIABLE_NAME).get();
       }
       else
       {
-        if (platformType() == null)
+        if (platformType(env) == null)
         {
           logger.error("Platform type not specified in environment variable '" + PLATFORM_TYPE_VARIABLE_NAME + "'");
           concurrent.Context.runtime().fail("Environment variable 'DATAWIRE_PLATFORM_TYPE' is not set.");
         }
 
-        if (platformType().startsWith(PLATFORM_TYPE_EC2))
+        if (platformType(env).startsWith(PLATFORM_TYPE_EC2))
         {
           logger.debug(PLATFORM_TYPE_VARIABLE_NAME + " = EC2");
 
-          List<String> parts = platformType().split(":");
+          List<String> parts = platformType(env).split(":");
           logger.debug("Platform Scope = " + parts[1]);
 
           if(parts.size() == 2)
           {
-            return aws.Ec2Host(parts[1]).get();
+              return aws.Ec2Host(env, parts[1]).get();
           }
           else
           {
@@ -110,7 +132,7 @@ namespace mdk_introspection
            that can be used easily. K8s users should expect to do it through the DATAWIRE_ROUTABLE_HOST and
            DATAWIRE_ROUTABLE_PORT environment variables.
 
-        if (platformType() == PLATFORM_TYPE_KUBERNETES || platformType() == PLATFORM_TYPE_GOOGLE_CONTAINER)
+        if (platformType(env) == PLATFORM_TYPE_KUBERNETES || platformType(env) == PLATFORM_TYPE_GOOGLE_CONTAINER)
         {
           logger.debug(PLATFORM_TYPE_VARIABLE_NAME + " = [" + PLATFORM_TYPE_KUBERNETES  + "|" + PLATFORM_TYPE_GOOGLE_CONTAINER + "]");
           return KubernetesHost().get();
@@ -124,14 +146,14 @@ namespace mdk_introspection
 
     @doc("Returns the routable port number for this service instance or uses the provided port if a value cannot be resolved.")
     @doc("This method always returns the value of the environment variable DATAWIRE_ROUTABLE_PORT if it is defined.")
-    static int getRoutablePort(int servicePort)
+    static int getRoutablePort(EnvironmentVariables env, int servicePort)
     {
-      if (EnvironmentVariable(ROUTABLE_PORT_VARIABLE_NAME).isDefined())
+      if (env.var(ROUTABLE_PORT_VARIABLE_NAME).isDefined())
       {
-        return parseInt(EnvironmentVariable(ROUTABLE_PORT_VARIABLE_NAME).get());
+        return parseInt(env.var(ROUTABLE_PORT_VARIABLE_NAME).get());
       }
 
-      if (platformType() == PLATFORM_TYPE_KUBERNETES)
+      if (platformType(env) == PLATFORM_TYPE_KUBERNETES)
       {
         return kubernetes.KubernetesPort().get();
       }

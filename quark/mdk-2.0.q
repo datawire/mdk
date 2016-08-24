@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk 2.0.1;
+package datawire_mdk 2.0.3;
 
 // DATAWIRE MDK
 
@@ -8,32 +8,37 @@ use discovery-3.0.q;
 use tracing-2.0.q;
 use introspection-1.0.q;
 use util-1.0.q;
+use mdk_runtime.q;
 
 import mdk_discovery;
 import mdk_tracing;
 import mdk_introspection;
 import mdk_util;
-
+import mdk_runtime;
 import quark.concurrent;
+import mdk_runtime.promise;
 
 @doc("Microservices Development Kit -- obtain a reference using MDK.init()")
 namespace mdk {
 
-    String _get(String name, String value) {
-        return os.Environment.ENV.get(name, value);
+    String _get(EnvironmentVariables env, String name, String value) {
+        return env.var(name).orElseGet(value);
     }
 
     @doc("Create an unstarted instance of the MDK.")
     MDK init() {
-        return new MDKImpl();
+        // XXX once we have native package wrappers for this code they will
+        // create the DI registry and actor disptacher. Until then, we create those
+        // here:
+        return new MDKImpl(mdk_runtime.defaultRuntime());
     }
 
     @doc("""
          Create a started instance of the MDK. This is equivalent to
-         callint init() followed by start() on the resulting instance.
+         calling init() followed by start() on the resulting instance.
          """)
     MDK start() {
-        MDK m = new MDKImpl();
+        MDK m = init();
         m.start();
         return m;
     }
@@ -164,12 +169,14 @@ namespace mdk {
         @doc("Record a log entry at the DEBUG logging level.")
         void debug(String category, String text);
 
-        @doc("Set the logging level for the session.")
+        @doc("EXPERIMENTAL: Set the logging level for the session.")
         void trace(String level);
 
-        // Temporarily disabled due to lack of authorization
-        /*
+
         @doc("""
+             EXPERIMENTAL; requires MDK_EXPERIMENTAL=1 environment variable to
+             function.
+
              Override service resolution for the current distributed
              session. All attempts to resolve *service*, *version*
              will be replaced with an attempt to resolve *target*,
@@ -177,7 +184,6 @@ namespace mdk {
              downstream services involved in the distributed session.
              """)
         void route(String service, String version, String target, String targetVersion);
-        */
 
         @doc("""
              Locate a compatible service instance.
@@ -243,18 +249,57 @@ namespace mdk {
 
         static Logger logger = new Logger("mdk");
 
-        Discovery _disco = new Discovery();
-        Tracer _tracer;
+        MDKRuntime _runtime;
+        Discovery _disco;
+        DiscoverySource _discoSource;
+        Tracer _tracer = null;
         String procUUID = Context.runtime().uuid();
+        bool _running = false;
 
-        MDKImpl() {
-            _disco.url = _get("MDK_DISCOVERY_URL", "wss://discovery.datawire.io/ws/v1");
-            _disco.token = DatawireToken.getToken();
+        @doc("Choose DiscoverySource based on environment variables.")
+        DiscoverySourceFactory getDiscoveryFactory(EnvironmentVariables env) {
+            String config = env.var("MDK_DISCOVERY_SOURCE").orElseGet("");
+            if (config == "") {
+                config = "datawire:" + DatawireToken.getToken(env);
+            }
+            DiscoverySourceFactory result = null;
+            if (config.startsWith("datawire:")) {
+                result = new DiscoClientFactory(config.substring(9, config.size()));
+            } else {
+                if (config.startsWith("synapse:path=")) {
+                    result = mdk_discovery.synapse.Synapse(config.substring(13, config.size()));
+                } else {
+                    panic("Unknown MDK discovery source: " + config);
+                }
+            }
+            return result;
+        }
 
-            String tracingURL = _get("MDK_TRACING_URL", "wss://tracing.datawire.io/ws/v1");
-            String tracingQueryURL = _get("MDK_TRACING_API_URL", "https://tracing.datawire.io/api/v1/logs");
-            _tracer = Tracer.withURLsAndToken(tracingURL, tracingQueryURL, _disco.token);
-            _tracer.initContext();
+        MDKImpl(MDKRuntime runtime) {
+            _runtime = runtime;
+            if (!runtime.dependencies.hasService("failurepolicy_factory")) {
+                runtime.dependencies.registerService("failurepolicy_factory",
+                                                     new CircuitBreakerFactory(runtime));
+            }
+            _disco = new Discovery(runtime);
+            // Tracing won't work if there's no DATAWIRE_TOKEN, but will try
+            // anyway. A later branch will make this better.
+            EnvironmentVariables env = runtime.getEnvVarsService();
+            String token = env.var("DATAWIRE_TOKEN").orElseGet("");
+            DiscoverySourceFactory discoFactory = getDiscoveryFactory(env);
+            _discoSource = discoFactory.create(_disco, runtime);
+            if (discoFactory.isRegistrar()) {
+                runtime.dependencies.registerService("discovery_registrar", _discoSource);
+            }
+            if (token != "") {
+                String tracingURL = _get(env, "MDK_TRACING_URL", "wss://tracing.datawire.io/ws/v1");
+                String tracingQueryURL = _get(env, "MDK_TRACING_API_URL", "https://tracing.datawire.io/api/v1/logs");
+                _tracer = Tracer(runtime);
+                _tracer.url = tracingURL;
+                _tracer.queryURL = tracingQueryURL;
+                _tracer.token = token;
+                _tracer.initContext();
+            }
         }
 
         float _timeout() {
@@ -262,12 +307,18 @@ namespace mdk {
         }
 
         void start() {
-            _disco.start();
+            self._running = true;
+            _runtime.dispatcher.startActor(_disco);
+            _runtime.dispatcher.startActor(_discoSource);
+            // Tracer starts up automatically as needed
         }
 
         void stop() {
-            _disco.stop();
+            self._running = false;
+            _runtime.dispatcher.stopActor(_disco);
+            _runtime.dispatcher.stopActor(_discoSource);
             _tracer.stop();
+            _runtime.stop();
         }
 
         void register(String service, String version, String address) {
@@ -281,11 +332,11 @@ namespace mdk {
             _disco.register(node);
         }
 
-        SessionImpl session() {
+        Session session() {
             return new SessionImpl(self, null);
         }
 
-        SessionImpl join(String encodedContext) {
+        Session join(String encodedContext) {
             return new SessionImpl(self, encodedContext);
         }
 
@@ -304,8 +355,11 @@ namespace mdk {
         MDKImpl _mdk;
         List<Node> _resolved = [];
         SharedContext _context;
+        bool _experimental = false;
 
         SessionImpl(MDKImpl mdk, String encodedContext) {
+            _experimental = (mdk._runtime.getEnvVarsService()
+                             .var("MDK_EXPERIMENTAL").orElseGet("") != "");
             _mdk = mdk;
             encodedContext = ?sanitize(encodedContext);
             if (encodedContext == null || encodedContext == "") {
@@ -328,8 +382,6 @@ namespace mdk {
             return _context.properties.contains(property);
         }
 
-        // Temporarily disabled due to lack of authorization
-        /*
         void route(String service, String version, String target, String targetVersion) {
             Map<String,List<Map<String,String>>> routes;
             if (!has("routes")) {
@@ -349,7 +401,6 @@ namespace mdk {
 
             targets.add({"version": version, "target": target, "targetVersion": targetVersion});
         }
-        */
 
         void trace(String level) {
             set("trace", level);
@@ -373,8 +424,10 @@ namespace mdk {
         }
 
         void _log(String level, String category, String text) {
-            _mdk._tracer.setContext(_context);
-            _mdk._tracer.log(_mdk.procUUID, level, category, text);
+            if (_mdk._tracer != null) {
+                _mdk._tracer.setContext(_context);
+                _mdk._tracer.log(_mdk.procUUID, level, category, text);
+            }
         }
 
         void critical(String category, String text) {
@@ -414,24 +467,23 @@ namespace mdk {
         }
 
         Promise _resolve(String service, String version) {
-            // Temporarily disabled due to lack of authorization
-            /*
-            Map<String,List<Map<String,String>>> routes = ?get("routes");
-            if (routes != null && routes.contains(service)) {
-                List<Map<String,String>> targets = routes[service];
-                int idx = 0;
-                while (idx < targets.size()) {
-                    Map<String,String> target = targets[idx];
-                    if (versionMatch(target["version"], version)) {
-                        service = target["target"];
-                        version = target["targetVersion"];
-                        break;
+            if (_experimental) {
+                Map<String,List<Map<String,String>>> routes = ?get("routes");
+                if (routes != null && routes.contains(service)) {
+                    List<Map<String,String>> targets = routes[service];
+                    int idx = 0;
+                    while (idx < targets.size()) {
+                        Map<String,String> target = targets[idx];
+                        if (versionMatch(target["version"], version)) {
+                            service = target["target"];
+                            version = target["targetVersion"];
+                            break;
+                        }
+                        idx = idx + 1;
                     }
-                    idx = idx + 1;
                 }
             }
 
-            */
             return _mdk._disco._resolve(service, version).
                 andThen(bind(self, "_resolvedCallback", []));
         }
