@@ -2,8 +2,8 @@ quark 1.0;
 
 package datawire_mdk_tracing 2.0.1;
 
-use protocol-1.0.q;
-use introspection-1.0.q;
+include protocol-1.0.q;
+include introspection-1.0.q;
 
 import mdk_protocol;
 import mdk_introspection;

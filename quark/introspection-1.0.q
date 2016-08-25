@@ -18,7 +18,7 @@ package datawire_mdk_introspection 1.0.1;
  * limitations under the License.
  */
 
-use mdk_runtime.q;
+include mdk_runtime.q;
 include introspection-internals-1.0.q;
 
 import mdk_runtime;

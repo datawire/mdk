@@ -5,7 +5,7 @@ package datawire_mdk_protocol 1.3.1;
 import quark.concurrent;
 import quark.reflect;
 
-use mdk_runtime.q;
+include mdk_runtime.q;
 
 import mdk_runtime;
 import mdk_runtime.actors;

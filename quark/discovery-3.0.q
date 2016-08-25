@@ -4,8 +4,8 @@ package datawire_mdk_discovery 3.5.0;
 
 include discovery-protocol-3.0.q;
 include synapse.q;
-use util-1.0.q;
-use mdk_runtime.q;
+include util-1.0.q;
+include mdk_runtime.q;
 
 import quark.concurrent;
 import quark.reflect;

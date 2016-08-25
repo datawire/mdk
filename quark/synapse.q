@@ -1,7 +1,5 @@
 quark 1.0;
 
-use mdk_runtime.q;
-
 import mdk_discovery;
 import mdk_runtime;
 import mdk_runtime.actors;
