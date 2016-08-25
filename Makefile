@@ -2,7 +2,10 @@ SHELL=/bin/bash
 
 .PHONY: default
 default:
-	echo "Run 'make setup' to setup the environment, 'make test' to run tests."
+	echo "You can run:"
+	echo "* 'make setup' to setup the environment"
+	echo "* 'make test' to run tests (requires setup)"
+	echo "* 'make packages' to build packages"
 
 virtualenv:
 	virtualenv virtualenv
@@ -20,3 +23,30 @@ test:
 	# MDK. This means tests.test_endtoend will fail if you are not on Travis
 	# or have not installed the MDK.
 	virtualenv/bin/python -m unittest discover -v
+
+output: $(wildcard quark/*.q) dist
+	rm -rf output
+	quark compile -o output.temp quark/mdk-2.0.q
+	mv output.temp output
+
+dist:
+	mkdir dist
+
+.PHONY: packages
+packages: python-packages ruby-packages javascript-packages java-packages
+
+.PHONY: python-packages
+python-packages: output
+	python scripts/build-packages.py py output/ dist/
+
+.PHONY: ruby-packages
+ruby-packages: output
+	python scripts/build-packages.py rb output/ dist/
+
+.PHONY: javascript-packages
+javascript-packages: output
+	python scripts/build-packages.py js output/ dist/
+
+.PHONY: java-packages
+java-packages: output
+	python scripts/build-packages.py java output/ dist/

@@ -21,6 +21,7 @@ def makeTest(filepath, language):
     def testQuark():
         print("Installing and running {} in {}...".format(filepath, language))
         check_call(["sudo", "docker", "run",
+                    # Mount volume into container so Docker can access quark files:
                     "-v", ROOT_DIR + ":/code",
                     "datawire/quark-run:" + QUARK_VERSION, "--" + language, docker_path])
     return FunctionTestCase(testQuark, description="{}:{}".format(filepath, language))
