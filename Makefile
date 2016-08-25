@@ -22,7 +22,7 @@ test:
 	# For now we rely on either .travis-test.sh or the user to install the
 	# MDK. This means tests.test_endtoend will fail if you are not on Travis
 	# or have not installed the MDK.
-	virtualenv/bin/python -m unittest discover -v
+	source virtualenv/bin/activate && python -m unittest discover -v
 
 output: $(wildcard quark/*.q) dist
 	rm -rf output
