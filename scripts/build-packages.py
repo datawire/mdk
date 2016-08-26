@@ -6,25 +6,22 @@ from glob import glob
 from subprocess import check_call
 
 
-def build_python(directory):
-    """Build Python packages from the output of quark compile (output/py)."""
-    result = []
-    for package_name in os.listdir(directory):
-        package_dir = os.path.join(directory, package_name)
-        check_call(["python", "setup.py", "bdist_wheel"], cwd=package_dir)
-        result.extend(glob(os.path.join(package_dir, "dist/*.whl")))
-    return result
+def build_python(package_dir):
+    """Build Python package from the output of quark compile (output/py/mdk-2.0)."""
+    check_call(["python", "setup.py", "bdist_wheel"], cwd=package_dir)
+    package, = glob(os.path.join(package_dir, "dist/*.whl"))
+    return package
 
-def build_ruby(directory):
-    """Build Ruby packages from the output of quark compile (output/rb)."""
+def build_ruby(package_dir):
+    """Build Ruby packages from the output of quark compile (output/rb/mdk-2.0)."""
 
 
-def build_javascript(directory):
-    """Build Javascript packages from the output of quark compile (output/js)."""
+def build_javascript(package_dir):
+    """Build Javascript packages from the output of quark compile (output/js/mdk-2.0)."""
 
 
-def build_java(directory):
-    """Build Java packages from the output of quark compile (output/java)."""
+def build_java(package_dir):
+    """Build Java packages from the output of quark compile (output/java/mdk-2.0)."""
 
 
 def main(language, in_directory, out_directory):
@@ -32,7 +29,7 @@ def main(language, in_directory, out_directory):
                 "rb": build_ruby,
                 "js": build_javascript,
                 "java": build_java}
-    result = handlers[language](os.path.join(in_directory, language))
+    result = handlers[language](in_directory)
     for path in result:
         os.rename(path, os.path.join(out_directory, os.path.basename(path)))
 

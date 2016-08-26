@@ -26,7 +26,7 @@ test:
 
 output: $(wildcard quark/*.q) dist
 	rm -rf output
-	quark compile -o output.temp quark/mdk-2.0.q
+	quark compile --include-stdlib -o output.temp quark/mdk-2.0.q
 	mv output.temp output
 
 dist:
@@ -37,16 +37,16 @@ packages: python-packages ruby-packages javascript-packages java-packages
 
 .PHONY: python-packages
 python-packages: output
-	python scripts/build-packages.py py output/ dist/
+	python scripts/build-packages.py py output/py/mdk-2.0 dist/
 
 .PHONY: ruby-packages
 ruby-packages: output
-	python scripts/build-packages.py rb output/ dist/
+	python scripts/build-packages.py rb output/rb/mdk-2.0 dist/
 
 .PHONY: javascript-packages
 javascript-packages: output
-	python scripts/build-packages.py js output/ dist/
+	python scripts/build-packages.py js output/js/mdk-2.0 dist/
 
 .PHONY: java-packages
 java-packages: output
-	python scripts/build-packages.py java output/ dist/
+	python scripts/build-packages.py java output/java/mdk-2.0 dist/
