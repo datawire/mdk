@@ -407,7 +407,7 @@ namespace mdk_protocol {
 
         */
 
-        static Logger logger = new Logger("protocol");
+        Logger logger = new Logger("protocol");
 
         float firstDelay = 1.0;
         float maxDelay = 16.0;

@@ -247,7 +247,7 @@ namespace mdk {
 
     class MDKImpl extends MDK {
 
-        static Logger logger = new Logger("mdk");
+        Logger logger = new Logger("mdk");
 
         MDKRuntime _runtime;
         Discovery _disco;

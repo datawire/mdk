@@ -69,7 +69,7 @@ namespace mdk_introspection
 
   class Platform 
   {
-    static Logger logger = new Logger("Platform");
+    Logger logger = new Logger("Platform");
 
     static String PLATFORM_TYPE_VARIABLE_NAME    = "DATAWIRE_PLATFORM_TYPE";
 

@@ -86,7 +86,7 @@ namespace actors {
     Reduce accidental re-entrancy by making sure messages are run asynchronously.
     """)
     class MessageDispatcher {
-	static Logger logger = new Logger("actors");
+	Logger logger = new Logger("actors");
 	List<_QueuedMessage> _queued = [];
 	bool _delivering = false;
 	Lock _lock = new Lock(); // Will become unnecessary once we abandon Quark runtime
