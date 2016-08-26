@@ -3,22 +3,22 @@ Release the MDK.
 
 The process:
 
-1. Ensure current commit has passing tests by talking to Github API.
+1. Ensure current commit has passing tests by talking to Travis API.
 2. Bump versions on all relevant files.
 
-Later, once we only have `master` branch and no more `develop` will add more
+(TODO: once we only have `master` branch and no more `develop` will add more
 steps:
 
 3. Git commit.
 4. Tag with new version.
-5. Tell user command to run to git push and actually release the code.
+5. Tell user command to run to git push and actually release the code.)
 
 For now however we will continue current process. I.e. local commit will need to
 be pushed to branch on GitHub, that branch will be merged to `develop` with PR,
 and `develop` merged to `master` with PR and then tag that release.
 
-There will also be infrastructure in the CI system to automatically upload
-Python/Ruby/JS/Java packages on tagged commits.
+(TODO: There will also be infrastructure in the CI system to automatically upload
+Python/Ruby/JS/Java packages on tagged commits.)
 
 
 Usage:
@@ -37,8 +37,8 @@ from docopt import docopt
 
 
 def ensure_passing_tests(options):
-    """Talk to GitHub, ensure all tests passed for the current git commit."""
-
+    """Talk to Travis CI, ensure all tests passed for the current git commit."""
+    # XXX use travispy
 
 def bump_versions(options):
     """Bump release version on all applicable files."""
