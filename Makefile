@@ -26,7 +26,8 @@ test:
 
 output: $(wildcard quark/*.q) dist
 	rm -rf output
-	quark compile --include-stdlib -o output.temp quark/mdk-2.0.q
+	# TODO: Once we have new Quark release, add --include-stdlib option:
+	quark compile -o output.temp quark/mdk-2.0.q
 	mv output.temp output
 
 dist:
