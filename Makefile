@@ -6,6 +6,7 @@ default:
 	echo "* 'make setup' to setup the environment"
 	echo "* 'make test' to run tests (requires setup)"
 	echo "* 'make packages' to build packages"
+	echo "* 'make release' to do a release"
 
 virtualenv:
 	virtualenv virtualenv
@@ -24,6 +25,10 @@ test:
 	# or have not installed the MDK.
 	source virtualenv/bin/activate && python -m unittest discover -v
 
+release:
+	virtualenv/bin/python scripts/release.py
+
+# Packaging commands:
 output: $(wildcard quark/*.q) dist
 	rm -rf output
 	quark compile --include-stdlib -o output.temp quark/mdk-2.0.q
