@@ -67,10 +67,8 @@ namespace mdk_introspection
     }
   }
 
-  class Platform 
+  class Platform
   {
-    Logger logger = new Logger("Platform");
-
     static String PLATFORM_TYPE_VARIABLE_NAME    = "DATAWIRE_PLATFORM_TYPE";
 
     static String PLATFORM_TYPE_EC2              = "EC2";
@@ -96,6 +94,7 @@ namespace mdk_introspection
     static String getRoutableHost(EnvironmentVariables env)
     {
       String result = null;
+      Logger logger = new Logger("Platform");
 
       if (env.var(ROUTABLE_HOST_VARIABLE_NAME).isDefined())
       {

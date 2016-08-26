@@ -48,7 +48,8 @@ namespace mdk_protocol {
             if (meth != null) {
                 obj = ?meth.invoke(null, [type]);
                 if (obj == null) {
-                    WSClient.logger.warn(clazz.getName() + "." + meth.getName() + " could not understand this json: " + encoded);
+                    Logger logger = new Logger("protocol");
+                    logger.warn(clazz.getName() + "." + meth.getName() + " could not understand this json: " + encoded);
                     return null;
                 }
                 clazz = obj.getClass();
