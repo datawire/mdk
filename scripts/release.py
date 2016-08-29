@@ -55,7 +55,7 @@ def ensure_passing_tests(options):
     travis = TravisPy()
     revision = check_output(["git", "rev-parse", "HEAD"])
     build_passed = False
-    for build in travis.builds(slug="datawire/mdk", number=50):
+    for build in travis.builds(slug="datawire/mdk", number=200):
         if build.commit_id == revision:
             if build.passed:
                 build_passed = True
@@ -65,7 +65,7 @@ def ensure_passing_tests(options):
                      + build.current_state())
 
     if not build_passed:
-        error("No matching build found.")
+        error("No matching build found on Travis CI.")
 
 
 def bump_versions(options):
