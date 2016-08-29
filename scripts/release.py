@@ -5,13 +5,13 @@ The process:
 
 0. Ensure current checkout is not dirty (i.e. everything is committed).
 1. Ensure current commit has passing tests by talking to Travis API.
-2. Bump versions on all relevant files.
+2. Bump versions on all relevant files using the bumpversion tool.
 
 (TODO: once we only have `master` branch and no more `develop` will add more
 steps:
 
-3. Git commit.
-4. Tag with new version.
+3. Git commit. Can be done via bumpversion.
+4. Tag with new version. Can be done via bumpversion.
 5. Tell user command to run to git push and actually release the code.)
 
 For now however we will continue current process. I.e. local commit will need to
@@ -72,6 +72,11 @@ def ensure_passing_tests(options):
 
 def bump_versions(options):
     """Bump release version on all applicable files."""
+    if options["patch"]:
+        increment = "patch"
+    elif options["minor"]:
+        increment = "minor"
+    check_output(["bumpversion", "--verbose", "--list", increment])
 
 
 def main():
