@@ -82,14 +82,25 @@ def bump_versions(options):
 def main():
     """Run the release."""
     options = docopt(HELP)
-    for index, step in enumerate([ensure_not_dirty,
-                                  ensure_passing_tests,
-                                  bump_versions,]):
+    for index, step in enumerate([]):#ensure_not_dirty,
+                                  #ensure_passing_tests,
+                                  #bump_versions,]):
         print("Step {}: {}".format(index + 1, step.__name__))
         step(options)
     print("""\
-All done! You can now push this branch to GitHub and get it merged to
-`master` via `develop`.""")
+Version numbers have been incremented. You should now:
+
+1. Inspect the changes in the branch.
+2. git add all changed files.
+3. git commit.
+4. git push to GitHub.
+5. Open a PR into `develop`.
+5. Merge PR into `develop` when tests pass.
+6. Merge `develop` into `master`.
+7. Create a release using the GitHub UI.
+
+These steps will be automated in future iterations of the release automation.
+""")
 
 if __name__ == '__main__':
     main()

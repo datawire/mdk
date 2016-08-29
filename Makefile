@@ -6,7 +6,8 @@ default:
 	echo "* 'make setup' to setup the environment"
 	echo "* 'make test' to run tests (requires setup)"
 	echo "* 'make packages' to build packages"
-	echo "* 'make release' to do a release"
+	echo "* 'make release-patch' to do a patch release (2.0.x)"
+	echo "* 'make release-minor' to do a minor release (2.x.0)"
 
 virtualenv:
 	virtualenv virtualenv
@@ -25,8 +26,11 @@ test:
 	# or have not installed the MDK.
 	source virtualenv/bin/activate && python -m unittest discover -v
 
-release:
-	virtualenv/bin/python scripts/release.py
+release-minor:
+	source virtualenv/bin/activate; python scripts/release.py minor
+
+release-patch:
+	source virtualenv/bin/activate; python scripts/release.py patch
 
 # Packaging commands:
 output: $(wildcard quark/*.q) dist
