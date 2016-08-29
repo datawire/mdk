@@ -1,22 +1,20 @@
 quark 1.0;
 
-package datawire_mdk_test 1.0.0;
-
-/* There are more tests in tests/test_discovery.py. */
+/* There are more tests in tests/test_*.py. */
 
 use ../mdk-2.0.q;
 
 import quark.test;
 import quark.reflect;
 
-void main(List<String> args) {
-    test.run(args);
-}
-
 import mdk_tracing;
 import mdk_tracing.protocol;
 import mdk_runtime;
 import mdk_discovery;
+
+void main(List<String> args) {
+    test.run(args);
+}
 
 FakeWSActor expectSocket(MDKRuntime runtime, String url) {
     FakeWebSockets ws = ?runtime.getWebSocketsService();
