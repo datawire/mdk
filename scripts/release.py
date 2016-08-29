@@ -82,9 +82,9 @@ def bump_versions(options):
 def main():
     """Run the release."""
     options = docopt(HELP)
-    for index, step in enumerate([]):#ensure_not_dirty,
-                                  #ensure_passing_tests,
-                                  #bump_versions,]):
+    for index, step in enumerate([ensure_not_dirty,
+                                  ensure_passing_tests,
+                                  bump_versions]):
         print("Step {}: {}".format(index + 1, step.__name__))
         step(options)
     print("""\
