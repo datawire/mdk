@@ -55,7 +55,7 @@ def ensure_passing_tests(options):
     travis = TravisPy()
     revision = check_output(["git", "rev-parse", "HEAD"])
     build_passed = False
-    for build in travis.builds(slug="datawire/mdk", number=200):
+    for build in travis.builds(slug="datawire/mdk"):
         if build.commit_id == revision:
             if build.passed:
                 build_passed = True
