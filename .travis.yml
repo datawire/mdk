@@ -17,3 +17,10 @@ script:
   - gem --version
   - env | grep -v DATAWIRE_TOKEN
   - ./.travis-test.sh
+
+# Upload packages on successful tagged builds:
+deploy:
+  provider: script
+  script: "make upload-packages"
+  on:
+    tags: true
