@@ -3,6 +3,7 @@ Release the MDK.
 
 The process:
 
+0. Ensure current checkout is not dirty (i.e. everything is committed).
 1. Ensure current commit has passing tests by talking to Travis API.
 2. Bump versions on all relevant files.
 
@@ -32,13 +33,40 @@ Commands:
 
 HELP = __doc__
 
-
+from subprocess import check_output
 from docopt import docopt
+from travispy import TravisPy
+
+
+def error(reason):
+    """Exit with the given reason printed out."""
+    exit("ERROR: " + reason)
+
+
+def ensure_not_dirty(options):
+    """Ensure the current checkout has no uncomitted changes."""
+    dirty = check_output(["git", "status", "--porcelain", "--untracked=no"]).splitlines()
+    if dirty:
+        error("git checkout has uncomitted changes.")
 
 
 def ensure_passing_tests(options):
     """Talk to Travis CI, ensure all tests passed for the current git commit."""
-    # XXX use travispy
+    travis = TravisPy()
+    revision = check_output(["git", "rev-parse", "HEAD"])
+    build_passed = False
+    for build in travis.builds(slug="datawire/mdk", number=50):
+        if build.commit_id == revision:
+            if build.passed:
+                build_passed = True
+                break
+            else:
+                error("Build either failed or is unfinished. Current state:"
+                     + build.current_state())
+
+    if not build_passed:
+        error("No matching build found.")
+
 
 def bump_versions(options):
     """Bump release version on all applicable files."""
@@ -47,9 +75,9 @@ def bump_versions(options):
 def main():
     """Run the release."""
     options = docopt(HELP)
-    for index, step in enumerate([ensure_passing_tests,
-                                  bump_versions,
-                                  ]):
+    for index, step in enumerate([ensure_not_dirty,
+                                  ensure_passing_tests,
+                                  bump_versions,]):
         print("Step {}: {}".format(index + 1, step.__name__))
         step(options)
     print("""\
