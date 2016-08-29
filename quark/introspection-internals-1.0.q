@@ -18,7 +18,7 @@ quark 1.0;
 
 import quark.os;
 
-use mdk_runtime.q;
+include mdk_runtime.q;
 import mdk_runtime;  // bring in EnvironmentVariables
 
 namespace mdk_introspection

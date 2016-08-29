@@ -8,6 +8,7 @@ node_modules
 tests/source/*_java/target
 
 quark/output
+output/
 
 venv
 virtualenv
@@ -27,3 +28,7 @@ build-tools
 *.pkcs12
 *.jks
 *.jceks
+
+.cache
+npm-debug.log
+dist/

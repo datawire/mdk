@@ -5,7 +5,7 @@ package datawire_mdk_protocol 1.3.1;
 import quark.concurrent;
 import quark.reflect;
 
-use mdk_runtime.q;
+include mdk_runtime.q;
 
 import mdk_runtime;
 import mdk_runtime.actors;
@@ -48,7 +48,8 @@ namespace mdk_protocol {
             if (meth != null) {
                 obj = ?meth.invoke(null, [type]);
                 if (obj == null) {
-                    WSClient.logger.warn(clazz.getName() + "." + meth.getName() + " could not understand this json: " + encoded);
+                    Logger logger = new Logger("protocol");
+                    logger.warn(clazz.getName() + "." + meth.getName() + " could not understand this json: " + encoded);
                     return null;
                 }
                 clazz = obj.getClass();
@@ -407,7 +408,7 @@ namespace mdk_protocol {
 
         */
 
-        static Logger logger = new Logger("protocol");
+        Logger logger = new Logger("protocol");
 
         float firstDelay = 1.0;
         float maxDelay = 16.0;

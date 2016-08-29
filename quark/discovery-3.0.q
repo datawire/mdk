@@ -4,8 +4,8 @@ package datawire_mdk_discovery 3.5.0;
 
 include discovery-protocol-3.0.q;
 include synapse.q;
-use util-1.0.q;
-use mdk_runtime.q;
+include util-1.0.q;
+include mdk_runtime.q;
 
 import quark.concurrent;
 import quark.reflect;
@@ -138,7 +138,7 @@ namespace mdk_discovery {
 
     @doc("Default circuit breaker policy.")
     class CircuitBreaker extends FailurePolicy {
-        static Logger _log = new Logger("mdk.breaker");
+        Logger _log = new Logger("mdk.breaker");
 
         int _threshold;
         float _delay;
@@ -417,7 +417,7 @@ namespace mdk_discovery {
     @doc("(see the register method) and a consumer can locate a provider for a")
     @doc("particular service (see the resolve method).")
     class Discovery extends Actor {
-        static Logger logger = new Logger("discovery");
+        Logger logger = new Logger("discovery");
 
         // Clusters the disco says are available, as well as clusters for
         // which we are awaiting resolution.
