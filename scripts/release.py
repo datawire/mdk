@@ -53,16 +53,18 @@ def ensure_not_dirty(options):
 def ensure_passing_tests(options):
     """Talk to Travis CI, ensure all tests passed for the current git commit."""
     travis = TravisPy()
-    revision = check_output(["git", "rev-parse", "HEAD"])
+    revision = check_output(["git", "rev-parse", "HEAD"]).strip()
     build_passed = False
     for build in travis.builds(slug="datawire/mdk"):
-        if build.commit_id == revision:
+        if build.commit.sha == revision:
             if build.passed:
                 build_passed = True
                 break
             else:
-                error("Build either failed or is unfinished. Current state:"
-                     + build.current_state())
+                error("Found the build but it has not passed.\n    Build state: "
+                      + build.state +
+                      "\n    Build URL: https://travis-ci.org/datawire/mdk/builds/"
+                      + str(build.id))
 
     if not build_passed:
         error("No matching build found on Travis CI.")
