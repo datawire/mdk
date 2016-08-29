@@ -4,6 +4,8 @@ quark 1.0;
 
 use ../mdk-2.0.q;
 
+package datawire_mdk_test 1.0.0;
+
 import quark.test;
 import quark.reflect;
 
