@@ -2,6 +2,9 @@ sudo: required
 dist: trusty
 services:
   - docker
+env:
+  global:
+    secure: "l5Ko1ZgDCafxDFVCWxRx2nLTiXXxUHcvC2sBZqVg/A5QBob2aQzcc7dFoxw/pb42G+qZnqlz3m2AYrq8Y+iJ2R//ZMzlHcTYI2jd7gXZIC41I1QFPhtwPHfixlTthMoG43Qg9t1h9jxNQu2QFit0Nj0t3EllHIaELoKfAE73HcRH6mHtXnbKJRNNhG1/Bg39bVonJycFn2CpIlmFKHOliurwUIFnhRkTsSJ4X7y2SLYWASEceFeFsKG1M52k7qfJcPIK5aq9hi53HPInUfksgBJTsU7rupqQr0C1rnkyFZKSrg+TFqF1KyLqJNN475FkpwYf0g1q0uNQYVbgJeP0BaElwsafPPFb0rrpPtXr7h2+b6HwAzo0/bRqHCNsw3P4RBsq44iX4MsoKhlxbADd4ZgIfRCo0pkSEq+x3LsBBf9blikLuCc2SC16C4NQ797bQ8bPwm2Z8teP/SlrU0B8AhZ4lXYeKL366RMUshgHWi+Pjcg+1sA6M01g6lHjqLHqaTLAXFq4ykzJWEbBdpiFncZpN35DLslhCqszJfmFHNfrkDU5uvrS6rt/ryx0R1Du3tkw2IneS1eEgCUUdlcB53Jn+OR2ZedhXgtsOfncti+7b1BgP0Z9j3tn06t92bb1xBtDmKOaloHNewmN3rck9Zy5YD/4mMFNvJU0mE3lD58="
 
 install:
   - sudo apt-get -y install software-properties-common
@@ -15,5 +18,11 @@ script:
   - ls -a
   - ruby --version
   - gem --version
-  - env | grep -v DATAWIRE_TOKEN
   - ./.travis-test.sh
+
+# Upload packages on successful tagged builds:
+deploy:
+  provider: script
+  script: "make upload-packages"
+  on:
+    tags: true

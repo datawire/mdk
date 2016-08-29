@@ -5,7 +5,10 @@ default:
 	echo "You can run:"
 	echo "* 'make setup' to setup the environment"
 	echo "* 'make test' to run tests (requires setup)"
-	echo "* 'make packages' to build packages"
+	echo "* 'make packages' to build packages (.whl, .gem, etc.)"
+	echo "* 'make release-patch' to do a patch release (2.0.x)"
+	echo "* 'make release-minor' to do a minor release (2.x.0)"
+	echo "* 'make upload-packages' to upload packages to native repos (e.g. .whl to PyPI, .gem to RubyGems.org, etc.)"
 
 virtualenv:
 	virtualenv virtualenv
@@ -24,6 +27,13 @@ test:
 	# or have not installed the MDK.
 	source virtualenv/bin/activate && python -m unittest discover -v
 
+release-minor:
+	source virtualenv/bin/activate; python scripts/release.py minor
+
+release-patch:
+	source virtualenv/bin/activate; python scripts/release.py patch
+
+# Packaging commands:
 output: $(wildcard quark/*.q) dist
 	rm -rf output
 	quark compile --include-stdlib -o output.temp quark/mdk-2.0.q
@@ -50,3 +60,9 @@ javascript-packages: output
 .PHONY: java-packages
 java-packages: output
 	python scripts/build-packages.py java output/java/mdk-2.0 dist/
+
+
+# Package upload commands
+.PHONY: upload-packages
+upload-packages: packages
+	source virtualenv/bin/activate; python scripts/upload.py
