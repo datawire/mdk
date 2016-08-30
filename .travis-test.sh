@@ -1,11 +1,8 @@
 #!/bin/bash
 set -e
 
-# Setup local Gem install instead of system install:
+# Make sure we're using correct version of Ruby:
 rvm use --ruby-version 2.3
-#echo "install: --user-install" > ~/.gemrc
-#echo "gempath at $1 is $(gem env gempath)"
-#export PATH="$PATH":~/.quark/bin/:$(gem env gempath | tr : \\n | grep -F -e "$HOME/.gem/" | head -1)/bin
 
 # Display what ruby we're using, to make sure it's correct:
 ruby --version
