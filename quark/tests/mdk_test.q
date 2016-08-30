@@ -2,7 +2,7 @@ quark 1.0;
 
 /* There are more tests in tests/test_*.py. */
 
-use ../mdk-2.0.q;
+include ../mdk-2.0.q;
 
 package datawire_mdk_test 1.0.0;
 
