@@ -15,5 +15,6 @@ script:
 deploy:
   provider: script
   script: "make upload-packages"
+  skip_cleanup: true
   on:
     tags: true

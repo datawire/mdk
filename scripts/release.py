@@ -33,9 +33,8 @@ Commands:
 
 HELP = __doc__
 
-from subprocess import check_output
+from subprocess import check_output, CalledProcessError
 from docopt import docopt
-from travispy import TravisPy
 
 
 def error(reason):
@@ -52,22 +51,11 @@ def ensure_not_dirty(options):
 
 def ensure_passing_tests(options):
     """Talk to Travis CI, ensure all tests passed for the current git commit."""
-    travis = TravisPy()
-    revision = check_output(["git", "rev-parse", "HEAD"]).strip()
-    build_passed = False
-    for build in travis.builds(slug="datawire/mdk"):
-        if build.commit.sha == revision:
-            if build.passed:
-                build_passed = True
-                break
-            else:
-                error("Found the build but it has not passed.\n    Build state: "
-                      + build.state +
-                      "\n    Build URL: https://travis-ci.org/datawire/mdk/builds/"
-                      + str(build.id))
-
-    if not build_passed:
-        error("No matching build found on Travis CI.")
+    try:
+        check_output(["python", "scripts/check-travis.py"])
+    except CalledProcessError:
+        # check-travis.py will print reason
+        raise SystemExit(1)
 
 
 def bump_versions(options):

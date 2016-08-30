@@ -23,9 +23,9 @@ setup: python-dependencies
 .PHONY: test
 test:
 	# For now we rely on either .travis-test.sh or the user to install the
-	# MDK. This means tests.test_endtoend will fail if you are not on Travis
+	# MDK. This means tests will fail if you are not on Travis
 	# or have not installed the MDK.
-	source virtualenv/bin/activate && python -m unittest discover -v
+	source virtualenv/bin/activate && py.test -n 4 -v tests
 
 release-minor:
 	source virtualenv/bin/activate; python scripts/release.py minor
