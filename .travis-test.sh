@@ -20,5 +20,8 @@ for CODE_LANG in --python --ruby --java --javascript ; do
     bash install.sh $CODE_LANG $TRAVIS_COMMIT
 done
 
+# Make sure we can build packages, if not there's no point in even continuing:
+make packages
+
 # Run the tests:
 make test
