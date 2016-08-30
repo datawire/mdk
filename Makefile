@@ -36,7 +36,8 @@ release-patch:
 # Packaging commands:
 output: $(wildcard quark/*.q) dist
 	rm -rf output
-	quark compile --include-stdlib -o output.temp quark/mdk-2.0.q
+	# Use installed Quark if we don't already have quark cli in PATH:
+	which quark || source ~/.quark/config.sh; quark compile --include-stdlib -o output.temp quark/mdk-2.0.q
 	mv output.temp output
 
 dist:
