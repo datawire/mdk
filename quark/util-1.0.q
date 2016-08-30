@@ -1,11 +1,11 @@
 quark 1.0;
 
-package datawire_mdk_util 1.0.0;
+package datawire_mdk_util 2.0.4;
 
 use js bluebird 3.4.1;
 include mdk_promises.js;
 
-use mdk_runtime.q;
+include mdk_runtime.q;
 
 import quark.os;
 import quark.concurrent;

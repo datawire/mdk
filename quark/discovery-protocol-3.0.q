@@ -1,7 +1,7 @@
 quark 1.0;
 
-use protocol-1.0.q;
-use util-1.0.q;
+include protocol-1.0.q;
+include util-1.0.q;
 
 import mdk_runtime.actors;
 import mdk_protocol;
@@ -48,7 +48,7 @@ namespace mdk_discovery {
             // Clusters we advertise to the disco service.
             Map<String, Cluster> registered = new Map<String, Cluster>();
 
-            static Logger dlog = new Logger("discovery");
+            Logger dlog = new Logger("discovery");
 
             DiscoClient(Actor subscriber, String token, String url, MDKRuntime runtime) {
                 super(runtime);

@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_runtime 1.2.0;
+package datawire_mdk_runtime 2.0.4;
 
 include actors_core.q;
 include actors_promise.q;
@@ -155,7 +155,7 @@ namespace mdk_runtime {
     class QuarkRuntimeWSActor extends WSActor, WSHandler {
 	// XXX need better story for logging; perhaps integrate MDK Session with
 	// the MessageDispatcher?
-	static Logger logger = new Logger("protocol");
+	Logger logger = new Logger("protocol");
 	WebSocket socket;
 	PromiseResolver factory;
 	Actor originator;
@@ -235,7 +235,7 @@ namespace mdk_runtime {
     class QuarkRuntimeWebSockets extends WebSockets {
 	// XXX need better story for logging; perhaps integrate MDK Session with
 	// the MessageDispatcher?
-	static Logger logger = new Logger("protocol");
+	Logger logger = new Logger("protocol");
 
 	MessageDispatcher dispatcher;
         List<WSActor> connections = [];

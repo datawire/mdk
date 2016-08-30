@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_introspection 1.0.1;
+package datawire_mdk_introspection 2.0.4;
 
 /* 
  * Copyright 2016 Datawire. All rights reserved.
@@ -18,7 +18,7 @@ package datawire_mdk_introspection 1.0.1;
  * limitations under the License.
  */
 
-use mdk_runtime.q;
+include mdk_runtime.q;
 include introspection-internals-1.0.q;
 
 import mdk_runtime;
@@ -67,10 +67,8 @@ namespace mdk_introspection
     }
   }
 
-  class Platform 
+  class Platform
   {
-    static Logger logger = new Logger("Platform");
-
     static String PLATFORM_TYPE_VARIABLE_NAME    = "DATAWIRE_PLATFORM_TYPE";
 
     static String PLATFORM_TYPE_EC2              = "EC2";
@@ -96,6 +94,7 @@ namespace mdk_introspection
     static String getRoutableHost(EnvironmentVariables env)
     {
       String result = null;
+      Logger logger = new Logger("Platform");
 
       if (env.var(ROUTABLE_HOST_VARIABLE_NAME).isDefined())
       {
