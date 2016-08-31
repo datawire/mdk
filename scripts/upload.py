@@ -80,6 +80,8 @@ def upload_npm():
 
 def main():
     upload_python()
+    upload_npm()
+    upload_gem()
 
 
 if __name__ == '__main__':
