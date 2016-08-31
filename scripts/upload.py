@@ -25,6 +25,8 @@ GEM_CONFIG = """\
 :rubygems_api_key: {}
 """
 
+NPM_CONFIG = "//registry.npmjs.org/:_authToken={}"
+
 
 def upload_python():
     """
@@ -56,6 +58,24 @@ def upload_gem():
         if not creds_existed:
             # Delete the file we wrote:
             os.remove(creds)
+
+
+def upload_npm():
+    """
+    Upload npm to npmjs repository.
+    """
+    npm = os.path.join("output/js/mdk-2.0")
+    config = os.path.expanduser("~/.npmrc")
+    config_existed = os.path.exists(config)
+    try:
+        if not config_existed:
+            with open(config, "w") as f:
+                f.write(NPM_CONFIG.format(os.environ["NPM_API_KEY"]))
+        check_call(["npm", "publish", npm])
+    finally:
+        if not config_existed:
+            # Delete the file we wrote:
+            os.remove(config)
 
 
 def main():
