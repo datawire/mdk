@@ -48,7 +48,7 @@ def upload_gem():
     if not os.path.exists(directory):
         os.makedirs(directory)
     creds = os.path.join(directory, "credentials")
-    creds_existed = os.path.exist(creds)
+    creds_existed = os.path.exists(creds)
     try:
         if not creds_existed:
             with open(creds, "w") as f:
