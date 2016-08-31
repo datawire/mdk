@@ -20,7 +20,7 @@ def main():
     revision = check_output(["git", "rev-parse", "HEAD"]).strip()
     build_passed = False
     for build in travis.builds(slug="datawire/mdk"):
-        if build.commit.sha == revision + "1":
+        if build.commit.sha == revision:
             if build.passed:
                 build_passed = True
                 break
