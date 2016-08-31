@@ -53,6 +53,7 @@ def upload_gem():
         if not creds_existed:
             with open(creds, "w") as f:
                 f.write(GEM_CONFIG.format(os.environ["RUBYGEMS_API_KEY"]))
+            os.chmod(creds, 0o600)
         check_call(["gem", "push", gem])
     finally:
         if not creds_existed:
