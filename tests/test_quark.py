@@ -15,7 +15,9 @@ if QUARK_VERSION.startswith("v"):
     QUARK_VERSION = QUARK_VERSION[1:]
 
 
-@pytest.fixture(params=[filename for filename in glob(QUARK_TESTS_DIR + "/*.q")])
+# Tests that don't need to run on all languages:
+@pytest.fixture(params=[filename for filename in glob(QUARK_TESTS_DIR + "/*.q")
+                        if not filename.endswith("runtime_test.q")])
 def filepath(request):
     return request.param
 
@@ -24,8 +26,18 @@ def language(request):
     return request.param
 
 
-def test_run(filepath, language):
-    """Create a test that installs and runs a Quark test file."""
+def test_run_python_only(filepath):
+    """Run Quark tests that don't need to run in multiple languages."""
+    run(filepath, "python")
+
+
+def test_run_all_languages(language):
+    """Run tests that have to be run in all languages."""
+    run(os.path.join(QUARK_TESTS_DIR, "runtime_test.q"), language)
+
+
+def run(filepath, language):
+    """Install and run a Quark test file."""
     docker_path = os.path.join("/code/quark/tests",
                                filepath[len(QUARK_TESTS_DIR) + 1:])
     print("Installing and running {} in {}...".format(filepath, language))
