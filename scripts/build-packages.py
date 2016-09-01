@@ -26,7 +26,7 @@ def build_javascript(package_dir):
 
 def build_java(package_dir):
     """Build Java packages from the output of quark compile (output/java/mdk-2.0)."""
-    # We just upload straight from directory, I believe
+    check_call("patch < ../../../pom.xml.patch", shell=True, cwd=package_dir)
     return []
 
 
