@@ -78,8 +78,19 @@ def upload_npm():
             # Delete the file we wrote:
             os.remove(config)
 
+def upload_jar():
+    """
+    Upload jar to ossrh.
+    """
+    check_call("openssl aes-256-cbc -K $encrypted_530a0926551f_key -iv $encrypted_530a0926551f_iv -in ci/cikey.asc.enc -out ci/cikey.asc -d", shell=True)
+    check_call(["mvn", "-P", "release",
+                "-f", "output/java/mdk-2.0",
+                "--settings", "ci/mvnsettings.xml",
+                "deploy", "nexus-staging:release:"])
+
 
 def main():
+    upload_jar()
     upload_python()
     upload_npm()
     upload_gem()
