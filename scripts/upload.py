@@ -83,6 +83,7 @@ def upload_jar():
     Upload jar to ossrh.
     """
     check_call("openssl aes-256-cbc -K $encrypted_530a0926551f_key -iv $encrypted_530a0926551f_iv -in ci/cikey.asc.enc -out ci/cikey.asc -d", shell=True)
+    check_call("gpg --fast-import ci/cikey.asc")
     check_call(["mvn", "-P", "release",
                 "-f", "output/java/mdk-2.0",
                 "--settings", "ci/mvnsettings.xml",
