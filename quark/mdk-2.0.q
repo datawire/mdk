@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk 2.0.10;
+package datawire_mdk 2.0.11;
 
 // DATAWIRE MDK
 
@@ -248,6 +248,7 @@ namespace mdk {
     class MDKImpl extends MDK {
 
         Logger logger = new Logger("mdk");
+        Map<String,Object> _reflection_hack = null;
 
         MDKRuntime _runtime;
         Discovery _disco;
@@ -276,6 +277,7 @@ namespace mdk {
         }
 
         MDKImpl(MDKRuntime runtime) {
+            _reflection_hack = new Map<String,Object>();
             _runtime = runtime;
             if (!runtime.dependencies.hasService("failurepolicy_factory")) {
                 runtime.dependencies.registerService("failurepolicy_factory",
