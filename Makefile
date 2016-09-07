@@ -11,14 +11,25 @@ default:
 	echo "* 'make upload-packages' to upload packages to native repos (e.g. .whl to PyPI, .gem to RubyGems.org, etc.)"
 
 virtualenv:
-	virtualenv virtualenv
+	virtualenv -p python2 virtualenv
 
 .PHONY: python-dependencies
 python-dependencies: virtualenv
 	virtualenv/bin/pip install -r dev-requirements.txt
 
+virtualenv3:
+	virtualenv -p python3 virtualenv3
+
+.PHONY: python3-dependencies
+python3-dependencies: virtualenv3
+	virtualenv3/bin/pip install -r dev-requirements.txt
+
 .PHONY: setup
-setup: python-dependencies
+setup: python-dependencies python3-dependencies install-quark
+
+.PHONY: install-mdk
+install-mdk: packages
+	virtualenv/bin/pip install dist/
 
 .PHONY: test
 test:
@@ -26,6 +37,7 @@ test:
 	# MDK. This means tests will fail if you are not on Travis
 	# or have not installed the MDK.
 	source virtualenv/bin/activate && py.test -n 4 -v tests
+	source virtualenv3/bin/activate && py.test -n 4 -v tests
 
 release-minor:
 	source virtualenv/bin/activate; python scripts/release.py minor
@@ -38,6 +50,8 @@ output: $(wildcard quark/*.q) dist
 	rm -rf output
 	# Use installed Quark if we don't already have quark cli in PATH:
 	which quark || source ~/.quark/config.sh; quark compile --include-stdlib -o output.temp quark/mdk-2.0.q
+	cp -R output.temp/py output.temp/py3
+	futurize -nw --no-diffs --unicode-literals --both-stages  output.temp/py3/mdk-2.0
 	mv output.temp output
 
 dist:
