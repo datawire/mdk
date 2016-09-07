@@ -16,12 +16,12 @@ def _mdk_mktempdir():
 def _mdk_writefile(path, contents):
     """Write a file to disk."""
     with open(path, "wb") as f:
-        f.write(contents)
+        f.write(contents.encode("utf-8"))
 
 def _mdk_readfile(path):
     """Read a file's contents."""
-    with open(path, "rb") as f:
-        return f.read()
+    with open(path, "r") as f:
+        return f.read().decode("utf-8")
 
 def _mdk_deletefile(path):
     """Delete a file."""
