@@ -1,6 +1,7 @@
 """
 Run tests written in Quark.
 """
+from __future__ import print_function
 
 import os
 from glob import glob

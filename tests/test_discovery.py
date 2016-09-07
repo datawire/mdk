@@ -5,6 +5,8 @@ Additional tests can be found in quark/tests/mdk_test.q.
 """
 
 from __future__ import absolute_import
+from builtins import range
+from builtins import object
 
 from unittest import TestCase
 
@@ -125,7 +127,7 @@ class DiscoveryTests(TestCase):
         disco.onMessage(None, NodeActive(node1))
         disco.onMessage(None, NodeActive(node2))
         disco.onMessage(None, ReplaceCluster("myservice", [node3, node4]))
-        self.assertItemsEqual(disco.knownNodes("myservice"), [node3, node4])
+        self.assertEqual(disco.knownNodes("myservice"), [node3, node4])
 
     def test_replaceEmpty(self):
         """
@@ -135,7 +137,7 @@ class DiscoveryTests(TestCase):
         node1 = create_node("somewhere")
         node2 = create_node("somewhere2")
         disco.onMessage(None, ReplaceCluster("myservice", [node1, node2]))
-        self.assertItemsEqual(disco.knownNodes("myservice"), [node1, node2])
+        self.assertEqual(disco.knownNodes("myservice"), [node1, node2])
 
     def test_replaceTriggersWaitingPromises(self):
         """
@@ -301,7 +303,7 @@ class FakeDiscovery(object):
         self.services = {}
 
     def is_empty(self):
-        return all([not addresses for addresses in self.services.values()])
+        return all([not addresses for addresses in list(self.services.values())])
 
     def add(self, service, address):
         self.services.setdefault(service, set()).add(address)
@@ -318,7 +320,7 @@ class FakeDiscovery(object):
     def compare(self, real_discovery):
         """Compare us to a real Discovery instance, assert same state."""
         real_services = {}
-        for name, cluster in real_discovery.services.items():
+        for name, cluster in list(real_discovery.services.items()):
             real_services[name] = set(node.address for node in cluster.nodes)
         assert self.services == real_services
 
@@ -344,17 +346,17 @@ class StatefulDiscoveryTesting(GenericStateMachine):
             return st.tuples(st.just(service_name), st.sampled_from(
                 self.fake.services[service_name]))
         return st.tuples(st.just("remove"), (
-                st.sampled_from(self.fake.services.keys()).flatmap(get_address)))
+                st.sampled_from(list(self.fake.services.keys())).flatmap(get_address)))
 
     def steps(self):
         result = add_strategy | replace_strategy
         # Replace or add to a known service cluster:
         if self.fake.services:
             result |= st.tuples(st.just("replace"),
-                                st.tuples(st.sampled_from(self.fake.services.keys()),
+                                st.tuples(st.sampled_from(list(self.fake.services.keys())),
                                           st.lists(nice_strings)))
             result |= st.tuples(st.just("add"),
-                                st.tuples(st.sampled_from(self.fake.services.keys()),
+                                st.tuples(st.sampled_from(list(self.fake.services.keys())),
                                           nice_strings))
         # Remove a known address from known cluster:
         if not self.fake.is_empty():
