@@ -20,7 +20,7 @@ def _mdk_writefile(path, contents):
 
 def _mdk_readfile(path):
     """Read a file's contents."""
-    with open(path, "r") as f:
+    with open(path, "rb") as f:
         return f.read().decode("utf-8")
 
 def _mdk_deletefile(path):
