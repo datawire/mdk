@@ -44,8 +44,8 @@ def assertRegisteryDiscoverable(test, discover):
     """
     service = random_string()
     address = random_string()
-    p = Popen(["python", os.path.join(CODE_PATH, "register.py"), service, address])
-    test.addCleanup(lambda: p.terminate())
+    p = Popen([sys.executable, os.path.join(CODE_PATH, "register.py"), service, address])
+    test.addCleanup(lambda: p.kill())
     resolved_address = discover(service)
     test.assertIn(address, resolved_address)
     return p, service

@@ -9,6 +9,15 @@ default:
 	echo "* 'make release-patch' to do a patch release (2.0.x)"
 	echo "* 'make release-minor' to do a minor release (2.x.0)"
 	echo "* 'make upload-packages' to upload packages to native repos (e.g. .whl to PyPI, .gem to RubyGems.org, etc.)"
+	echo "* 'make clean' to undo setup and packages"
+
+.PHONY: clean
+clean:
+	rm -fr virtualenv
+	rm -fr virtualenv3
+	rm -fr output
+	rm -fr dist
+	rm -f quark/*.qc
 
 virtualenv:
 	virtualenv -p python2 virtualenv
@@ -27,42 +36,57 @@ python3-dependencies: virtualenv3
 .PHONY: setup
 setup: python-dependencies python3-dependencies install-quark
 
+.PHONY: install-quark
+install-quark:
+	which quark || \
+		curl -# -L https://raw.githubusercontent.com/datawire/quark/master/install.sh | \
+		bash -s -- -q `echo bozzo/python3-compat || cat QUARK_VERSION.txt`
+
 .PHONY: install-mdk
 install-mdk: packages
-	virtualenv/bin/pip install dist/
+	virtualenv/bin/pip install --upgrade dist/datawire_mdk-*-py2*-none-any.whl
+	virtualenv3/bin/pip install --upgrade dist/datawire_mdk-*-*py3-none-any.whl
+	gem install --no-doc dist/datawire_mdk-*.gem
+	npm install output/js/mdk-2.0
+	cd output/java/mdk-2.0 && mvn install
 
 .PHONY: test
-test:
-	# For now we rely on either .travis-test.sh or the user to install the
-	# MDK. This means tests will fail if you are not on Travis
-	# or have not installed the MDK.
-	source virtualenv/bin/activate && py.test -n 4 -v tests
-	source virtualenv3/bin/activate && py.test -n 4 -v tests
+test: install-mdk test-python test-python3
+
+.PHONY: test-python
+test-python:
+	virtualenv/bin/py.test -n 4 -v tests
+
+.PHONY: test-python3
+test-python3:
+	virtualenv3/bin/py.test -n 4 -v tests
 
 release-minor:
-	source virtualenv/bin/activate; python scripts/release.py minor
+	virtualenv/bin/python scripts/release.py minor
 
 release-patch:
-	source virtualenv/bin/activate; python scripts/release.py patch
+	virtualenv/bin/python scripts/release.py patch
 
 # Packaging commands:
 output: $(wildcard quark/*.q) dist
 	rm -rf output
 	# Use installed Quark if we don't already have quark cli in PATH:
-	which quark || source ~/.quark/config.sh; quark compile --include-stdlib -o output.temp quark/mdk-2.0.q
-	cp -R output.temp/py output.temp/py3
-	futurize -nw --no-diffs --unicode-literals --both-stages  output.temp/py3/mdk-2.0
+	which quark || source ~/.quark/config.sh; quark compile --verbose --include-stdlib -o output.temp quark/mdk-2.0.q
 	mv output.temp output
 
 dist:
 	mkdir dist
 
 .PHONY: packages
-packages: python-packages ruby-packages javascript-packages java-packages
+packages: python-packages python3-packages ruby-packages javascript-packages java-packages
 
 .PHONY: python-packages
 python-packages: output
 	python scripts/build-packages.py py output/py/mdk-2.0 dist/
+
+.PHONY: python3-packages
+python3-packages: output
+	python scripts/build-packages.py py3 output/py/mdk-2.0 dist/
 
 .PHONY: ruby-packages
 ruby-packages: output
