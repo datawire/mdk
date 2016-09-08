@@ -22,7 +22,7 @@ if QUARK_VERSION.startswith("v"):
 def filepath(request):
     return request.param
 
-@pytest.fixture(params= ["python", "java", "ruby", "javascript"])
+@pytest.fixture(params= ["python3", "python", "java", "ruby", "javascript"])
 def language(request):
     return request.param
 
@@ -30,6 +30,10 @@ def language(request):
 def test_run_python_only(filepath):
     """Run Quark tests that don't need to run in multiple languages."""
     run(filepath, "python")
+
+def test_run_python3_only(filepath):
+    """Run Quark tests that don't need to run in multiple languages."""
+    run(filepath, "python3")
 
 
 def test_run_all_languages(language):
@@ -44,5 +48,5 @@ def run(filepath, language):
     print("Installing and running {} in {}...".format(filepath, language))
     check_call(["sudo", "docker", "run",
                 # Mount volume into container so Docker can access quark files:
-                "-v", ROOT_DIR + ":/code",
-                "datawire/quark-run:" + QUARK_VERSION, "--" + language, docker_path])
+                "-v", ROOT_DIR + ":/code",] +
+                ["datawire/quark-run:" + QUARK_VERSION, "--" + language, '--verbose', docker_path])
