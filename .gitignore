@@ -9,6 +9,7 @@ tests/source/*_java/target
 
 quark/output
 output/
+QUARK_VERSION-dirty.txt
 
 venv
 virtualenv
