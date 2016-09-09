@@ -40,7 +40,7 @@ setup: python-dependencies python3-dependencies install-quark
 install-quark:
 	which quark || \
 		curl -# -L https://raw.githubusercontent.com/datawire/quark/master/install.sh | \
-		bash -s -- -q `echo bozzo/python3-compat || cat QUARK_VERSION.txt`
+		bash -s -- -q `echo bozzo/js-lazy-import || cat QUARK_VERSION.txt`
 
 .PHONY: install-mdk
 install-mdk: packages
