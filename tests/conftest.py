@@ -10,7 +10,7 @@ try:
     dirty = open(os.path.join(ROOT_DIR, "QUARK_VERSION-dirty.txt")).read().strip()
     QUARK_VERSION = dirty
     QUARK_VERSION_STATUS = "Overriding the quark version %s with the local quark version %s" % (official, dirty)
-except FileNotFoundError:
+except IOError:
     QUARK_VERSION = official
     QUARK_VERSION_STATUS = "Testing with quark version %s, QUARK_VERSION-dirty.txt not found" % (official)
 # Git tag starts with v, but the Docker tag does not:
