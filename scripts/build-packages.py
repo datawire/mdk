@@ -5,12 +5,15 @@ import sys
 from glob import glob
 from subprocess import check_call
 
+ROOT_DIR=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def build_python(package_dir):
     """Build Python package from the output of quark compile (output/py/mdk-2.0)."""
-    check_call(["python", "setup.py", "bdist_wheel"], cwd=package_dir)
+    python = os.path.join(ROOT_DIR, "virtualenv/bin/python2")
+    assert os.path.exists(python), python
+    print(python)
+    check_call([python, "setup.py", "bdist_wheel", "--universal"], cwd=package_dir)
     return glob(os.path.join(package_dir, "dist/*.whl"))
-
 
 def build_ruby(package_dir):
     """Build Ruby packages from the output of quark compile (output/rb/mdk-2.0)."""
@@ -37,7 +40,9 @@ def main(language, in_directory, out_directory):
                 "java": build_java}
     results = handlers[language](in_directory)
     for result in results:
-        os.rename(result, os.path.join(out_directory, os.path.basename(result)))
+        target = os.path.join(out_directory, os.path.basename(result))
+        print("Moving %s to %s" % (result, target))
+        os.rename(result, target)
 
 if __name__ == '__main__':
     main(sys.argv[1], sys.argv[2], sys.argv[3])

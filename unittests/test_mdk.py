@@ -1,6 +1,8 @@
 """
 Tests for the MDK public API that are easier to do in Python.
 """
+from builtins import range
+from builtins import object
 
 from unittest import TestCase
 from tempfile import mkdtemp

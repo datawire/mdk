@@ -5,13 +5,15 @@ build
 *.pyc
 
 node_modules
-tests/source/*_java/target
+functionaltests/source/*_java/target
 
 quark/output
 output/
+QUARK_VERSION-dirty.txt
 
 venv
 virtualenv
+virtualenv3
 build-tools
 
 # KDE

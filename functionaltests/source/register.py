@@ -1,4 +1,5 @@
 """Register a service given on command-line args."""
+from __future__ import print_function
 
 import time
 import sys
