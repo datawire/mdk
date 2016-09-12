@@ -40,7 +40,7 @@ setup: python-dependencies python3-dependencies install-quark
 install-quark:
 	which quark || \
 		curl -# -L https://raw.githubusercontent.com/datawire/quark/master/install.sh | \
-		bash -s -- -q `echo bozzo/js-lazy-import || cat QUARK_VERSION.txt`
+		bash -s -- -q `cat QUARK_VERSION.txt`
 
 .PHONY: install-mdk
 install-mdk: packages
@@ -71,22 +71,18 @@ release-patch:
 output: $(wildcard quark/*.q) dist
 	rm -rf output
 	# Use installed Quark if we don't already have quark cli in PATH:
-	which quark || source ~/.quark/config.sh; quark compile --verbose --include-stdlib -o output.temp quark/mdk-2.0.q
+	which quark || source ~/.quark/config.sh; quark compile --include-stdlib -o output.temp quark/mdk-2.0.q
 	mv output.temp output
 
 dist:
 	mkdir dist
 
 .PHONY: packages
-packages: python-packages python3-packages ruby-packages javascript-packages java-packages
+packages: python-packages ruby-packages javascript-packages java-packages
 
 .PHONY: python-packages
 python-packages: output
 	python scripts/build-packages.py py output/py/mdk-2.0 dist/
-
-.PHONY: python3-packages
-python3-packages: output
-	python scripts/build-packages.py py3 output/py/mdk-2.0 dist/
 
 .PHONY: ruby-packages
 ruby-packages: output

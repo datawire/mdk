@@ -12,17 +12,8 @@ def build_python(package_dir):
     python = os.path.join(ROOT_DIR, "virtualenv/bin/python2")
     assert os.path.exists(python), python
     print(python)
-    check_call([python, "setup.py", "bdist_wheel"], cwd=package_dir)
+    check_call([python, "setup.py", "bdist_wheel", "--universal"], cwd=package_dir)
     return glob(os.path.join(package_dir, "dist/*.whl"))
-
-def build_python3(package_dir):
-    """Build Python package from the output of quark compile (output/py/mdk-2.0)."""
-    python = os.path.join(ROOT_DIR, "virtualenv3/bin/python3")
-    assert os.path.exists(python), python
-    print(python)
-    check_call([python, "setup.py", "bdist_wheel"], cwd=package_dir)
-    return glob(os.path.join(package_dir, "dist/*.whl"))
-
 
 def build_ruby(package_dir):
     """Build Ruby packages from the output of quark compile (output/rb/mdk-2.0)."""
@@ -44,7 +35,6 @@ def build_java(package_dir):
 
 def main(language, in_directory, out_directory):
     handlers = {"py": build_python,
-                "py3": build_python3,
                 "rb": build_ruby,
                 "js": build_javascript,
                 "java": build_java}
