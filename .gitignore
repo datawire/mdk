@@ -5,7 +5,7 @@ build
 *.pyc
 
 node_modules
-tests/source/*_java/target
+functionaltests/source/*_java/target
 
 quark/output
 output/

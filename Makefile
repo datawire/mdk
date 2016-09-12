@@ -55,11 +55,12 @@ test: install-mdk test-python test-python3
 
 .PHONY: test-python
 test-python:
-	virtualenv/bin/py.test -n 4 -v tests
+	virtualenv/bin/py.test -n 4 -v unittests functionaltests
 
 .PHONY: test-python3
 test-python3:
-	virtualenv3/bin/py.test -n 4 -v tests
+	# Functional tests don't benefit from being run in another language:
+	virtualenv3/bin/py.test -n 4 -v unittests
 
 release-minor:
 	virtualenv/bin/python scripts/release.py minor
