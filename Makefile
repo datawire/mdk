@@ -18,6 +18,8 @@ clean:
 	rm -fr output
 	rm -fr dist
 	rm -f quark/*.qc
+	rm -fr ~/.m2/repository/datawire_mdk
+	rm -fr ~/.m2/repository/io/datawire/mdk
 
 virtualenv:
 	virtualenv -p python2 virtualenv
