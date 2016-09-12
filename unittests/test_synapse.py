@@ -64,7 +64,7 @@ class SynapseTests(TestCase):
             for n in l:
                 result.append((n.service, n.address, n.version, n.properties))
             return result
-        self.assertItemsEqual(get_attrs(first), get_attrs(second))
+        self.assertEqual(get_attrs(first), get_attrs(second))
 
     def test_newFile(self):
         """A new file in the correct format updates Discovery."""

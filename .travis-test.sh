@@ -11,17 +11,5 @@ gem --version
 # Prepare virtualenv:
 make setup
 
-# Enter the virtualenv:
-source virtualenv/bin/activate
-
-echo "Git commit is:" $TRAVIS_COMMIT
-for CODE_LANG in --python --ruby --java --javascript ; do
-    echo "Language is:" $CODE_LANG
-    bash install.sh $CODE_LANG $TRAVIS_COMMIT
-done
-
-# Make sure we can build packages, if not there's no point in even continuing:
-make packages
-
 # Run the tests:
 make test

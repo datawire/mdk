@@ -1,4 +1,5 @@
 """Write some logs."""
+from __future__ import print_function
 
 import sys
 import time
@@ -11,7 +12,7 @@ start = time.time()
 def got_logs(log_events, context):
     results = set()
     for event in log_events.result:
-        print event.context, event.category, event.text
+        print(event.context, event.category, event.text)
         if event.context.traceId in context:
             results.add((event.category, event.text))
     expected = set([("process1", "hello"), ("process2", "world")])

@@ -1,6 +1,8 @@
 """End-to-end tests for the MDK API."""
+from builtins import str
 
 import os
+import sys
 import time
 from random import random
 from subprocess import Popen, check_output, check_call
@@ -13,6 +15,8 @@ CODE_PATH = os.path.abspath(
 def random_string():
     return "random_" + str(random())[2:]
 
+def decoded_check_output(*args, **kwargs):
+    return check_output(*args, **kwargs).decode('utf-8')
 
 def run_python(command, extra_args=(), output=False):
     """
@@ -20,9 +24,9 @@ def run_python(command, extra_args=(), output=False):
 
     Returns output if output=True, in which case stderr will cause error.
     """
-    args = ["python", os.path.join(CODE_PATH, command)] + list(extra_args)
+    args = [sys.executable, os.path.join(CODE_PATH, command)] + list(extra_args)
     if output:
-        command = check_output
+        command = decoded_check_output
     else:
         command = check_call
     return command(args)
@@ -40,8 +44,8 @@ def assertRegisteryDiscoverable(test, discover):
     """
     service = random_string()
     address = random_string()
-    p = Popen(["python", os.path.join(CODE_PATH, "register.py"), service, address])
-    test.addCleanup(lambda: p.terminate())
+    p = Popen([sys.executable, os.path.join(CODE_PATH, "register.py"), service, address])
+    test.addCleanup(lambda: p.kill())
     resolved_address = discover(service)
     test.assertIn(address, resolved_address)
     return p, service
@@ -94,7 +98,7 @@ class JavascriptTests(TestCase):
         """Minimal discovery end-to-end test with a Javascript client."""
         assertRegisteryDiscoverable(
             self,
-            lambda service: check_output(
+            lambda service: decoded_check_output(
                 ["node", os.path.join(CODE_PATH, "resolve.js"), service]))
 
 
@@ -110,7 +114,7 @@ class RubyTests(TestCase):
         """Minimal discovery end-to-end test with a Javascript client."""
         assertRegisteryDiscoverable(
             self,
-            lambda service: check_output(
+            lambda service: decoded_check_output(
                 ["ruby", os.path.join(CODE_PATH, "resolve.rb"), service]))
 
 
@@ -132,7 +136,7 @@ class JavaTests(TestCase):
                     "package"])
         assertRegisteryDiscoverable(
             self,
-            lambda service: check_output(
+            lambda service: decoded_check_output(
                 ["java", "-jar", os.path.join(
                     CODE_PATH,"resolve_java/target/resolve-0.0.1.jar"),
                  service]))
