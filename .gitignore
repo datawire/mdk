@@ -15,6 +15,7 @@ venv
 virtualenv
 virtualenv3
 build-tools
+.hypothesis
 
 # KDE
 .directory
