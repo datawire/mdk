@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import os
+import sys
 from subprocess import check_call
 import pytest
 
@@ -26,7 +27,12 @@ def run(filepath, language):
     docker_path = os.path.join("/code",
                                filepath[len(ROOT_DIR) + 1:])
     print("Installing and running {} in {}...".format(filepath, language))
-    check_call(["sudo", "docker", "run",
+    if sys.platform == "darwin":
+        maybe_sudo = []
+    else:
+        maybe_sudo = ["sudo"]
+    check_call(maybe_sudo +
+               ["docker", "run",
                 # Mount volume into container so Docker can access quark files:
                 "-v", ROOT_DIR + ":/code",] +
                 ["datawire/quark-run:" + QUARK_VERSION, "--" + language, '--verbose', docker_path])
