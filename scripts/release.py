@@ -33,6 +33,7 @@ Commands:
 
 HELP = __doc__
 
+import sys
 from subprocess import check_output, CalledProcessError
 from docopt import docopt
 
@@ -52,7 +53,7 @@ def ensure_not_dirty(options):
 def ensure_passing_tests(options):
     """Talk to Travis CI, ensure all tests passed for the current git commit."""
     try:
-        check_output(["python", "scripts/check-travis.py"])
+        check_output([sys.executable, "scripts/check-travis.py"])
     except CalledProcessError:
         # check-travis.py will print reason
         raise SystemExit(1)

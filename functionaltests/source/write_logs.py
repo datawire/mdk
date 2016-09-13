@@ -1,10 +1,11 @@
 """Write some logs."""
+from __future__ import print_function
 
 import sys
 import time
 import os
 import logging
-logging.basicConfig(file=sys.stderr, level=logging.DEBUG)
+logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
 from mdk import start
 mdk = start()
@@ -24,7 +25,7 @@ def main():
             print("Took more than 60 seconds, giving up.")
             os._exit(1)
 
-        print(event.category, event.text)
+        print((event.category, event.text))
         if event.category == category:
             results.add((event.text, event.level))
         if expected == results:

@@ -9,29 +9,66 @@ default:
 	echo "* 'make release-patch' to do a patch release (2.0.x)"
 	echo "* 'make release-minor' to do a minor release (2.x.0)"
 	echo "* 'make upload-packages' to upload packages to native repos (e.g. .whl to PyPI, .gem to RubyGems.org, etc.)"
+	echo "* 'make clean' to undo setup and packages"
+
+.PHONY: clean
+clean:
+	rm -fr virtualenv
+	rm -fr virtualenv3
+	rm -fr output
+	rm -fr dist
+	rm -f quark/*.qc
+	rm -fr ~/.m2/repository/datawire_mdk
+	rm -fr ~/.m2/repository/io/datawire/mdk
 
 virtualenv:
-	virtualenv virtualenv
+	virtualenv -p python2 virtualenv
 
 .PHONY: python-dependencies
 python-dependencies: virtualenv
 	virtualenv/bin/pip install -r dev-requirements.txt
 
+virtualenv3:
+	virtualenv -p python3 virtualenv3
+
+.PHONY: python3-dependencies
+python3-dependencies: virtualenv3
+	virtualenv3/bin/pip install -r dev-requirements.txt
+
 .PHONY: setup
-setup: python-dependencies
+setup: python-dependencies python3-dependencies install-quark
+
+.PHONY: install-quark
+install-quark:
+	which quark || \
+		curl -# -L https://raw.githubusercontent.com/datawire/quark/master/install.sh | \
+		bash -s -- -q `cat QUARK_VERSION.txt`
+
+.PHONY: install-mdk
+install-mdk: packages
+	virtualenv/bin/pip install --upgrade dist/datawire_mdk-*-py2*-none-any.whl
+	virtualenv3/bin/pip install --upgrade dist/datawire_mdk-*-*py3-none-any.whl
+	gem install --no-doc dist/datawire_mdk-*.gem
+	npm install output/js/mdk-2.0
+	cd output/java/mdk-2.0 && mvn install
 
 .PHONY: test
-test:
-	# For now we rely on either .travis-test.sh or the user to install the
-	# MDK. This means tests will fail if you are not on Travis
-	# or have not installed the MDK.
-	source virtualenv/bin/activate && py.test -n 4 -v tests
+test: install-mdk test-python test-python3
+
+.PHONY: test-python
+test-python:
+	virtualenv/bin/py.test -n 4 -v unittests functionaltests
+
+.PHONY: test-python3
+test-python3:
+	# Functional tests don't benefit from being run in another language:
+	virtualenv3/bin/py.test -n 4 -v unittests
 
 release-minor:
-	source virtualenv/bin/activate; python scripts/release.py minor
+	virtualenv/bin/python scripts/release.py minor
 
 release-patch:
-	source virtualenv/bin/activate; python scripts/release.py patch
+	virtualenv/bin/python scripts/release.py patch
 
 # Packaging commands:
 output: $(wildcard quark/*.q) dist
