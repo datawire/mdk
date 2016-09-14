@@ -355,7 +355,9 @@ namespace mdk {
                                           "DEBUG": 4};
 
         MDKImpl _mdk;
-        List<Node> _resolved = [];
+        // Each List<Node> is another stack level added by
+        // start_interaction. First one is implicit fallback in case none are started.
+        List<List<Node>> _resolved = [[]];
         SharedContext _context;
         bool _experimental = false;
 
@@ -504,12 +506,16 @@ namespace mdk {
         }
 
         Node _resolvedCallback(Node result) {
-            _resolved.add(result);
+            _current_interaction().add(result);
             return result;
         }
 
+        List<Node> _current_interaction() {
+            return _resolved[_resolved.size() - 1];
+        }
+
         void start_interaction() {
-            _resolved = [];
+            _resolved.add([]);
         }
 
         String inject() {
@@ -523,8 +529,10 @@ namespace mdk {
         }
 
         void fail_interaction(String message) {
-            List<Node> suspects = _resolved;
-            _resolved = [];
+            // All Nodes resolved in current interaction are marked as having
+            // failed:
+            List<Node> suspects = _current_interaction();
+            _resolved[_resolved.size() - 1] = [];
 
             List<String> involved = [];
             int idx = 0;
@@ -540,9 +548,9 @@ namespace mdk {
         }
 
         void finish_interaction() {
-            // XXX: pops a level off the stack
-            List<Node> nodes = _resolved;
-            _resolved = [];
+            // Pops a level off the stack
+            List<Node> nodes = _current_interaction();
+            _resolved.remove(_resolved.size() - 1);
 
             int idx = 0;
             while (idx < nodes.size()) {

@@ -3,13 +3,18 @@ Tests for the MDK public API that are easier to do in Python.
 """
 from builtins import range
 from builtins import object
+from past.builtins import unicode
 
 from unittest import TestCase
 from tempfile import mkdtemp
+from collections import Counter
+
+import hypothesis.strategies as st
+from hypothesis import given, assume
 
 from mdk import MDKImpl
 from mdk_runtime import fakeRuntime
-from mdk_discovery import ReplaceCluster
+from mdk_discovery import ReplaceCluster, NodeActive
 
 from .test_discovery import create_node
 
@@ -70,10 +75,26 @@ class TestingFailurePolicyFactory(object):
         return TestingFailurePolicy()
 
 
+def add_bools(list_of_lists):
+    """
+    Given recursive list that can contain other lists, return tuple of that plus
+    a booleans strategy for each list.
+    """
+    l = []
+    def count(recursive):
+        l.append(1)
+        for child in recursive:
+            if isinstance(child, list):
+                count(child)
+    count(list_of_lists)
+    return st.tuples(st.just(list_of_lists), st.tuples(*[st.sampled_from([True, False]) for i in l]))
+
+
 class InteractionTestCase(TestCase):
     """Tests for the Session interaction API."""
 
-    def setUp(self):
+    def init(self):
+        """Initialize an empty environment."""
         # Initialize runtime and MDK:
         self.runtime = fakeRuntime()
         self.runtime.getEnvVarsService().set("DATAWIRE_TOKEN", "")
@@ -81,6 +102,12 @@ class InteractionTestCase(TestCase):
                                                   TestingFailurePolicyFactory())
         self.mdk = MDKImpl(self.runtime)
         self.mdk.start()
+        self.disco = self.mdk._disco
+        # Create a session:
+        self.session = self.mdk.session()
+
+    def setUp(self):
+        self.init()
 
         # Register some nodes:
         self.node1 = create_node("a1", "service1")
@@ -88,14 +115,11 @@ class InteractionTestCase(TestCase):
         self.node3 = create_node("b1", "service2")
         self.node4 = create_node("b2", "service2")
         self.all_nodes = set([self.node1, self.node2, self.node3, self.node4])
-        self.disco = self.mdk._disco
+
         self.disco.onMessage(None, ReplaceCluster("service1",
                                                   [self.node1, self.node2]))
         self.disco.onMessage(None, ReplaceCluster("service2",
                                                   [self.node3, self.node4]))
-
-        # Create a session:
-        self.session = self.mdk.session()
 
     def assertPolicyState(self, policies, successes, failures):
         """
@@ -175,3 +199,56 @@ class InteractionTestCase(TestCase):
         self.session.finish_interaction()
 
         self.assertPolicyState([self.disco.failurePolicy(node)], 1, 1)
+
+    @given(st.recursive(st.text(alphabet="abcd", min_size=1, max_size=3),
+                        st.lists).flatmap(add_bools))
+    def test_nestedInteractions(self, values):
+        """
+        Nested interactions operate independently of parent interactions.
+
+        :param values: a two-tuple composed of:
+           - a recursive list of unicode and other recursive lists - list start
+             means begin interaction, string means node resolve, list end means
+             finish interaction.
+           - list of False/True; True means failed interaction
+        """
+        requested_interactions, failures = values
+        failures = iter(failures)
+        assume(not isinstance(requested_interactions, unicode))
+        self.init()
+
+        failures = iter(failures)
+        created_services = {}
+        expected_success_nodes = Counter()
+        expected_failed_nodes = Counter()
+
+        def run_interaction(children):
+            fails = next(failures)
+            self.session.start_interaction()
+            for child in children:
+                if isinstance(child, unicode):
+                    # Make sure disco knows about the node:
+                    if child in created_services:
+                        node = created_services[child]
+                    else:
+                        node = create_node(child, child)
+                        created_services[child] = node
+                    self.disco.onMessage(None, NodeActive(node))
+                    # Make sure the child Node is resolved in the interaction
+                    self.session.resolve(node.service, "1.0")
+                    if fails:
+                        expected_failed_nodes[node] += 1
+                    else:
+                        expected_success_nodes[node] += 1
+                else:
+                    run_interaction(child)
+            if fails:
+                self.session.fail_interaction("OHNO")
+            self.session.finish_interaction()
+
+        run_interaction(requested_interactions)
+        for node in set(expected_failed_nodes) | set(expected_success_nodes):
+            policy = self.disco.failurePolicy(node)
+            self.assertEqual((policy.successes, policy.failures),
+                             (expected_success_nodes[node],
+                              expected_failed_nodes[node]))
