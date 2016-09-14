@@ -41,7 +41,7 @@ def ensure_master(options):
     """Ensure the current branch is master."""
     branch = check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).strip()
     if branch != "master":
-        error("Current checked out branch is %s. Please run:\ngit checkout master\n")
+        error("Current checked out branch is %s. Please run:\n\n    git checkout master\n" % (branch,))
 
 
 def git_pull(options):
