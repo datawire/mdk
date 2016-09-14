@@ -346,6 +346,10 @@ namespace mdk {
 
     macro Object sanitize(Object obj) $js{_qrt.sanitize_undefined($obj)}$py{$obj}$rb{$obj}$java{$obj};
 
+    class _TLSInit extends TLSInitializer<bool> {
+        bool getValue() { return false; }
+    }
+
     class SessionImpl extends Session {
 
         static Map<String,int> _levels = {"CRITICAL": 0,
@@ -353,6 +357,8 @@ namespace mdk {
                                           "WARN": 2,
                                           "INFO": 3,
                                           "DEBUG": 4};
+        // True if we're inside logging code path:
+        static TLS<bool> _inLogging = new TLS<bool>(new _TLSInit());
 
         MDKImpl _mdk;
         // Each List<Node> is another stack level added by
@@ -429,43 +435,45 @@ namespace mdk {
 
         void _log(String level, String category, String text) {
             if (_mdk._tracer != null) {
+                if (_inLogging.getValue()) {
+                    // We're being called recursively. We don't want logging
+                    // inside the tracer to trigger logging to the tracer! So
+                    // sadly we have to just drop the message on the floor.
+                    return;
+                }
+                _inLogging.setValue(true);
                 _mdk._tracer.setContext(_context);
                 _mdk._tracer.log(_mdk.procUUID, level, category, text);
+                _inLogging.setValue(false);
             }
         }
 
         void critical(String category, String text) {
-            // XXX: no critical
             if (_enabled("CRITICAL")) {
-                _mdk.logger.error(category + ": " + text);
                 _log("CRITICAL", category, text);
             }
         }
 
         void error(String category, String text) {
             if (_enabled("ERROR")) {
-                _mdk.logger.error(category + ": " + text);
                 _log("ERROR", category, text);
             }
         }
 
         void warn(String category, String text) {
             if (_enabled("WARN")) {
-                _mdk.logger.warn(category + ": " + text);
                 _log("WARN", category, text);
             }
         }
 
         void info(String category, String text) {
             if (_enabled("INFO")) {
-                _mdk.logger.info(category + ": " + text);
                 _log("INFO", category, text);
             }
         }
 
         void debug(String category, String text) {
             if (_enabled("DEBUG")) {
-                _mdk.logger.debug(category + ": " + text);
                 _log("DEBUG", category, text);
             }
         }
