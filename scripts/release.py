@@ -3,24 +3,12 @@ Release the MDK.
 
 The process:
 
-0. Ensure current checkout is not dirty (i.e. everything is committed).
-1. Ensure current commit has passing tests by talking to Travis API.
-2. Bump versions on all relevant files using the bumpversion tool.
-
-(TODO: once we only have `master` branch and no more `develop` will add more
-steps:
-
-3. Git commit. Can be done via bumpversion.
-4. Tag with new version. Can be done via bumpversion.
-5. Tell user command to run to git push and actually release the code.)
-
-For now however we will continue current process. I.e. local commit will need to
-be pushed to branch on GitHub, that branch will be merged to `develop` with PR,
-and `develop` merged to `master` with PR and then tag that release.
-
-(TODO: There will also be infrastructure in the CI system to automatically upload
-Python/Ruby/JS/Java packages on tagged commits.)
-
+1. Ensure current checkout is not dirty (i.e. everything is committed).
+2. Ensure current branch is master.
+3. Git pull so we're up-to-date with origin/master.
+4. Ensure current commit has passing tests by talking to Travis API.
+5. Bump versions on all relevant files using the bumpversion tool, then commit and tag.
+6. Tell user command to run to git push and actually release the code.
 
 Usage:
   release.py patch
@@ -34,7 +22,7 @@ Commands:
 HELP = __doc__
 
 import sys
-from subprocess import check_output, CalledProcessError
+from subprocess import check_output, CalledProcessError, check_call
 from docopt import docopt
 
 
@@ -48,6 +36,17 @@ def ensure_not_dirty(options):
     dirty = check_output(["git", "status", "--porcelain", "--untracked=no"]).splitlines()
     if dirty:
         error("git checkout has uncomitted changes.")
+
+def ensure_master(options):
+    """Ensure the current branch is master."""
+    branch = check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).strip()
+    if branch != "master":
+        error("Current checked out branch is %s. Please run:\ngit checkout master\n")
+
+
+def git_pull(options):
+    """Make sure master branch is up-to-date."""
+    check_call(["git", "pull"])
 
 
 def ensure_passing_tests(options):
@@ -72,23 +71,18 @@ def main():
     """Run the release."""
     options = docopt(HELP)
     for index, step in enumerate([ensure_not_dirty,
+                                  ensure_master,
+                                  git_pull,
                                   ensure_passing_tests,
                                   bump_versions]):
         print("Step {}: {}".format(index + 1, step.__name__))
         step(options)
     print("""\
-Version numbers have been incremented. You should now:
+The release has been committed and tagged locally.
 
-1. Inspect the changes in the branch.
-2. git add all changed files.
-3. git commit.
-4. git push to GitHub.
-5. Open a PR into `develop`.
-5. Merge PR into `develop` when tests pass.
-6. Merge `develop` into `master`.
-7. Create a release using the GitHub UI.
+You can now push it upstream by running:
 
-These steps will be automated in future iterations of the release automation.
+    git push origin master --tags
 """)
 
 if __name__ == '__main__':
