@@ -22,7 +22,8 @@ def _on_request_started(sender, **extra):
 def _on_request_exception(sender, **extra):
     """Fail interaction when a request handlers raises an error."""
     exc = extra.get("exception", None)
-    g.mdk_session.fail_interaction(traceback.format_exc(exc))
+    g.mdk_session.fail_interaction(
+        "".join(traceback.format_exception_only(exc.__class__, exc)))
 
 def _on_request_tearing_down(sender, **extra):
     """Finish an interaction when a request is done."""
