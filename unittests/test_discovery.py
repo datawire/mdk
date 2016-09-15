@@ -17,7 +17,7 @@ from .common import fake_runtime
 
 from mdk_discovery import (
     Discovery, Node, NodeActive, NodeExpired, ReplaceCluster,
-    CircuitBreakerFactory,
+    CircuitBreakerFactory, StaticRoutes,
 )
 
 
@@ -385,3 +385,22 @@ class StatefulDiscoveryTesting(GenericStateMachine):
         self.fake.compare(self.real)
 
 StatefulDiscoveryTests = StatefulDiscoveryTesting.TestCase
+
+
+class StaticDiscoverySourceTests(TestCase):
+    """Tests for StaticDiscoverySource."""
+
+    def setUp(self):
+        self.runtime = fake_runtime()
+        self.disco = Discovery(self.runtime)
+        self.runtime.dispatcher.startActor(self.disco)
+        self.nodes = [create_node("a", "service1"),
+                      create_node("b", "service2")]
+        self.static = StaticRoutes(self.nodes).create(self.disco, self.runtime)
+        self.runtime.dispatcher.startActor(self.static)
+
+    def test_active(self):
+        """The nodes the StaticRoutes was registered with are active."""
+        self.assertEqual(self.disco.knownNodes("service1"), [self.nodes[0]])
+        self.assertEqual(self.disco.knownNodes("service2"), [self.nodes[1]])
+
