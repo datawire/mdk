@@ -270,7 +270,12 @@ namespace mdk {
                 if (config.startsWith("synapse:path=")) {
                     result = mdk_discovery.synapse.Synapse(config.substring(13, config.size()));
                 } else {
-                    panic("Unknown MDK discovery source: " + config);
+                    if (config.startsWith("static:nodes=")) {
+                        String json = config.substring(14, config.size());
+                        result = mdk_discovery.StaticRoutes.parseJSON(json);
+                    } else {
+                        panic("Unknown MDK discovery source: " + config);
+                    }
                 }
             }
             return result;

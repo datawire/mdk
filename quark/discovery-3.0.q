@@ -115,6 +115,13 @@ namespace mdk_discovery {
     class StaticRoutes extends DiscoverySourceFactory {
         List<Node> _knownNodes;
 
+        static StaticRoutes parseJSON(String json_encoded) {
+            List<Node> nodes = [];
+            fromJSON(Class.get("quark.List<mdk_discovery.Node>"), nodes,
+                     json_encoded.parseJSON());
+            return new StaticRoutes(nodes);
+        }
+
         StaticRoutes(List<Node> knowNodes) {
             self._knownNodes = knowNodes;
         }
