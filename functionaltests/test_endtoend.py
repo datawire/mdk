@@ -5,31 +5,13 @@ import os
 import sys
 import time
 from random import random
-from subprocess import Popen, check_output, check_call
+from subprocess import Popen, check_call, check_output
 from unittest import TestCase
 
-CODE_PATH = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "source"))
-
+from .utils import CODE_PATH, run_python
 
 def random_string():
     return "random_" + str(random())[2:]
-
-def decoded_check_output(*args, **kwargs):
-    return check_output(*args, **kwargs).decode('utf-8')
-
-def run_python(command, extra_args=(), output=False):
-    """
-    Run a Python program.
-
-    Returns output if output=True, in which case stderr will cause error.
-    """
-    args = [sys.executable, os.path.join(CODE_PATH, command)] + list(extra_args)
-    if output:
-        command = decoded_check_output
-    else:
-        command = check_call
-    return command(args)
 
 
 def assertRegisteryDiscoverable(test, discover):
@@ -98,7 +80,7 @@ class JavascriptTests(TestCase):
         """Minimal discovery end-to-end test with a Javascript client."""
         assertRegisteryDiscoverable(
             self,
-            lambda service: decoded_check_output(
+            lambda service: check_output(
                 ["node", os.path.join(CODE_PATH, "resolve.js"), service]))
 
 
@@ -114,7 +96,7 @@ class RubyTests(TestCase):
         """Minimal discovery end-to-end test with a Javascript client."""
         assertRegisteryDiscoverable(
             self,
-            lambda service: decoded_check_output(
+            lambda service: check_output(
                 ["ruby", os.path.join(CODE_PATH, "resolve.rb"), service]))
 
 
@@ -136,7 +118,7 @@ class JavaTests(TestCase):
                     "package"])
         assertRegisteryDiscoverable(
             self,
-            lambda service: decoded_check_output(
+            lambda service: check_output(
                 ["java", "-jar", os.path.join(
                     CODE_PATH,"resolve_java/target/resolve-0.0.1.jar"),
                  service]))
