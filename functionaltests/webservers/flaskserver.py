@@ -3,7 +3,9 @@ Flask server that uses MDK's Flask integration and exposes the behavior
 expected by test_webframeworks.py.
 """
 
-from flask import g, Flask
+from json import dumps
+
+from flask import g, request, Flask
 
 from mdk.flask import mdk_setup
 
@@ -13,6 +15,17 @@ app = Flask(__name__)
 @app.route("/context")
 def context():
     return g.mdk_session.externalize()
+
+@app.route("/resolve")
+def resolve():
+    node = g.mdk_session.resolve("service1", "1.0")
+    # This should be a RecordingFailurePolicy:
+    policy = g.mdk_session._mdk._disco.failurePolicy(node)
+    result = dumps({node.address: [policy.successes, policy.failures]})
+    if request.args.get("error"):
+        raise RuntimeError("Erroring as requested.")
+    else:
+        return result
 
 
 if __name__ == '__main__':

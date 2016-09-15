@@ -12,35 +12,20 @@ setup:
 
 1. An endpoint /context that returns the result of externalize() on the current
    session. This verifies X-MDK-CONTEXT handling.
-2. StaticRoutes used as a discovery source with nodes service1 -> address1,
-   service2 -> address2, service2 -> service3.
-3. RecordingFailurePolicy used as the FailurePolicy.
-4. An endpoint /resolve?services=a,b,c. Each comma separated service should be
-   resolved, and the result returned as a JSON object mapping service name to a
-   list with first value being number of successes, second value being number of
-   failures recorded.
-
-
-XXXX
-Implementation ideas:
-
-For errors:
-1. Add a FailurePolicy that records failures
-2. Test suite registers known bad service with unique id that is at localhost:1, thus causing failures if connected to? or maybe just hard code a particular address as being bad and causing exception?
-
-For X-MDK-Context:
-Send query with header that causes logging.
-Send query without header that causes logging.
-
-For interaction start:
-Add StaticDiscoverySource that stores entries in memory.
-Add API for extracting nodes used in an interaction?
+2. RecordingFailurePolicy used as the FailurePolicy.
+3. An endpoint /resolve[?error=1]. Service "service1" should be resolved, and if
+   error query flag is set an error should abort handling (e.g. raise an
+   exception). Otherwise the result returned as a JSON object mapping resulting
+   address to a list with first value being number of successes, second value
+   being number of failures recorded.
 """
 
 import pathlib
 import sys
-from json import loads
+import os
+from json import loads, dumps
 from subprocess import Popen
+from time import sleep
 
 import requests
 import pytest
@@ -58,13 +43,30 @@ URL = "http://localhost:9191"
                 ])
 def webserver(request):
     """A fixture that runs a webserver in the background on port 9191."""
-    p = Popen(request.param)
+    # Tell MDK to hard code discovery source, and use testing-oriented failure
+    # policy:
+    env = os.environ.copy()
+    env.update({"MDK_DISCOVERY_SOURCE":
+                "static:nodes=" + dumps([
+                    {"service": "service1", "address": "address1", "version": "1.0"},
+                    {"service": "service2", "address": "address2", "version": "1.0"},
+                ]),
+                "MDK_FAILURE_POLICY": "recording"})
+    p = Popen(request.param, env=env)
+    # Wait for web server to come up:
+    for i in range(10):
+        try:
+            requests.get(URL)
+        except:
+            sleep(1.0)
+        else:
+            break
     yield
     p.terminate()
     p.wait()
 
 
-def test_with_context(webserver):
+def test_session_with_context(webserver):
     """
     If a X-MDK-CONTEXT header is sent to the webserver it reads it and uses the
     encoded session.
@@ -75,7 +77,7 @@ def test_with_context(webserver):
     assert loads(context.decode("utf-8"))["traceId"] == returned_context["traceId"]
 
 
-def test_without_context(webserver):
+def test_session_without_context(webserver):
     """
     If no X-MDK-CONTEXT header is sent to the webserver it creates a new
     session.
@@ -83,3 +85,35 @@ def test_without_context(webserver):
     context = run_python("create-context.py", output=True)
     returned_context = requests.get(URL + "/context").json()
     assert loads(context.decode("utf-8"))["traceId"] != returned_context["traceId"]
+
+
+def test_interaction(webserver):
+    """
+    The webserver ties interactions to requests, and fails the interaction on
+    errors.
+
+    We test this by first sending a non-error request. The result should
+    indicate no success for address1 because interaction ends *after* response
+    is assembled.
+
+    Then we send an erroring request.
+
+    Then we send another non-error request. The result should indicate one
+    success and single failure for address1.
+
+    Then we send another non-error request. The result should indicate two
+    successes and single failure for address1.
+    """
+    url = URL + "/resolve"
+    result1 = requests.get(url).json()
+    assert result1 == {"address1": [0, 0]}
+    assert requests.get(url + "?error=1").status_code == 500
+
+    result2 = requests.get(url).json()
+    # One success from first query, onse failure from second query:
+    assert result2 == {"address1": [1, 1]}
+
+    result3 = requests.get(url).json()
+    # One success from first query, onse failure from second query, one success
+    # from third query:
+    assert result3 == {"address1": [2, 1]}
