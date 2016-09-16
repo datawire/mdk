@@ -40,6 +40,8 @@ URL = "http://localhost:9191"
 @pytest.fixture(scope="module",
                 params=[
                     [sys.executable, str(WEBSERVERS_ROOT / "flaskserver.py")],
+                    [sys.executable, str(WEBSERVERS_ROOT / "django-manage.py"),
+                     "runserver", "9191"],
                 ])
 def webserver(request):
     """A fixture that runs a webserver in the background on port 9191."""
