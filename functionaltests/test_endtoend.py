@@ -8,7 +8,7 @@ from random import random
 from subprocess import Popen, check_call, check_output
 from unittest import TestCase
 
-from utils import CODE_PATH, run_python
+from utils import CODE_PATH, ROOT_PATH, run_python
 
 def random_string():
     return "random_" + str(random())[2:]
@@ -33,20 +33,24 @@ def assertRegisteryDiscoverable(test, discover):
     return p, service
 
 
-class PythonTests(TestCase):
+class Python2Tests(TestCase):
     """Tests for Python usage of MDK API."""
+
+    python_binary = os.path.join(ROOT_PATH, "virtualenv/bin/python")
 
     def test_discovery(self):
         """Minimal discovery end-to-end test."""
         # 1. Services registered by one process can be looked up by another.
         p, service = assertRegisteryDiscoverable(
             self,
-            lambda service: run_python("resolve.py", [service], output=True))
+            lambda service: run_python(self.python_binary, "resolve.py",
+                                       [service], output=True))
 
         # 2. If the service is unregistered via MDK stop() then it is no longer resolvable.
         p.terminate()
         time.sleep(3)
-        resolved_address = run_python("resolve.py", [service], output=True)
+        resolved_address = run_python(self.python_binary, "resolve.py",
+                                      [service], output=True)
         self.assertEqual(b"not found", resolved_address)
 
     def test_logging(self):
@@ -56,7 +60,7 @@ class PythonTests(TestCase):
         """
         # Write some logs, waiting for them to arrive:
         service = random_string()
-        run_python("write_logs.py", [service])
+        run_python(self.python_binary, "write_logs.py", [service])
 
     def test_tracing(self):
         """Minimal tracing end-to-end test.
@@ -64,9 +68,15 @@ class PythonTests(TestCase):
         One process can start a session context and a second one can join it,
         and they both get logged together.
         """
-        context_id = run_python("start_trace.py", output=True)
+        context_id = run_python(self.python_binary, "start_trace.py", output=True)
         print("context_id", context_id)
-        run_python("continue_trace.py", [context_id])
+        run_python(self.python_binary, "continue_trace.py", [context_id])
+
+
+class Python3Tests(Python2Tests):
+    """Tests for Python 3 usage of MDK API."""
+
+    python_binary = os.path.join(ROOT_PATH, "virtualenv3/bin/python")
 
 
 class JavascriptTests(TestCase):

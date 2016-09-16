@@ -71,7 +71,7 @@ def test_session_with_context(webserver):
     If a X-MDK-CONTEXT header is sent to the webserver it reads it and uses the
     encoded session.
     """
-    context = run_python("create-context.py", output=True)
+    context = run_python(sys.executable, "create-context.py", output=True)
     returned_context = requests.get(URL + "/context",
                                     headers={"X-MDK-CONTEXT": context}).json()
     assert loads(context.decode("utf-8"))["traceId"] == returned_context["traceId"]
@@ -82,7 +82,7 @@ def test_session_without_context(webserver):
     If no X-MDK-CONTEXT header is sent to the webserver it creates a new
     session.
     """
-    context = run_python("create-context.py", output=True)
+    context = run_python(sys.executable, "create-context.py", output=True)
     returned_context = requests.get(URL + "/context").json()
     assert loads(context.decode("utf-8"))["traceId"] != returned_context["traceId"]
 
