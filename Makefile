@@ -35,8 +35,11 @@ virtualenv3:
 python3-dependencies: virtualenv3
 	virtualenv3/bin/pip install -r dev-requirements.txt
 
+node_modules:
+	mkdir node_modules
+
 .PHONY: setup
-setup: python-dependencies python3-dependencies install-quark
+setup: python-dependencies python3-dependencies node_modules install-quark
 
 .PHONY: install-quark
 install-quark:
