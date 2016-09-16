@@ -1,0 +1,8 @@
+{
+    "name": "datawire_mdk_express",
+    "version": "1.0.0",
+    "main": "datawire_mdk_express.js",
+    "license": "Apache-2.0",
+    "url": "https://github.com/datawire/mdk"
+    # XXX add dependencies? probably peerDependencies. and npm 3 won't install those so also install in Makefile.
+}

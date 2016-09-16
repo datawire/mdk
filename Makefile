@@ -48,11 +48,12 @@ install-quark:
 		bash -s -- -q `cat QUARK_VERSION.txt`
 
 .PHONY: install-mdk
-install-mdk: packages
+install-mdk: packages $(wildcard javascript/datawire_mdk_express/*)
 	virtualenv/bin/pip install --upgrade dist/datawire_mdk-*-py2*-none-any.whl
 	virtualenv3/bin/pip install --upgrade dist/datawire_mdk-*-*py3-none-any.whl
 	gem install --no-doc dist/datawire_mdk-*.gem
 	npm install output/js/mdk-2.0
+	npm install javascript/datawire_mdk_express/
 	cd output/java/mdk-2.0 && mvn install
 
 .PHONY: test
