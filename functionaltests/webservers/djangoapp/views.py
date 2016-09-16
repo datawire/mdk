@@ -2,6 +2,9 @@ from json import dumps
 
 from django.http import HttpResponse
 
+def index(request):
+    return HttpResponse("")
+
 def context(request):
     return HttpResponse(request.mdk_session.externalize())
 
