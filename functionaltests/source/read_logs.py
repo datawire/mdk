@@ -49,8 +49,8 @@ class Retriever(object):
             sys.exit(1)
         tracer = self.mdk._tracer
         now = int(self.start * 1000)
-        tracer.query(now - 60000, now + 120000).andEither(
-            lambda events: self._got_logs, self._got_error)
+        tracer.query(now - 60000, now + 120000).andEither(self._got_logs,
+                                                          self._got_error)
 
 
 def main():
