@@ -8,7 +8,7 @@ from random import random
 from subprocess import Popen, check_call, check_output
 from unittest import TestCase
 
-from .utils import CODE_PATH, run_python
+from utils import CODE_PATH, run_python
 
 def random_string():
     return "random_" + str(random())[2:]
@@ -28,7 +28,7 @@ def assertRegisteryDiscoverable(test, discover):
     address = random_string()
     p = Popen([sys.executable, os.path.join(CODE_PATH, "register.py"), service, address])
     test.addCleanup(lambda: p.kill())
-    resolved_address = discover(service)
+    resolved_address = discover(service).decode("utf-8")
     test.assertIn(address, resolved_address)
     return p, service
 
@@ -47,7 +47,7 @@ class PythonTests(TestCase):
         p.terminate()
         time.sleep(3)
         resolved_address = run_python("resolve.py", [service], output=True)
-        self.assertEqual("not found", resolved_address)
+        self.assertEqual(b"not found", resolved_address)
 
     def test_logging(self):
         """Minimal logging end-to-end test.
@@ -65,6 +65,7 @@ class PythonTests(TestCase):
         and they both get logged together.
         """
         context_id = run_python("start_trace.py", output=True)
+        print("context_id", context_id)
         run_python("continue_trace.py", [context_id])
 
 
