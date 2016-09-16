@@ -2,7 +2,6 @@
 Tests for the MDK public API that are easier to do in Python.
 """
 from builtins import range
-from builtins import object
 from past.builtins import unicode
 
 from unittest import TestCase
@@ -14,7 +13,9 @@ from hypothesis import given, assume
 
 from mdk import MDKImpl
 from mdk_runtime import fakeRuntime
-from mdk_discovery import ReplaceCluster, NodeActive
+from mdk_discovery import (
+    ReplaceCluster, NodeActive, RecordingFailurePolicyFactory,
+)
 
 from .test_discovery import create_node
 
@@ -54,27 +55,6 @@ class MDKInitializationTestCase(TestCase):
         self.assertFalse(runtime.getWebSocketsService().fakeActors)
 
 
-class TestingFailurePolicy(object):
-    """FailurePolicy used for testing."""
-    successes = 0
-    failures = 0
-
-    def success(self):
-        self.successes += 1
-
-    def failure(self):
-        self.failures += 1
-
-    def available(self):
-        return True
-
-
-class TestingFailurePolicyFactory(object):
-    """Factory for TestingFailurePolicy."""
-    def create(self):
-        return TestingFailurePolicy()
-
-
 def add_bools(list_of_lists):
     """
     Given recursive list that can contain other lists, return tuple of that plus
@@ -99,7 +79,7 @@ class InteractionTestCase(TestCase):
         self.runtime = fakeRuntime()
         self.runtime.getEnvVarsService().set("DATAWIRE_TOKEN", "")
         self.runtime.dependencies.registerService("failurepolicy_factory",
-                                                  TestingFailurePolicyFactory())
+                                                  RecordingFailurePolicyFactory())
         self.mdk = MDKImpl(self.runtime)
         self.mdk.start()
         self.disco = self.mdk._disco

@@ -5,31 +5,13 @@ import os
 import sys
 import time
 from random import random
-from subprocess import Popen, check_output, check_call
+from subprocess import Popen, check_call, check_output
 from unittest import TestCase
 
-CODE_PATH = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "source"))
-
+from utils import CODE_PATH, ROOT_PATH, run_python
 
 def random_string():
     return "random_" + str(random())[2:]
-
-def decoded_check_output(*args, **kwargs):
-    return check_output(*args, **kwargs).decode('utf-8')
-
-def run_python(command, extra_args=(), output=False):
-    """
-    Run a Python program.
-
-    Returns output if output=True, in which case stderr will cause error.
-    """
-    args = [sys.executable, os.path.join(CODE_PATH, command)] + list(extra_args)
-    if output:
-        command = decoded_check_output
-    else:
-        command = check_call
-    return command(args)
 
 
 def assertRegisteryDiscoverable(test, discover):
@@ -46,26 +28,30 @@ def assertRegisteryDiscoverable(test, discover):
     address = random_string()
     p = Popen([sys.executable, os.path.join(CODE_PATH, "register.py"), service, address])
     test.addCleanup(lambda: p.kill())
-    resolved_address = discover(service)
+    resolved_address = discover(service).decode("utf-8")
     test.assertIn(address, resolved_address)
     return p, service
 
 
-class PythonTests(TestCase):
+class Python2Tests(TestCase):
     """Tests for Python usage of MDK API."""
+
+    python_binary = os.path.join(ROOT_PATH, "virtualenv/bin/python")
 
     def test_discovery(self):
         """Minimal discovery end-to-end test."""
         # 1. Services registered by one process can be looked up by another.
         p, service = assertRegisteryDiscoverable(
             self,
-            lambda service: run_python("resolve.py", [service], output=True))
+            lambda service: run_python(self.python_binary, "resolve.py",
+                                       [service], output=True))
 
         # 2. If the service is unregistered via MDK stop() then it is no longer resolvable.
         p.terminate()
         time.sleep(3)
-        resolved_address = run_python("resolve.py", [service], output=True)
-        self.assertEqual("not found", resolved_address)
+        resolved_address = run_python(self.python_binary, "resolve.py",
+                                      [service], output=True)
+        self.assertEqual(b"not found", resolved_address)
 
     def test_logging(self):
         """Minimal logging end-to-end test.
@@ -74,7 +60,7 @@ class PythonTests(TestCase):
         """
         # Write some logs, waiting for them to arrive:
         service = random_string()
-        run_python("write_logs.py", [service])
+        run_python(self.python_binary, "write_logs.py", [service])
 
     def test_tracing(self):
         """Minimal tracing end-to-end test.
@@ -82,8 +68,15 @@ class PythonTests(TestCase):
         One process can start a session context and a second one can join it,
         and they both get logged together.
         """
-        context_id = run_python("start_trace.py", output=True)
-        run_python("continue_trace.py", [context_id])
+        context_id = run_python(self.python_binary, "start_trace.py", output=True)
+        print("context_id", context_id)
+        run_python(self.python_binary, "continue_trace.py", [context_id])
+
+
+class Python3Tests(Python2Tests):
+    """Tests for Python 3 usage of MDK API."""
+
+    python_binary = os.path.join(ROOT_PATH, "virtualenv3/bin/python")
 
 
 class JavascriptTests(TestCase):
@@ -98,7 +91,7 @@ class JavascriptTests(TestCase):
         """Minimal discovery end-to-end test with a Javascript client."""
         assertRegisteryDiscoverable(
             self,
-            lambda service: decoded_check_output(
+            lambda service: check_output(
                 ["node", os.path.join(CODE_PATH, "resolve.js"), service]))
 
 
@@ -114,7 +107,7 @@ class RubyTests(TestCase):
         """Minimal discovery end-to-end test with a Javascript client."""
         assertRegisteryDiscoverable(
             self,
-            lambda service: decoded_check_output(
+            lambda service: check_output(
                 ["ruby", os.path.join(CODE_PATH, "resolve.rb"), service]))
 
 
@@ -136,7 +129,7 @@ class JavaTests(TestCase):
                     "package"])
         assertRegisteryDiscoverable(
             self,
-            lambda service: decoded_check_output(
+            lambda service: check_output(
                 ["java", "-jar", os.path.join(
                     CODE_PATH,"resolve_java/target/resolve-0.0.1.jar"),
                  service]))

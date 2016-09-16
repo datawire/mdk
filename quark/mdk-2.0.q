@@ -270,10 +270,26 @@ namespace mdk {
                 if (config.startsWith("synapse:path=")) {
                     result = mdk_discovery.synapse.Synapse(config.substring(13, config.size()));
                 } else {
-                    panic("Unknown MDK discovery source: " + config);
+                    if (config.startsWith("static:nodes=")) {
+                        String json = config.substring(13, config.size());
+                        result = mdk_discovery.StaticRoutes.parseJSON(json);
+                    } else {
+                        panic("Unknown MDK discovery source: " + config);
+                    }
                 }
             }
             return result;
+        }
+
+        @doc("Choose FailurePolicy based on environment variables.")
+        FailurePolicyFactory getFailurePolicy(MDKRuntime runtime) {
+            String config = runtime.getEnvVarsService()
+                .var("MDK_FAILURE_POLICY").orElseGet("");
+            if (config == "recording") {
+                return new mdk_discovery.RecordingFailurePolicyFactory();
+            } else {
+                return new CircuitBreakerFactory(runtime);
+            }
         }
 
         MDKImpl(MDKRuntime runtime) {
@@ -281,7 +297,7 @@ namespace mdk {
             _runtime = runtime;
             if (!runtime.dependencies.hasService("failurepolicy_factory")) {
                 runtime.dependencies.registerService("failurepolicy_factory",
-                                                     new CircuitBreakerFactory(runtime));
+                                                     getFailurePolicy(runtime));
             }
             _disco = new Discovery(runtime);
             // Tracing won't work if there's no DATAWIRE_TOKEN, but will try
