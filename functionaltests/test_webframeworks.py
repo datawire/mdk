@@ -43,7 +43,7 @@ URL = "http://localhost:9191"
      # Add --noreload so we don't have two Django processes,
      # which makes cleanup harder:
      "runserver", "9191", "--noreload"],
-    ["node", str(WEBSERVERS_ROOT / "npmserver.js")],
+    ["node", str(WEBSERVERS_ROOT / "expressserver.js")],
 ])
 def webserver(request):
     """A fixture that runs a webserver in the background on port 9191."""

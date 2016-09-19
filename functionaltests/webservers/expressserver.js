@@ -8,7 +8,7 @@ app.get('/context', function (req, res) {
     res.send(req.mdk_session.externalize());
 });
 
-app.get('/resolve', function (req, res) {
+app.get('/resolve', function (req, res, next) {
     req.mdk_session.resolve_async("service1", "1.0").then(
         function (node) {
             var policy = req.mdk_session._mdk._disco.failurePolicy(node);
