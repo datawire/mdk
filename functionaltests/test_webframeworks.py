@@ -37,8 +37,7 @@ WEBSERVERS_ROOT = pathlib.Path(__file__).parent / "webservers"
 URL = "http://localhost:9191"
 
 
-@pytest.fixture(scope="module",
-                params=[
+@pytest.fixture(params=[
                     [sys.executable, str(WEBSERVERS_ROOT / "flaskserver.py")],
                     [sys.executable, str(WEBSERVERS_ROOT / "django-manage.py"),
                      "runserver", "9191"],
