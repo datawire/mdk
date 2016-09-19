@@ -21,6 +21,7 @@ Commands:
 
 HELP = __doc__
 
+import os
 import sys
 from subprocess import check_output, CalledProcessError, check_call
 from docopt import docopt
@@ -58,13 +59,32 @@ def ensure_passing_tests(options):
         raise SystemExit(1)
 
 
-def bump_versions(options):
-    """Bump release version on all applicable files."""
+def _bump_versions(options, config_path):
+    """Bump release version, using specific config."""
     if options["patch"]:
         increment = "patch"
     elif options["minor"]:
         increment = "minor"
-    check_output(["bumpversion", "--verbose", "--list", increment])
+    check_output(["bumpversion",
+                  "--verbose",
+                  # List the changed files
+                  "--list",
+                  # Don't enforce not-being-dirty; we enforce that earlier, and
+                  # we run bumpversion multiple times in a row:
+                  "--allow-dirty",
+                  # Which config file to use
+                  "--config-file", config_path, increment],
+                 cwd=os.path.dirname(config_path) or ".")
+
+
+def bump_mdk_versions(options):
+    """Bump MDK release version."""
+    _bump_versions(options, ".bumpversion.cfg")
+
+
+def bump_express_versions(options):
+    """Bump Express integration release version."""
+    _bump_versions(options, "javascript/datawire_mdk_express/.bumpversion.cfg")
 
 
 def main():
@@ -74,7 +94,8 @@ def main():
                                   ensure_master,
                                   git_pull,
                                   ensure_passing_tests,
-                                  bump_versions]):
+                                  bump_mdk_versions,
+                                  bump_express_versions]):
         print("Step {}: {}".format(index + 1, step.__name__))
         step(options)
     print("""\
