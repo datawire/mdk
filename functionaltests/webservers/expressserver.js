@@ -1,3 +1,4 @@
+var process = require('process');
 var express = require('express');
 var mdk_express = require('datawire_mdk_express');
 var app = express();
@@ -24,6 +25,6 @@ app.get('/resolve', function (req, res, next) {
 
 app.use(mdk_express.mdkErrorHandler);
 
-app.listen(9191, function () {
-  console.log('Listening on port 9191');
+app.listen(process.argv[2], function () {
+    console.log('Listening on port ' + process.argv[2].toString());
 });

@@ -3,6 +3,7 @@ Flask server that uses MDK's Flask integration and exposes the behavior
 expected by test_webframeworks.py.
 """
 
+import sys
 from json import dumps
 
 from flask import g, request, Flask
@@ -30,4 +31,4 @@ def resolve():
 
 if __name__ == '__main__':
     mdk_setup(app)
-    app.run(port=9191)
+    app.run(port=int(sys.argv[1]))
