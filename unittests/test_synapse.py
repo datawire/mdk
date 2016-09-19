@@ -4,7 +4,7 @@ Tests for Synapse DiscoverySource support.
 
 from __future__ import absolute_import
 
-from unittest import TestCase, SkipTest
+from unittest import TestCase
 from shutil import rmtree
 from tempfile import mkdtemp
 from json import dumps

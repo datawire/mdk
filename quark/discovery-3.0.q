@@ -88,6 +88,53 @@ namespace mdk_discovery {
         bool isRegistrar();
     }
 
+    @doc("Discovery actor for hard-coded static routes.")
+    class _StaticRoutesActor extends DiscoverySource {
+        Actor _subscriber;
+        List<Node> _knownNodes;
+
+        _StaticRoutesActor(Actor subscriber, List<Node> knownNodes) {
+            self._subscriber = subscriber;
+            self._knownNodes = knownNodes;
+        }
+
+        void onStart(MessageDispatcher dispatcher) {
+            int idx = 0;
+            while (idx < self._knownNodes.size()) {
+                dispatcher.tell(self, new NodeActive(self._knownNodes[idx]),
+                                self._subscriber);
+                idx = idx + 1;
+            }
+        }
+
+        void onMessage(Actor origin, Object message) {}
+        void onStop() {}
+    }
+
+    @doc("Create a DiscoverySource with hard-coded static routes.")
+    class StaticRoutes extends DiscoverySourceFactory {
+        List<Node> _knownNodes;
+
+        static StaticRoutes parseJSON(String json_encoded) {
+            List<Node> nodes = [];
+            fromJSON(Class.get("quark.List<mdk_discovery.Node>"), nodes,
+                     json_encoded.parseJSON());
+            return new StaticRoutes(nodes);
+        }
+
+        StaticRoutes(List<Node> knowNodes) {
+            self._knownNodes = knowNodes;
+        }
+
+        bool isRegistrar() {
+            return false;
+        }
+
+        DiscoverySource create(Actor subscriber, MDKRuntime runtime) {
+            return new _StaticRoutesActor(subscriber, self._knownNodes);
+        }
+    }
+
     @doc("Message sent to DiscoveryRegistrar Actor to register a node.")
     class RegisterNode {
         Node node;
@@ -202,6 +249,33 @@ namespace mdk_discovery {
 
         FailurePolicy create() {
             return new CircuitBreaker(time, threshold, retestDelay);
+        }
+    }
+
+    @doc("FailurePolicy that records failures and successes.")
+    class RecordingFailurePolicy extends FailurePolicy {
+        int successes = 0;
+        int failures = 0;
+
+        void success() {
+            self.successes = self.successes + 1;
+        }
+
+        void failure() {
+            self.failures = self.failures + 1;
+        }
+
+        bool available() {
+            return true;
+        }
+    }
+
+    @doc("Factory for FailurePolicy useful for testing.")
+    class RecordingFailurePolicyFactory extends FailurePolicyFactory {
+        RecordingFailurePolicyFactory() {}
+
+        FailurePolicy create() {
+            return new RecordingFailurePolicy();
         }
     }
 
