@@ -38,8 +38,12 @@ python3-dependencies: virtualenv3
 node_modules:
 	mkdir node_modules
 
+.PHONY: js-dependencies
+js-dependencies: node_modules
+	npm install express
+
 .PHONY: setup
-setup: python-dependencies python3-dependencies node_modules install-quark
+setup: python-dependencies python3-dependencies js-dependencies install-quark
 
 .PHONY: install-quark
 install-quark:
