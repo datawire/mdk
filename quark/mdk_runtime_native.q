@@ -99,9 +99,11 @@ namespace mdk_runtime {
 	}
     }
 
-    macro String _connect(String url, WSHandler handler)
+    macro void _connect(String url, WSHandler handler)
+        $java{}
         $py{native.connect(($url), ($handler))}
         $js{native.connect(($url), ($handler))}
+        $rb{false}
     ;
 
     @doc("Client WebSocket support")
@@ -153,17 +155,22 @@ namespace mdk_runtime {
         Object call(Object arg) {
 	    timeService.dispatcher.tell(
 	        self.timeService, new Happening(self.event, self.timeService.time()), self.requester);
+            return null;
         }
     }
 
     macro void _schedule(UnaryCallable callable, float delayInSeconds)
+        $java{}
         $py{native.schedule(($callable), ($delayInSeconds))}
         $js{native.schedule(($callable), ($delayInSeconds))}
+        $rb{false}
     ;
 
     macro float _now()
+        $java{(1.0)}
         $py{native.now()}
         $js{native.now()}
+        $rb{(1.0)}
     ;
 
     @doc("Time and scheduling via native code.")
@@ -199,8 +206,10 @@ namespace mdk_runtime {
     }
 
     macro String _env_get(String name)
+        $java{($name)}
         $py{native.env_get($name)}
         $js{native.env_get($name)}
+        $rb{($name)}
     ;
 
     @doc("Environment variables via native path.")
