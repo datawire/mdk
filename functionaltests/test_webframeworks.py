@@ -38,11 +38,13 @@ URL = "http://localhost:9191"
 
 
 @pytest.fixture(params=[
-                    [sys.executable, str(WEBSERVERS_ROOT / "flaskserver.py")],
-                    [sys.executable, str(WEBSERVERS_ROOT / "django-manage.py"),
-                     "runserver", "9191"],
-                    ["node", str(WEBSERVERS_ROOT / "npmserver.js")],
-                ])
+    [sys.executable, str(WEBSERVERS_ROOT / "flaskserver.py")],
+    [sys.executable, str(WEBSERVERS_ROOT / "django-manage.py"),
+     # Add --noreload so we don't have two Django processes,
+     # which makes cleanup harder:
+     "runserver", "9191", "--noreload"],
+    ["node", str(WEBSERVERS_ROOT / "npmserver.js")],
+])
 def webserver(request):
     """A fixture that runs a webserver in the background on port 9191."""
     # Tell MDK to hard code discovery source, and use testing-oriented failure
