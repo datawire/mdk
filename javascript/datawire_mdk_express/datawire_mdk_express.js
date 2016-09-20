@@ -6,8 +6,8 @@ process.on('exit', function () {
     mdk.stop();
 });
 
+// Start an interaction for each request, end it when the response finishes.
 exports.mdkSessionStart = function (req, res, next) {
-    console.log("entry point");
     var header = req.get(datawire_mdk.mdk.MDK.CONTEXT_HEADER);
     if (header === undefined) {
         header = null;
@@ -16,7 +16,6 @@ exports.mdkSessionStart = function (req, res, next) {
     req.mdk_session.start_interaction();
     var mdk_session = req.mdk_session;
     function endSession() {
-        console.log("on-end callback");
         mdk_session.finish_interaction();
     }
     res.on("finish", endSession);
@@ -24,9 +23,8 @@ exports.mdkSessionStart = function (req, res, next) {
     next();
 };
 
-
+// Fail the interaction on errors.
 exports.mdkErrorHandler = function (err, req, res, next) {
-    console.log("err entry point");
     req.mdk_session.fail_interaction(err.toString());
     next(err);
 };

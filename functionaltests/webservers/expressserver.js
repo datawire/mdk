@@ -1,8 +1,10 @@
 var process = require('process');
 var express = require('express');
+var timeout = require('connect-timeout');
 var mdk_express = require('datawire_mdk_express');
 var app = express();
 
+app.use(timeout('1s', {respond: true}));
 app.use(mdk_express.mdkSessionStart);
 
 app.get('/context', function (req, res) {
@@ -10,7 +12,6 @@ app.get('/context', function (req, res) {
 });
 
 app.get('/resolve', function (req, res) {
-    console.log("URL: " + req.originalUrl);
     var isError = req.query.error !== undefined;
     req.mdk_session.resolve_async("service1", "1.0").then(
         function (node) {

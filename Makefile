@@ -40,7 +40,7 @@ node_modules:
 
 .PHONY: js-dependencies
 js-dependencies: node_modules
-	npm install express
+	npm install express connect-timeout
 
 .PHONY: setup
 setup: python-dependencies python3-dependencies js-dependencies install-quark

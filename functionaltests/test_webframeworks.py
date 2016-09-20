@@ -127,7 +127,7 @@ def test_interaction(webserver, port_number):
     url = get_url(port_number, "/resolve")
     result1 = requests.get(url).json()
     assert result1 == {"address1": [0, 0]}
-    assert requests.get(url + "?error=1").status_code == 500
+    assert requests.get(url + "?error=1").status_code in (500, 503)
 
     result2 = requests.get(url).json()
     # One success from first query, onse failure from second query:
