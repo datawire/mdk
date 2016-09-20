@@ -9,13 +9,15 @@ app.get('/context', function (req, res) {
     res.send(req.mdk_session.externalize());
 });
 
-app.get('/resolve', function (req, res, next) {
+app.get('/resolve', function (req, res) {
+    console.log("URL: " + req.originalUrl);
+    var isError = req.query.error !== undefined;
     req.mdk_session.resolve_async("service1", "1.0").then(
         function (node) {
             var policy = req.mdk_session._mdk._disco.failurePolicy(node);
             var result = {};
             result[node.address] = [policy.successes, policy.failures];
-            if (req.GET.get("error")) {
+            if (isError) {
                 throw "Erroring as requested.";
             } else {
                 res.json(result);
