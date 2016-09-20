@@ -193,7 +193,7 @@ namespace mdk_runtime {
     }
 
     @doc("Create a MDKRuntime with the default configuration and start its actors.")
-    MDKRuntime defaultRuntime() {
+    MDKRuntime quarkRuntimeRuntime() {
 	MDKRuntime runtime = new MDKRuntime();
         runtime.dependencies.registerService("envvar", new RealEnvVars());
         QuarkRuntimeTime timeService = new QuarkRuntimeTime();

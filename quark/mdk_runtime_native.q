@@ -140,13 +140,13 @@ namespace mdk_runtime {
         }
     }
 
-    class _ScheduleTask extends UnaryCallable {
+    class _ScheduleCallable extends UnaryCallable {
 
 	NativeTime timeService;
 	Actor requester;
 	String event;
 
-	_ScheduleTask(NativeTime timeService, Actor requester, String event) {
+	_ScheduleCallable(NativeTime timeService, Actor requester, String event) {
 	    self.timeService = timeService;
 	    self.requester = requester;
 	    self.event = event;
@@ -197,7 +197,7 @@ namespace mdk_runtime {
                 // necessary in non-threaded versions.
                 seconds = 0.001;
             }
-	    _schedule(new _ScheduleTask(self, origin, sched.event), seconds);
+	    _schedule(new _ScheduleCallable(self, origin, sched.event), seconds);
 	}
 
 	float time() {
@@ -219,20 +219,40 @@ namespace mdk_runtime {
         }
     }
 
+    macro bool isJava() $py{False} $js{false} $java{true} $rb{false};
+    macro bool isRuby() $py{False} $js{false} $java{false} $rb{true};
+
     @doc("Create a MDKRuntime with the default configuration and start its actors.")
     MDKRuntime defaultRuntime() {
 	MDKRuntime runtime = new MDKRuntime();
-        runtime.dependencies.registerService("envvar", new NativeEnvVars());
-        NativeTime timeService = new NativeTime();
-        NativeWebSockets websockets = new NativeWebSockets();
+
+        EnvironmentVariables envVars;
+        Time timeService;
+        SchedulingActor schedActor;
+        WebSockets websockets;
+        if (isJava() || isRuby()) {
+            envVars = new RealEnvVars();
+            timeService = new QuarkRuntimeTime();
+            schedActor = ?timeService;
+            websockets = new QuarkRuntimeWebSockets();
+        } else {
+            envVars = new NativeEnvVars();
+            timeService = new NativeTime();
+            schedActor = ?timeService;
+            websockets = new NativeWebSockets();
+        }
+        runtime.dependencies.registerService("envvar", envVars);
         runtime.dependencies.registerService("time", timeService);
-        runtime.dependencies.registerService("schedule", timeService);
+        runtime.dependencies.registerService("schedule", schedActor);
         runtime.dependencies.registerService("websockets", websockets);
+
         mdk_runtime.files.FileActor fileActor = new mdk_runtime.files.FileActorImpl(runtime);
         runtime.dependencies.registerService("files", fileActor);
-	runtime.dispatcher.startActor(timeService);
+
+	runtime.dispatcher.startActor(schedActor);
         runtime.dispatcher.startActor(websockets);
         runtime.dispatcher.startActor(fileActor);
+
 	return runtime;
     }
 
