@@ -65,12 +65,13 @@ test: install-mdk setup-docker test-python test-python3
 
 .PHONY: test-python
 test-python:
-	virtualenv/bin/py.test -n 4 -v unittests functionaltests
+	# Functional tests don't benefit from being run in another language, so
+	# we only run them under Python 3:
+	virtualenv/bin/py.test -n 4 -v unittests
 
 .PHONY: test-python3
 test-python3:
-	# Functional tests don't benefit from being run in another language:
-	virtualenv3/bin/py.test -n 4 -v unittests
+	virtualenv3/bin/py.test -n 4 -v unittests functionaltests
 
 release-minor:
 	virtualenv/bin/python scripts/release.py minor
@@ -79,10 +80,11 @@ release-patch:
 	virtualenv/bin/python scripts/release.py patch
 
 # Packaging commands:
-output: $(wildcard quark/*.q) dist
-	rm -rf output
+output: $(wildcard quark/*.q) $(wildcard python/*.py) dist
+	rm -rf output output.temp
 	# Use installed Quark if we don't already have quark cli in PATH:
 	which quark || source ~/.quark/config.sh; quark compile --include-stdlib -o output.temp quark/mdk-2.0.q
+	cp python/*.py output.temp/py/mdk-2.0/mdk/
 	mv output.temp output
 
 dist:

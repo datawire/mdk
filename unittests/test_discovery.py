@@ -9,6 +9,7 @@ from builtins import range
 from builtins import object
 
 from unittest import TestCase
+from json import dumps
 
 from hypothesis.stateful import GenericStateMachine
 from hypothesis import strategies as st
@@ -17,7 +18,7 @@ from .common import fake_runtime
 
 from mdk_discovery import (
     Discovery, Node, NodeActive, NodeExpired, ReplaceCluster,
-    CircuitBreakerFactory,
+    CircuitBreakerFactory, StaticRoutes,
 )
 
 
@@ -385,3 +386,39 @@ class StatefulDiscoveryTesting(GenericStateMachine):
         self.fake.compare(self.real)
 
 StatefulDiscoveryTests = StatefulDiscoveryTesting.TestCase
+
+
+class StaticDiscoverySourceTests(TestCase):
+    """Tests for StaticDiscoverySource."""
+
+    def setUp(self):
+        self.runtime = fake_runtime()
+        self.disco = Discovery(self.runtime)
+        self.runtime.dispatcher.startActor(self.disco)
+
+    def test_active(self):
+        """The nodes the StaticRoutes was registered with are active."""
+        nodes = [create_node("a", "service1"),
+                 create_node("b", "service2")]
+        static = StaticRoutes(nodes).create(self.disco, self.runtime)
+        self.runtime.dispatcher.startActor(static)
+
+        self.assertEqual(self.disco.knownNodes("service1"), [nodes[0]])
+        self.assertEqual(self.disco.knownNodes("service2"), [nodes[1]])
+
+    def test_parseJSON(self):
+        """
+        Nodes encoded as JSON and loaded with StaticRoutes.parseJSON are registered
+        as active.
+        """
+        static = StaticRoutes.parseJSON(dumps(
+            [{"service": "service1", "address": "a", "version": "1.0"},
+             {"service": "service2", "address": "b", "version": "2.0"}]
+        )).create(self.disco, self.runtime)
+
+        self.runtime.dispatcher.startActor(static)
+
+        [node1] = self.disco.knownNodes("service1")
+        self.assertEqual((node1.address, node1.version), ("a", "1.0"))
+        [node2] = self.disco.knownNodes("service2")
+        self.assertEqual((node2.address, node2.version), ("b", "2.0"))
