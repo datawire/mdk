@@ -20,6 +20,7 @@ clean:
 	rm -f quark/*.qc
 	rm -fr ~/.m2/repository/datawire_mdk
 	rm -fr ~/.m2/repository/io/datawire/mdk
+	rm -rf node_modules
 
 virtualenv:
 	virtualenv -p python2 virtualenv
@@ -35,8 +36,15 @@ virtualenv3:
 python3-dependencies: virtualenv3
 	virtualenv3/bin/pip install -r dev-requirements.txt
 
+node_modules:
+	mkdir node_modules
+
+.PHONY: js-dependencies
+js-dependencies: node_modules
+	npm install express connect-timeout
+
 .PHONY: setup
-setup: python-dependencies python3-dependencies install-quark
+setup: python-dependencies python3-dependencies js-dependencies install-quark
 
 .PHONY: install-quark
 install-quark:
@@ -45,11 +53,12 @@ install-quark:
 		bash -s -- -q `cat QUARK_VERSION.txt`
 
 .PHONY: install-mdk
-install-mdk: packages
+install-mdk: packages $(wildcard javascript/datawire_mdk_express/*)
 	virtualenv/bin/pip install --upgrade dist/datawire_mdk-*-py2*-none-any.whl
 	virtualenv3/bin/pip install --upgrade dist/datawire_mdk-*-*py3-none-any.whl
 	gem install --no-doc dist/datawire_mdk-*.gem
 	npm install output/js/mdk-2.0
+	npm install javascript/datawire_mdk_express/
 	cd output/java/mdk-2.0 && mvn install
 
 .PHONY: test

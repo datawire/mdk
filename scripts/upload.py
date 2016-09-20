@@ -65,14 +65,16 @@ def upload_npm():
     """
     Upload npm to npmjs repository.
     """
-    npm = os.path.join("output/js/mdk-2.0")
+    mdk_npm = "output/js/mdk-2.0"
+    express_npm = "javascript/datawire_mdk_express"
     config = os.path.expanduser("~/.npmrc")
     config_existed = os.path.exists(config)
     try:
         if not config_existed:
             with open(config, "w") as f:
                 f.write(NPM_CONFIG.format(os.environ["NPM_API_KEY"]))
-        check_call(["npm", "publish", npm])
+        check_call(["npm", "publish", mdk_npm])
+        check_call(["npm", "publish", express_npm])
     finally:
         if not config_existed:
             # Delete the file we wrote:

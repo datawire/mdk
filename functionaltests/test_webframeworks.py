@@ -49,13 +49,13 @@ def port_number(worker_id):
 
 
 @pytest.fixture(params=[
-                    [sys.executable, str(WEBSERVERS_ROOT / "flaskserver.py"),
-                     "$PORTNUMBER"],
-                    [sys.executable, str(WEBSERVERS_ROOT / "django-manage.py"),
-                     # Add --noreload so we don't have two Django processes,
-                     # which makes cleanup harder:
-                     "runserver", "$PORTNUMBER", "--noreload"],
-                ])
+    [sys.executable, str(WEBSERVERS_ROOT / "flaskserver.py"), "$PORTNUMBER"],
+    [sys.executable, str(WEBSERVERS_ROOT / "django-manage.py"),
+     # Add --noreload so we don't have two Django processes,
+     # which makes cleanup harder:
+     "runserver", "$PORTNUMBER", "--noreload"],
+    ["node", str(WEBSERVERS_ROOT / "expressserver.js"), "$PORTNUMBER"],
+])
 def webserver(request, port_number):
     """A fixture that runs a webserver in the background on port 9191."""
     # Tell MDK to hard code discovery source, and use testing-oriented failure
@@ -127,7 +127,7 @@ def test_interaction(webserver, port_number):
     url = get_url(port_number, "/resolve")
     result1 = requests.get(url).json()
     assert result1 == {"address1": [0, 0]}
-    assert requests.get(url + "?error=1").status_code == 500
+    assert requests.get(url + "?error=1").status_code in (500, 503)
 
     result2 = requests.get(url).json()
     # One success from first query, onse failure from second query:
