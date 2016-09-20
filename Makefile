@@ -20,6 +20,7 @@ clean:
 	rm -f quark/*.qc
 	rm -fr ~/.m2/repository/datawire_mdk
 	rm -fr ~/.m2/repository/io/datawire/mdk
+	rm -rf node_modules
 
 virtualenv:
 	virtualenv -p python2 virtualenv
