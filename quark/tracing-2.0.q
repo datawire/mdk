@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_tracing 2.0.12;
+package datawire_mdk_tracing 2.0.13;
 
 include protocol-1.0.q;
 include introspection-1.0.q;
