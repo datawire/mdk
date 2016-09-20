@@ -69,9 +69,6 @@ def _bump_versions(options, config_path):
                   "--verbose",
                   # List the changed files
                   "--list",
-                  # Don't enforce not-being-dirty; we enforce that earlier, and
-                  # we run bumpversion multiple times in a row:
-                  "--allow-dirty",
                   # Which config file to use
                   "--config-file", config_path, increment],
                  cwd=os.path.dirname(config_path) or ".")
@@ -82,11 +79,6 @@ def bump_mdk_versions(options):
     _bump_versions(options, ".bumpversion.cfg")
 
 
-def bump_express_versions(options):
-    """Bump Express integration release version."""
-    _bump_versions(options, "javascript/datawire_mdk_express/.bumpversion.cfg")
-
-
 def main():
     """Run the release."""
     options = docopt(HELP)
@@ -95,7 +87,7 @@ def main():
                                   git_pull,
                                   ensure_passing_tests,
                                   bump_mdk_versions,
-                                  bump_express_versions]):
+                                  ]):
         print("Step {}: {}".format(index + 1, step.__name__))
         step(options)
     print("""\
