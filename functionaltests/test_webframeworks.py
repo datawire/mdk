@@ -34,14 +34,29 @@ from utils import run_python
 
 
 WEBSERVERS_ROOT = pathlib.Path(__file__).parent / "webservers"
-URL = "http://localhost:9191"
 
 
-@pytest.fixture(scope="module",
-                params=[
-                    [sys.executable, str(WEBSERVERS_ROOT / "flaskserver.py")],
+PORTS = [9190 + i for i in range(100)]
+
+
+@pytest.fixture()
+def port_number(worker_id):
+    """A fixture that returns a different port for each parallel worker."""
+    i = 0
+    if worker_id != "master":
+        i = int("".join([c for c in worker_id if c.isdigit()]))
+    return PORTS[i]
+
+
+@pytest.fixture(params=[
+                    [sys.executable, str(WEBSERVERS_ROOT / "flaskserver.py"),
+                     "$PORTNUMBER"],
+                    [sys.executable, str(WEBSERVERS_ROOT / "django-manage.py"),
+                     # Add --noreload so we don't have two Django processes,
+                     # which makes cleanup harder:
+                     "runserver", "$PORTNUMBER", "--noreload"],
                 ])
-def webserver(request):
+def webserver(request, port_number):
     """A fixture that runs a webserver in the background on port 9191."""
     # Tell MDK to hard code discovery source, and use testing-oriented failure
     # policy:
@@ -52,11 +67,13 @@ def webserver(request):
                     {"service": "service2", "address": "address2", "version": "1.0"},
                 ]),
                 "MDK_FAILURE_POLICY": "recording"})
-    p = Popen(request.param, env=env)
+    command = [(str(port_number) if i == "$PORTNUMBER" else i)
+               for i in request.param]
+    p = Popen(command, env=env)
     # Wait for web server to come up:
     for i in range(10):
         try:
-            requests.get(URL)
+            requests.get(get_url(port_number, "/"))
         except:
             sleep(1.0)
         else:
@@ -65,29 +82,32 @@ def webserver(request):
     p.terminate()
     p.wait()
 
+def get_url(port, path):
+    """Return the URL for a request."""
+    return "http://localhost:%d%s" % (port, path)
 
-def test_session_with_context(webserver):
+def test_session_with_context(webserver, port_number):
     """
     If a X-MDK-CONTEXT header is sent to the webserver it reads it and uses the
     encoded session.
     """
     context = run_python(sys.executable, "create-context.py", output=True)
-    returned_context = requests.get(URL + "/context",
+    returned_context = requests.get(get_url(port_number, "/context"),
                                     headers={"X-MDK-CONTEXT": context}).json()
     assert loads(context.decode("utf-8"))["traceId"] == returned_context["traceId"]
 
 
-def test_session_without_context(webserver):
+def test_session_without_context(webserver, port_number):
     """
     If no X-MDK-CONTEXT header is sent to the webserver it creates a new
     session.
     """
     context = run_python(sys.executable, "create-context.py", output=True)
-    returned_context = requests.get(URL + "/context").json()
+    returned_context = requests.get(get_url(port_number, "/context")).json()
     assert loads(context.decode("utf-8"))["traceId"] != returned_context["traceId"]
 
 
-def test_interaction(webserver):
+def test_interaction(webserver, port_number):
     """
     The webserver ties interactions to requests, and fails the interaction on
     errors.
@@ -104,7 +124,7 @@ def test_interaction(webserver):
     Then we send another non-error request. The result should indicate two
     successes and single failure for address1.
     """
-    url = URL + "/resolve"
+    url = get_url(port_number, "/resolve")
     result1 = requests.get(url).json()
     assert result1 == {"address1": [0, 0]}
     assert requests.get(url + "?error=1").status_code == 500
