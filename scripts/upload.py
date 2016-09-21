@@ -44,6 +44,7 @@ def upload_gem():
     Upload gem to rubygems.org.
     """
     gem, = glob("dist/datawire_mdk*.gem")
+    gem2, = glob("dist/rack*.gem")
     directory = os.path.expanduser("~/.gem")
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -55,6 +56,7 @@ def upload_gem():
                 f.write(GEM_CONFIG.format(os.environ["RUBYGEMS_API_KEY"]))
             os.chmod(creds, 0o600)
         check_call(["gem", "push", gem])
+        check_call(["gem", "push", gem2])
     finally:
         if not creds_existed:
             # Delete the file we wrote:
@@ -65,14 +67,16 @@ def upload_npm():
     """
     Upload npm to npmjs repository.
     """
-    npm = os.path.join("output/js/mdk-2.0")
+    mdk_npm = "output/js/mdk-2.0"
+    express_npm = "javascript/datawire_mdk_express"
     config = os.path.expanduser("~/.npmrc")
     config_existed = os.path.exists(config)
     try:
         if not config_existed:
             with open(config, "w") as f:
                 f.write(NPM_CONFIG.format(os.environ["NPM_API_KEY"]))
-        check_call(["npm", "publish", npm])
+        check_call(["npm", "publish", mdk_npm])
+        check_call(["npm", "publish", express_npm])
     finally:
         if not config_existed:
             # Delete the file we wrote:

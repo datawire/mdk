@@ -8,8 +8,5 @@ rvm use --ruby-version 2.3
 ruby --version
 gem --version
 
-# Prepare virtualenv:
-make setup
-
 # Run the tests:
 make test

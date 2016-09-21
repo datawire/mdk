@@ -1,9 +1,5 @@
 """
 Django middleware that enables the MDK.
-
-This is old-style (Django <1.10) middleware. Please see
-https://docs.djangoproject.com/en/1.10/topics/http/middleware/#upgrading-middleware
-if you're using Django 1.10.
 """
 
 import atexit
@@ -11,15 +7,22 @@ from traceback import format_exception_only
 
 from mdk import start
 
+# Django 1.10 new-style middleware compatibility:
+try:
+    from django.utils.deprecation import MiddlewareMixin
+except ImportError:
+    MiddlewareMixin = object
 
-class MDKSessionMiddleware(object):
+
+class MDKSessionMiddleware(MiddlewareMixin):
     """
     Add an MDK session to the Django request, as well as circuit breaker
     support.
 
     The request object will get a ``mdk_session`` attribute added to it.
     """
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        MiddlewareMixin.__init__(self, *args, **kwargs)
         self.mdk = start()
         atexit.register(self.mdk.stop)
 

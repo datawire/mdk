@@ -15,12 +15,13 @@ default:
 clean:
 	rm -fr virtualenv
 	rm -fr virtualenv3
+	rm -rf django110env
 	rm -fr output
 	rm -fr dist
 	rm -f quark/*.qc
 	rm -fr ~/.m2/repository/datawire_mdk
 	rm -fr ~/.m2/repository/io/datawire/mdk
-	rm -fr node_modules/datawire_mdk
+	rm -rf node_modules
 
 virtualenv:
 	virtualenv -p python2 virtualenv
@@ -32,12 +33,28 @@ python-dependencies: virtualenv
 virtualenv3:
 	virtualenv -p python3 virtualenv3
 
+django110env:
+	virtualenv -p python3 django110env
+
 .PHONY: python3-dependencies
-python3-dependencies: virtualenv3
+python3-dependencies: virtualenv3 django110env
 	virtualenv3/bin/pip install -r dev-requirements.txt
+	django110env/bin/pip install django\>=1.10
+
+node_modules:
+	mkdir node_modules
+
+.PHONY: js-dependencies
+js-dependencies: node_modules
+	npm install express connect-timeout
+
+.PHONY: ruby-dependencies
+ruby-dependencies:
+	gem install --no-doc sinatra
+	gem install --no-doc json
 
 .PHONY: setup
-setup: python-dependencies python3-dependencies install-quark
+setup: python-dependencies python3-dependencies js-dependencies ruby-dependencies install-quark
 
 .PHONY: install-quark
 install-quark:
@@ -46,11 +63,14 @@ install-quark:
 		bash -s -- -q `cat QUARK_VERSION.txt`
 
 .PHONY: install-mdk
-install-mdk: packages
+install-mdk: packages $(wildcard javascript/datawire_mdk_express/*)
 	virtualenv/bin/pip install --upgrade dist/datawire_mdk-*-py2*-none-any.whl
 	virtualenv3/bin/pip install --upgrade dist/datawire_mdk-*-*py3-none-any.whl
+	django110env/bin/pip install --upgrade dist/datawire_mdk-*-*py3-none-any.whl
 	gem install --no-doc dist/datawire_mdk-*.gem
+	gem install --no-doc dist/rack*.gem
 	npm install output/js/mdk-2.0
+	npm install javascript/datawire_mdk_express/
 	cd output/java/mdk-2.0 && mvn install
 
 .PHONY: setup-docker
@@ -100,6 +120,8 @@ python-packages: output
 .PHONY: ruby-packages
 ruby-packages: output
 	python scripts/build-packages.py rb output/rb/mdk-2.0 dist/
+	cd ruby/rack-mdk && gem build rack-mdk.gemspec
+	mv ruby/rack-mdk/*.gem dist/
 
 .PHONY: javascript-packages
 javascript-packages: output
