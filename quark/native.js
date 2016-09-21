@@ -25,7 +25,14 @@
 
     var WebSocket = require("ws");
 
-    var quark = require("quark").quark;
+    var quark;
+    try {
+        // quark compile --include-stdlib
+        quark = require("./quark");
+    } catch (exc) {
+        // normal quark compilation
+        quark = require("quark").quark;
+    }
 
 
     exports.now = function now() {
