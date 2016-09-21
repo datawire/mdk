@@ -15,9 +15,9 @@ get '/resolve' do
   session = env[:mdk_session]
   node = session.resolve("service1", "1.0")
   if params['error'] != nil then
-    throw "Erroring as required."
+    throw "Erroring as requested."
   else
-    policy = req.mdk_session._mdk._disco.failurePolicy(node)
+    policy = session._mdk._disco.failurePolicy(node)
     {node.address => [policy.successes, policy.failures]}.to_json
   end
 end

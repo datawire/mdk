@@ -13,7 +13,7 @@ module Rack
       end
 
       def call(env)
-        env[:mdk_session] = @mdk.join_session(env["HTTP_X_MDK_CONTEXT"])
+        env[:mdk_session] = @mdk.join(env["HTTP_X_MDK_CONTEXT"])
         env[:mdk_session].start_interaction
         begin
           @app.call(env)
