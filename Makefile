@@ -48,8 +48,13 @@ node_modules:
 js-dependencies: node_modules
 	npm install express connect-timeout
 
+.PHONY: ruby-dependencies
+ruby-dependencies:
+	gem install --no-doc sinatra
+	gem install --no-doc json
+
 .PHONY: setup
-setup: python-dependencies python3-dependencies js-dependencies install-quark
+setup: python-dependencies python3-dependencies js-dependencies ruby-dependencies install-quark
 
 .PHONY: install-quark
 install-quark:
