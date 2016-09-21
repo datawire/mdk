@@ -14,7 +14,7 @@ env:
 
 install:
   - rvm install 2.3
-  - sudo docker pull datawire/quark-run:$(cat QUARK_VERSION.txt)
+  - sudo docker pull datawire/quark-run:$(cat QUARK_VERSION.txt | cut -b 2-)
   - rvm use --ruby-version 2.3 && make setup
 
 script:
