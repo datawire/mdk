@@ -1,5 +1,5 @@
 package quark_mdk
 
-interface MdkAPI (
+interface MdkAPI {
 	Start()
-)
+}

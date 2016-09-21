@@ -1,19 +1,17 @@
 package mdk
 
-import "fmt"
-import "github.com/datawire/mdk_go/mdk/discovery"
-import "quark/quark/quark_mdk"
+import "quark/quark/quark_mdk/mdk/api"
 
-interface MDK (
-	quark_mdk.MdkAPI
-)
+type MDK interface {
+	api.MDK
+}
 
 
-func Start() {
-	fmt.Print("MDK Start\n")
-        discovery.Discoball()
+func Start() MDK {
+	mdk := api.GetMDK();
+	mdk.Start();
+	return mdk;
 }
 
 func Stop() {
-	fmt.Print("MDK Stop\n")
 }
