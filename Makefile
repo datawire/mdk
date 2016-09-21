@@ -15,6 +15,7 @@ default:
 clean:
 	rm -fr virtualenv
 	rm -fr virtualenv3
+	rm -rf django110env
 	rm -fr output
 	rm -fr dist
 	rm -f quark/*.qc
@@ -32,9 +33,13 @@ python-dependencies: virtualenv
 virtualenv3:
 	virtualenv -p python3 virtualenv3
 
+django110env:
+	virtualenv -p python3 django110env
+
 .PHONY: python3-dependencies
-python3-dependencies: virtualenv3
+python3-dependencies: virtualenv3 django110env
 	virtualenv3/bin/pip install -r dev-requirements.txt
+	django110env/bin/pip install django\>=1.10
 
 node_modules:
 	mkdir node_modules
@@ -56,6 +61,7 @@ install-quark:
 install-mdk: packages $(wildcard javascript/datawire_mdk_express/*)
 	virtualenv/bin/pip install --upgrade dist/datawire_mdk-*-py2*-none-any.whl
 	virtualenv3/bin/pip install --upgrade dist/datawire_mdk-*-*py3-none-any.whl
+	django110env/bin/pip install --upgrade dist/datawire_mdk-*-*py3-none-any.whl
 	gem install --no-doc dist/datawire_mdk-*.gem
 	npm install output/js/mdk-2.0
 	npm install javascript/datawire_mdk_express/
