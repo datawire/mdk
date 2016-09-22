@@ -328,7 +328,26 @@ namespace mdk {
             self._running = true;
             _runtime.dispatcher.startActor(_disco);
             _runtime.dispatcher.startActor(_discoSource);
-            // Tracer starts up automatically as needed
+
+            // Tracer is written to start up automatically as needed.
+            // However, the current implementation leads to a deadlock
+            // in certain conditions. Force Tracer to start on startup
+            // to avoid this problem for now. We should fix this a
+            // better way later, i.e. by removing the on-demand
+            // startup code or by fixing the deadlock.
+            //
+            // In summary, calling log(...) does a _startIfNeeded(),
+            // which starts an actor sometimes. That start causes the
+            // dispatcher queue to get processed, which sometimes hits
+            // a schedule event. The protocol schedule event handler
+            // does an isStarted(). Both _startIfNeeded and isStarted
+            // try to hold the same lock on the TracingClient
+            // instance. It boils down to _startIfNeeded() calling out
+            // to other code while holding the lock.
+            if (_tracer != null) {
+                _tracer._openIfNeeded();
+                _tracer._client._startIfNeeded();
+            }
         }
 
         void stop() {
