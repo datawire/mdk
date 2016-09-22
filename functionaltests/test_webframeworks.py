@@ -59,6 +59,7 @@ def port_number(worker_id):
     ["django110env/bin/python", str(WEBSERVERS_ROOT / "django110-manage.py"),
      "runserver", "$PORTNUMBER", "--noreload"],
     ["node", str(WEBSERVERS_ROOT / "expressserver.js"), "$PORTNUMBER"],
+    ["ruby", str(WEBSERVERS_ROOT / "sinatraserver.rb"), "$PORTNUMBER"],
 ])
 def webserver(request, port_number):
     """A fixture that runs a webserver in the background on port 9191."""

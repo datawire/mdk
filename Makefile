@@ -48,8 +48,13 @@ node_modules:
 js-dependencies: node_modules
 	npm install express connect-timeout
 
+.PHONY: ruby-dependencies
+ruby-dependencies:
+	gem install --no-doc sinatra
+	gem install --no-doc json
+
 .PHONY: setup
-setup: python-dependencies python3-dependencies js-dependencies install-quark
+setup: python-dependencies python3-dependencies js-dependencies ruby-dependencies install-quark
 
 .PHONY: install-quark
 install-quark:
@@ -63,6 +68,7 @@ install-mdk: packages $(wildcard javascript/datawire_mdk_express/*)
 	virtualenv3/bin/pip install --upgrade dist/datawire_mdk-*-*py3-none-any.whl
 	django110env/bin/pip install --upgrade dist/datawire_mdk-*-*py3-none-any.whl
 	gem install --no-doc dist/datawire_mdk-*.gem
+	gem install --no-doc dist/rack*.gem
 	npm install output/js/mdk-2.0
 	npm install javascript/datawire_mdk_express/
 	cd output/java/mdk-2.0 && mvn install
@@ -107,6 +113,8 @@ python-packages: output
 .PHONY: ruby-packages
 ruby-packages: output
 	python scripts/build-packages.py rb output/rb/mdk-2.0 dist/
+	cd ruby/rack-mdk && gem build rack-mdk.gemspec
+	mv ruby/rack-mdk/*.gem dist/
 
 .PHONY: javascript-packages
 javascript-packages: output
