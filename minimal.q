@@ -1,6 +1,14 @@
 quark *;
 
 namespace mdk {
+    api.MDK init() {
+        return api.GetMDK();
+    }
+    api.MDK start() {
+        api.MDK m = init();
+        m.start();
+        return m;
+    }
     namespace api {
         interface Session {
             String externalize()

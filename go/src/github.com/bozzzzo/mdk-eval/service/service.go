@@ -8,11 +8,11 @@ import (
 type Plug struct {
 }
 
-func (self *Plug) Init(m mdk.MDK) {
+func (self *Plug) Init(m mdk.Api_MDK) {
 	fmt.Printf("service plugin %v got initialized by %v\n", self, m);
 }
 
-func (self *Plug) OnSession(s mdk.Session) {
+func (self *Plug) OnSession(s mdk.Api_Session) {
 	fmt.Printf("oh, look a new session %v\n", s);
 }
 
