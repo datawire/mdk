@@ -18,10 +18,11 @@ clean:
 	rm -rf django110env
 	rm -fr output
 	rm -fr dist
-	rm -f quark/*.qc
+	rm -f quark/*.qc quark/tests/*.qc
 	rm -fr ~/.m2/repository/datawire_mdk
 	rm -fr ~/.m2/repository/io/datawire/mdk
 	rm -rf node_modules
+	find . -name "__pycache__" -print0 | xargs -0 rm -fr
 
 virtualenv:
 	virtualenv -p python2 virtualenv
@@ -84,7 +85,7 @@ test-python:
 
 .PHONY: test-python3
 test-python3:
-	virtualenv3/bin/py.test -n 4 -v unittests functionaltests
+	virtualenv3/bin/py.test -n 4 -v --timeout=120 unittests functionaltests
 
 release-minor:
 	virtualenv/bin/python scripts/release.py minor
