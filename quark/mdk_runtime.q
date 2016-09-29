@@ -161,38 +161,71 @@ namespace mdk_runtime {
 	Actor originator;
 	MessageDispatcher dispatcher;
 	String state = "CONNECTING";
+        List<Object> incoming = [];  // FIXME: WS Messages received before actor has started
 
 	QuarkRuntimeWSActor(Actor originator, PromiseResolver factory) {
 	    self.originator = originator;
 	    self.factory = factory;
 	}
 
+        // Debugging
+        void logTS(String message) {
+            long now = Context.runtime().now();
+            int tenths = (now.truncateToInt() / 100) % 100000;  // in tenths of seconds
+            float seconds = tenths.toFloat() / 10.0;
+            logger.debug(seconds.toString() + " " + message);
+        }
+
+        void logPrologue(String what) {
+            String disMessage = "";
+            if (self.dispatcher == null) {
+                disMessage = ", no dispatcher";
+            }
+            logTS(what +
+                  ", current state " + self.state +
+                  ", originator " + self.originator.toString() +
+                  ", I am " + self.toString() +
+                  disMessage);
+        }
+
 	// Actor
 	void onStart(MessageDispatcher dispatcher) {
+            logPrologue("ws onStart");
 	    self.dispatcher = dispatcher;
+
+            // Send actor-model messages for incoming WS messages
+            // received before this actor was started. FIXME: This
+            // case ought not to exist.
+            while (self.incoming.size() > 0) {
+                self.dispatcher.tell(self, self.incoming.remove(0), self.originator);
+            }
 	}
 
 	void onMessage(Actor origin, Object message) {
+            logPrologue("ws onMessage (actor message)");
+            logTS("   message is from " + origin.toString());
 	    if (message.getClass().id == "quark.String"
 		&& self.state == "CONNECTED") {
+                logTS("   send-ish, message is: " + message.toString());
 		self.socket.send(?message);
 		return;
 	    }
 	    if (message.getClass().id == "mdk_runtime.WSClose"
 		&& self.state == "CONNECTED") {
+                logTS("   close-ish, switching to DISCONNECTING state");
 		self.state = "DISCONNECTING";
 		self.socket.close();
 		return;
 	    }
+            logger.warn("ws onMessage got unhandled message: " +
+                        message.getClass().id + " in state " + self.state);
 	}
 
 	// WSHandler
 	void onWSConnected(WebSocket socket) {
-	    logger.debug("onWSConnected, current state " + self.state +
-			 "originator: " + self.originator.toString() + " and I am " +
-			 self.toString());
+            logPrologue("onWSConnected");
 	    if (self.state == "ERROR") {
-		logger.debug("Connection event after error event!");
+		logTS("Connection event after error event!");
 		return;
 	    }
 	    self.state = "CONNECTED";
@@ -201,8 +234,8 @@ namespace mdk_runtime {
 	}
 
 	void onWSError(WebSocket socket, WSError error) {
-	    logger.debug("onWSError, current state " + self.state +
-			 "originator: " + self.originator.toString());
+            logPrologue("onWSError");
+            logTS("onWSError, reason is: " + error.toString());
 	    if (self.state == "CONNECTING") {
 		logger.error("Error connecting to WebSocket: " + error.toString());
                 self.state = "ERROR";
@@ -213,18 +246,34 @@ namespace mdk_runtime {
 	}
 
 	void onWSMessage(WebSocket socket, String message) {
-	    logger.debug("onWSMessage, current state: " + self.state +
-			 "originator: " + self.originator.toString());
-	    self.dispatcher.tell(self, new WSMessage(message), self.originator);
+            logPrologue("onWSMessage");
+            logTS("onWSMessage, message is: " + message);
+
+            // FIXME: Sometimes we start receiving WS messages before
+            // this actor has been started. Work around that for now
+            // by buffering those WS messages and then delivering them
+            // as actor messages in onStart(...).
+            Object deliverable = new WSMessage(message);
+            if (self.dispatcher == null) {
+                self.incoming.add(deliverable);
+            } else {
+                self.dispatcher.tell(self, deliverable, self.originator);
+            }
 	}
 
 	void onWSFinal(WebSocket socket) {
-	    logger.debug("onWSFinal, current state " + self.state +
-			 "originator: " + self.originator.toString());
+            logPrologue("onWSFinal");
 	    if (self.state == "DISCONNECTING" || self.state == "CONNECTED") {
 		self.state = "DISCONNECTED";
 		self.socket = null;
-		self.dispatcher.tell(self, new WSClosed(), self.originator);
+
+                // FIXME: Racy race race! See onWSMessage(...) above.
+                Object deliverable = new WSClosed();
+                if (self.dispatcher == null) {
+                    self.incoming.add(deliverable);
+                } else {
+                    self.dispatcher.tell(self, deliverable, self.originator);
+                }
 	    }
 	}
     }
