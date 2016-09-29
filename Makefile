@@ -4,7 +4,7 @@ SHELL=/bin/bash
 default:
 	echo "You can run:"
 	echo "* 'make setup' to setup the environment"
-	echo "* 'make test' to run tests (requires setup)"
+	echo "* 'make test' to run tests (requires setup and DATAWIRE_TOKEN)"
 	echo "* 'make packages' to build packages (.whl, .gem, etc.)"
 	echo "* 'make release-patch' to do a patch release (2.0.x)"
 	echo "* 'make release-minor' to do a minor release (2.x.0)"
@@ -77,6 +77,13 @@ install-mdk: packages $(wildcard javascript/datawire_mdk_express/*)
 .PHONY: test
 test: install-mdk test-python test-python3
 
+.PHONY: guard-token
+guard-token:
+	@ if [ "${DATAWIRE_TOKEN}" = "" ]; then \
+	    echo "DATAWIRE_TOKEN not set"; \
+	    exit 1; \
+	fi
+
 .PHONY: test-python
 test-python:
 	# Functional tests don't benefit from being run in another language, so
@@ -84,8 +91,8 @@ test-python:
 	virtualenv/bin/py.test -n 4 -v unittests
 
 .PHONY: test-python3
-test-python3:
-	virtualenv3/bin/py.test -n 4 -v --timeout=120 unittests functionaltests
+test-python3: guard-token
+	virtualenv3/bin/py.test -n 4 -v --timeout=180 unittests functionaltests
 
 release-minor:
 	virtualenv/bin/python scripts/release.py minor
