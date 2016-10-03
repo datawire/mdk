@@ -122,6 +122,7 @@ javascript-packages: output
 
 .PHONY: java-packages
 java-packages: output
+	cp -f pom.xml.manual output/java/mdk-2.0/pom.xml
 	python scripts/build-packages.py java output/java/mdk-2.0 dist/
 
 

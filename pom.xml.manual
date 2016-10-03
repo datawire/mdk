@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <!-- A manually maintained pom.xml for the Java MDK packages. -->
   <modelVersion>4.0.0</modelVersion>
   <groupId>io.datawire.mdk</groupId>
   <artifactId>datawire_mdk</artifactId>
-  <version>2.0.13</version>
+  <!-- Don't remove or change the comment on the next line, it's used by
+       .bumpversion.cfg to find where to replace the version on release. -->
+  <version>2.0.14</version><!-- PACKAGE VERSION HERE -->
   <name>datawire_mdk</name>
   <description>Java mdk</description>
   <url>http://datawire.github.io/mdk/</url>
