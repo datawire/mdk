@@ -171,6 +171,9 @@ namespace mdk_runtime {
 
         // Debugging
         void logTS(String message) {
+            if (true) {  // Disabled by default
+                return;
+            }
             long now = Context.runtime().now();
             int tenths = (now.truncateToInt() / 100) % 100000;  // in tenths of seconds
             float seconds = tenths.toFloat() / 10.0;
@@ -614,6 +617,7 @@ namespace mdk_runtime {
 
     @doc("Create a MDKRuntime with the default configuration and start its actors.")
     MDKRuntime defaultRuntime() {
+        //logging.makeConfig().setLevel("DEBUG").configure();
         MDKRuntime runtime = new MDKRuntime();
         runtime.dependencies.registerService("envvar", new RealEnvVars());
         QuarkRuntimeTime timeService = new QuarkRuntimeTime();
