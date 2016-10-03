@@ -78,7 +78,7 @@ def webserver(request, port_number):
     # Wait for web server to come up:
     for i in range(10):
         try:
-            requests.get(get_url(port_number, "/"))
+            requests.get(get_url(port_number, "/"), timeout=0.1)
         except:
             if p.poll() is not None:
                 raise AssertionError("Webserver exited prematurely.")
