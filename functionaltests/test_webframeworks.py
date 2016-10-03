@@ -80,6 +80,8 @@ def webserver(request, port_number):
         try:
             requests.get(get_url(port_number, "/"))
         except:
+            if p.poll() is not None:
+                raise AssertionError("Webserver exited prematurely.")
             sleep(1.0)
         else:
             break
