@@ -86,43 +86,41 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
         <version>2.4.3</version>
-        <configuration>
-          <artifactSet>
-            <includes>
-              <include>io.netty:netty-all</include>
-              <include>junit:*</include>
-              <include>com.fasterxml.jackson.jr:*</include>
-            </includes>
-          </artifactSet>
-          <relocations>
-            <relocation>
-              <pattern>com.fasterxml.jackson</pattern>
-              <shadedPattern>datawire_mdk_shaded.com.fasterxml.jackson</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>io.netty</pattern>
-              <shadedPattern>datawire_mdk_shaded.io.netty</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>junit</pattern>
-              <shadedPattern>datawire_mdk_shaded.junit</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>org.junit</pattern>
-              <shadedPattern>datawire_mdk_shaded.org.junit</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>org.hamcrest</pattern>
-              <shadedPattern>datawire_mdk_shaded.org.hamcrest</shadedPattern>
-            </relocation>
-          </relocations>
-        </configuration>
         <executions>
           <execution>
             <phase>package</phase>
             <goals>
               <goal>shade</goal>
             </goals>
+            <configuration>
+              <minimizeJar>false</minimizeJar>
+              <createDependencyReducedPom>true</createDependencyReducedPom>
+              <dependencyReducedPomLocation>
+                ${java.io.tmpdir}/dependency-reduced-pom.xml
+              </dependencyReducedPomLocation>
+              <relocations>
+                <relocation>
+                  <pattern>com.fasterxml.jackson</pattern>
+                  <shadedPattern>internaldatawire.com.fasterxml.jackson</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>io.netty</pattern>
+                  <shadedPattern>internaldatawire.io.netty</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>junit</pattern>
+                  <shadedPattern>internaldatawire.junit</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>org.junit</pattern>
+                  <shadedPattern>internaldatawire.org.junit</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>org.hamcrest</pattern>
+                  <shadedPattern>internaldatawire.org.hamcrest</shadedPattern>
+                </relocation>
+              </relocations>
+            </configuration>
           </execution>
         </executions>
       </plugin>
