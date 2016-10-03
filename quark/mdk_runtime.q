@@ -159,11 +159,12 @@ namespace mdk_runtime {
         WebSocket socket;
         PromiseResolver factory;
         Actor originator;
+        String url;
         MessageDispatcher dispatcher;
         String state = "CONNECTING";
-        List<Object> incoming = [];  // FIXME: WS Messages received before actor has started
 
-        QuarkRuntimeWSActor(Actor originator, PromiseResolver factory) {
+        QuarkRuntimeWSActor(String url, Actor originator, PromiseResolver factory) {
+            self.url = url;
             self.originator = originator;
             self.factory = factory;
         }
@@ -185,6 +186,7 @@ namespace mdk_runtime {
                   ", current state " + self.state +
                   ", originator " + self.originator.toString() +
                   ", I am " + self.toString() +
+                  " [" + self.url + "]" +
                   disMessage);
         }
 
@@ -192,13 +194,7 @@ namespace mdk_runtime {
         void onStart(MessageDispatcher dispatcher) {
             logPrologue("ws onStart");
             self.dispatcher = dispatcher;
-
-            // Send actor-model messages for incoming WS messages
-            // received before this actor was started. FIXME: This
-            // case ought not to exist.
-            while (self.incoming.size() > 0) {
-                self.dispatcher.tell(self, self.incoming.remove(0), self.originator);
-            }
+            Context.runtime().open(self.url, self);
         }
 
         void onMessage(Actor origin, Object message) {
@@ -248,17 +244,7 @@ namespace mdk_runtime {
         void onWSMessage(WebSocket socket, String message) {
             logPrologue("onWSMessage");
             logTS("onWSMessage, message is: " + message);
-
-            // FIXME: Sometimes we start receiving WS messages before
-            // this actor has been started. Work around that for now
-            // by buffering those WS messages and then delivering them
-            // as actor messages in onStart(...).
-            Object deliverable = new WSMessage(message);
-            if (self.dispatcher == null) {
-                self.incoming.add(deliverable);
-            } else {
-                self.dispatcher.tell(self, deliverable, self.originator);
-            }
+            self.dispatcher.tell(self, new WSMessage(message), self.originator);
         }
 
         void onWSFinal(WebSocket socket) {
@@ -266,14 +252,7 @@ namespace mdk_runtime {
             if (self.state == "DISCONNECTING" || self.state == "CONNECTED") {
                 self.state = "DISCONNECTED";
                 self.socket = null;
-
-                // FIXME: Racy race race! See onWSMessage(...) above.
-                Object deliverable = new WSClosed();
-                if (self.dispatcher == null) {
-                    self.incoming.add(deliverable);
-                } else {
-                    self.dispatcher.tell(self, deliverable, self.originator);
-                }
+                self.dispatcher.tell(self, new WSClosed(), self.originator);
             }
         }
     }
@@ -293,10 +272,9 @@ namespace mdk_runtime {
             logger.debug(originator.toString() + "requested connection to "
                          + url);
             PromiseResolver factory =  new PromiseResolver(self.dispatcher);
-            QuarkRuntimeWSActor actor = new QuarkRuntimeWSActor(originator, factory);
+            QuarkRuntimeWSActor actor = new QuarkRuntimeWSActor(url, originator, factory);
             connections.add(actor);
             self.dispatcher.startActor(actor);
-            Context.runtime().open(url, actor);
             return factory.promise;
         }
 
