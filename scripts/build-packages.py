@@ -4,6 +4,7 @@ import os
 import sys
 from glob import glob
 from subprocess import check_call
+from shutil import copyfile
 
 ROOT_DIR=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -29,7 +30,8 @@ def build_javascript(package_dir):
 
 def build_java(package_dir):
     """Build Java packages from the output of quark compile (output/java/mdk-2.0)."""
-    check_call("patch < ../../../pom.xml.patch", shell=True, cwd=package_dir)
+    copyfile(os.path.join(ROOT_DIR, "pom.xml.manual"),
+             os.path.join(package_dir, "pom.xml"))
     return []
 
 

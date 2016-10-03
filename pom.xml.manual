@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <!-- A manually maintained pom.xml for the Java MDK packages. -->
   <modelVersion>4.0.0</modelVersion>
   <groupId>io.datawire.mdk</groupId>
   <artifactId>datawire_mdk</artifactId>
-  <version>2.0.4</version>
+  <!-- Don't remove or change the comment on the next line, it's used by
+       .bumpversion.cfg to find where to replace the version on release. -->
+  <version>2.0.14</version><!-- PACKAGE VERSION HERE -->
   <name>datawire_mdk</name>
   <description>Java mdk</description>
   <url>http://datawire.github.io/mdk/</url>
@@ -83,25 +86,41 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
         <version>2.4.3</version>
-        <configuration>
-          <artifactSet>
-            <includes>
-              <include>io.netty:netty-all</include>
-            </includes>
-          </artifactSet>
-          <relocations>
-            <relocation>
-              <pattern>io.netty</pattern>
-              <shadedPattern>datawire_mdk_shaded.io.netty</shadedPattern>
-            </relocation>
-          </relocations>
-        </configuration>
         <executions>
           <execution>
             <phase>package</phase>
             <goals>
               <goal>shade</goal>
             </goals>
+            <configuration>
+              <minimizeJar>false</minimizeJar>
+              <createDependencyReducedPom>true</createDependencyReducedPom>
+              <dependencyReducedPomLocation>
+                ${java.io.tmpdir}/dependency-reduced-pom.xml
+              </dependencyReducedPomLocation>
+              <relocations>
+                <relocation>
+                  <pattern>com.fasterxml.jackson</pattern>
+                  <shadedPattern>internaldatawire.com.fasterxml.jackson</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>io.netty</pattern>
+                  <shadedPattern>internaldatawire.io.netty</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>junit</pattern>
+                  <shadedPattern>internaldatawire.junit</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>org.junit</pattern>
+                  <shadedPattern>internaldatawire.org.junit</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>org.hamcrest</pattern>
+                  <shadedPattern>internaldatawire.org.hamcrest</shadedPattern>
+                </relocation>
+              </relocations>
+            </configuration>
           </execution>
         </executions>
       </plugin>
