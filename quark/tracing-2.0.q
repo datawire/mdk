@@ -49,9 +49,6 @@ namespace mdk_tracing {
 
     class Tracer extends Actor {
         Logger logger = new Logger("MDK Tracer");
-
-        String queryURL = "https://tracing.datawire.io/api/v1/logs";
-
         long lastPoll = 0L;
 
         TLS<SharedContext> _context = new TLS<SharedContext>(new SharedContextInitializer());
@@ -63,28 +60,16 @@ namespace mdk_tracing {
             self._client = new protocol.TracingClient(self, wsclient);
         }
 
+        @doc("Backwards compatibility.")
         static Tracer withURLsAndToken(String url, String queryURL, String token) {
+            return withURLAndToken(url, token);
+        }
+
+        static Tracer withURLAndToken(String url, String token) {
             MDKRuntime runtime = defaultRuntime();
-            WSClient client = new WSClient(runtime, url, token);
-            runtime.dispatcher.startActor(client);
+            WSClient wsclient = new WSClient(runtime, url, token);
+            runtime.dispatcher.startActor(wsclient);
             Tracer newTracer = new Tracer(runtime, wsclient);
-
-            if ((queryURL == null) || (queryURL.size() == 0)) {
-                URL parsedURL = URL.parse(url);
-
-                if (parsedURL.scheme == "ws") {
-                    parsedURL.scheme = "http";
-                }
-                else {
-                    parsedURL.scheme = "https";
-                }
-
-                parsedURL.path = "/api/v1/logs";
-
-                newTracer.queryURL = parsedURL.toString();
-            } else {
-                newTracer.queryURL = queryURL;
-            }
             runtime.dispatcher.startActor(newTracer);
             return newTracer;
         }
@@ -156,87 +141,8 @@ namespace mdk_tracing {
             _client.log(evt);
         }
 
-        Promise poll() {
-            logger.trace("Polling for logs...");
-
-            long rightNow = now();
-            Promise result = query(lastPoll, rightNow);
-            lastPoll = rightNow;
-            return result.andThen(bind(self, "deresultify", []));
-        }
-
         void subscribe(UnaryCallable handler) {
             _client.subscribe(handler);
-        }
-
-        List<LogEvent> deresultify(api.GetLogEventsResult result) {
-            logger.trace("got " + result.result.size().toString() + " log events");
-            return result.result;
-        }
-
-        @doc("Query the trace logs. startTimeMillis and endTimeMillis are milliseconds since the UNIX epoch.")
-        Promise query(long startTimeMillis, long endTimeMillis) {
-            // Set up args.
-            List<String> args = [];
-            String reqID = "Query ";
-
-            if (startTimeMillis >= 0) {
-                args.add("startTime=" + startTimeMillis.toString());
-                reqID = reqID + startTimeMillis.toString();
-            }
-
-            reqID = reqID + "-";
-
-            if (endTimeMillis >= 0) {
-                args.add("endTime=" + endTimeMillis.toString());
-                reqID = reqID + endTimeMillis.toString();
-            }
-
-            // Grab the full URL...
-
-            String url = self.queryURL;
-
-            if (args.size() > 0) {
-                url = url + "?" + "&".join(args);
-            }
-
-            // Off we go.
-            HTTPRequest req = new HTTPRequest(url);
-
-            req.setMethod("GET");
-            req.setHeader("Content-Type", "application/json");
-            req.setHeader("Authorization", "Bearer " + self.token);
-
-            return IO.httpRequest(req).andThen(bind(self, "handleQueryResponse", []));
-        }
-
-        Object handleQueryResponse(HTTPResponse response) {
-            int code = response.getCode();      // HTTP status code
-            String body = response.getBody();   // just to save keystrokes later
-
-            if (code == 200) {
-                // All good. Parse the JSON in the body...
-                return api.GetLogEventsResult.decode(body);
-            }
-            else {
-                // Per the HTTP status code, something has gone wrong. Try to pull a
-                // sensible error out of the body...
-                String error = "";
-
-                if (body.size() > 0) {
-                    error = body;
-                }
-
-                // In any case, if we have no error, synthesize something from the
-                // status code.
-                if (error.size() < 1) {
-                    error = "HTTP response " + code.toString();
-                }
-
-                logger.error("query failure: " + error);
-
-                return new HTTPError(error);
-            }
         }
     }
 

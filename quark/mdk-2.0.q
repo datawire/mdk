@@ -329,9 +329,7 @@ namespace mdk {
                 runtime.dependencies.registerService("discovery_registrar", _discoSource);
             }
             if (_wsclient != null) {
-                String tracingQueryURL = _get(env, "MDK_TRACING_API_URL", "https://tracing.datawire.io/api/v1/logs");
                 _tracer = Tracer(runtime, _wsclient);
-                _tracer.queryURL = tracingQueryURL;
                 _tracer.initContext();
             }
         }
