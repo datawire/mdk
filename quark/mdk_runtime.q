@@ -171,9 +171,6 @@ namespace mdk_runtime {
 
         // Debugging
         void logTS(String message) {
-            if (true) {  // Disabled by default
-                return;
-            }
             long now = Context.runtime().now();
             int tenths = (now.truncateToInt() / 100) % 100000;  // in tenths of seconds
             float seconds = tenths.toFloat() / 10.0;
