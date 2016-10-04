@@ -356,6 +356,25 @@ namespace mdk_protocol {
         }
     }
 
+    @doc("""A message to send to WSClient.
+
+    The sending Actor subscribes to WSConnected, all WSMessage received by the
+    WSClient, as well as a periodic Pump message.
+    """)
+    class SubscribeToWSClient {}
+
+    @doc("Sent to a subscriber every once in a while, to tell subscribers they can send data.")
+    class Pump {}
+
+    @doc("Sent to a subscriber when connection happens.")
+    class WSConnected {
+        Actor websock;
+
+        WSConnected(Actor websock) {
+            self.websock = websock;
+        }
+    }
+
     @doc("Common protocol machinery for web socket based protocol clients.")
     class WSClient extends ProtocolHandler, Actor {
 
@@ -420,23 +439,33 @@ namespace mdk_protocol {
         String sockUrl = null;
 
         long lastConnectAttempt = 0L;
-        long lastHeartbeat = 0L;
 
         Time timeService;
         Actor schedulingActor;
         WebSockets websockets;
         MessageDispatcher dispatcher;
 
-        WSClient(MDKRuntime runtime) {
+        // URL to connect to
+        String url;
+        // Token to send for authentication
+        String token;
+        // Actors subscribed to Pump and passed on WSMessage messages:
+        List<Actor> subscribers = [];
+        // True if we are started:
+        bool _started = false;
+
+        WSClient(MDKRuntime runtime, String url, String token) {
             self.dispatcher = runtime.dispatcher;
             self.timeService = runtime.getTimeService();
             self.schedulingActor = runtime.getScheduleService();
             self.websockets = runtime.getWebSocketsService();
+            self.url = url;
+            self.token = token;
         }
 
-        String url();
-        String token();
-        bool isStarted();
+        bool isStarted() {
+            return _started;
+        }
 
         bool isConnected() {
             return sock != null;
@@ -474,10 +503,12 @@ namespace mdk_protocol {
 
         // Actor interface:
         void onStart(MessageDispatcher dispatcher) {
+            self._started = true;
             schedule(0.0);
         }
 
         void onStop() {
+            self._started = false;
             if (isConnected()) {
                 shutdown();
                 self.dispatcher.tell(self, new WSClose(), sock);
@@ -496,8 +527,16 @@ namespace mdk_protocol {
                 return;
             }
             if (typeId == "mdk_runtime.WSMessage") {
-                WSMessage wsmessage = ?message;
-                self.onWSMessage(wsmessage.body);
+                // Send WSMessage on to subscribers; one of them will handle it:
+                int idx = 0;
+                while (idx < self.subscribers.size()) {
+                    self.dispatcher.tell(self, message, self.subscribers[idx]);
+                    idx = idx + 1;
+                }
+                return;
+            }
+            if (typeId == "mdk_protocol.SubscribeToWSClient") {
+                self.subscribers.add(origin);
                 return;
             }
         }
@@ -518,17 +557,12 @@ namespace mdk_protocol {
               - If we haven't sent a heartbeat recently enough, then
               do that.
             */
-
             long rightNow = (self.timeService.time()*1000.0).round();
-            long heartbeatInterval = ((ttl/2.0)*1000.0).round();
             long reconnectInterval = (reconnectDelay*1000.0).round();
 
             if (isConnected()) {
                 if (isStarted()) {
                     pump();
-                    if (rightNow - lastHeartbeat >= heartbeatInterval) {
-                        doHeartbeat();
-                    }
                 }
             } else {
                 if (isStarted() && (rightNow - lastConnectAttempt) >= reconnectInterval) {
@@ -546,11 +580,6 @@ namespace mdk_protocol {
             lastConnectAttempt = (self.timeService.time()*1000.0).round();
         }
 
-        void doHeartbeat() {
-            heartbeat();
-            lastHeartbeat = (self.timeService.time()*1000.0).round();
-        }
-
         void open(String url) {
             sockUrl = url;
             String tok = token();
@@ -565,17 +594,25 @@ namespace mdk_protocol {
                            bind(self, "onWSError", []));
         }
 
-        void startup() {}
+        void startup() {
+            WSConnected message = new WSConnected(self.sock);
+            int idx = 0;
+            while (idx < subscribers.size()) {
+                self.dispatcher.tell(self, message, subscribers[idx]);
+                idx = idx + 1;
+            }
+        }
 
-        void pump() {}
-
-        void heartbeat() {}
+        void pump() {
+            Pump message = new Pump();
+            int idx = 0;
+            while (idx < subscribers.size()) {
+                self.dispatcher.tell(self, message, subscribers[idx]);
+                idx = idx + 1;
+            }
+        }
 
         void shutdown() {}
-
-        void onWSMessage(String message) {
-            // Override in subclasses
-        }
 
         void onWSConnected(WSActor socket) {
             // Whenever we (re)connect, notify the server of any

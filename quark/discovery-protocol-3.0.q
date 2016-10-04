@@ -37,59 +37,63 @@ namespace mdk_discovery {
 
         Also supports registering discovery information with the server.
         """)
-        class DiscoClient extends WSClient, DiscoHandler, DiscoverySource, DiscoveryRegistrar {
-            bool _started = false;
-            String _token;
-            String _url;
+        class DiscoClient extends DiscoHandler, DiscoverySource, DiscoveryRegistrar {
             FailurePolicyFactory _failurePolicyFactory;
             MessageDispatcher _dispatcher;
             Actor _subscriber;  // We will send discovery events here
-
+            WSClient _wsclient; // The WSClient we will use
             // Clusters we advertise to the disco service.
             Map<String, Cluster> registered = new Map<String, Cluster>();
 
             Logger dlog = new Logger("discovery");
 
-            DiscoClient(Actor subscriber, String token, String url, MDKRuntime runtime) {
-                super(runtime);
-                self._subscriber = subscriber;
+            long lastHeartbeat = 0L;
+            Actor sock; // Websocket actor for the WS connection
+
+            DiscoClient(Actor disco_subscriber, WSClient wsclient, MDKRuntime runtime) {
+                self._subscriber = disco_subscriber;
+                self._wsclient = wsclient;
                 self._failurePolicyFactory = ?runtime.dependencies.getService("failurepolicy_factory");
-                self._token = token;
-                self._url = url;
             }
 
-            // Actor interface; placeholder for when we stop using WSClient as
-            // a superclass.
             void onStart(MessageDispatcher dispatcher) {
                 self._dispatcher = dispatcher;
-                self._started = true;
-                super.onStart(dispatcher);
+                // Tell WSClient we want to subscribe to messages
+                self._dispatcher.tell(self, new SubscribeToWSClient(), self._wsclient);
             }
 
-            void onStop() {
-                self._started = false;
-                super.onStop();
-            }
+            void onStop() {}
 
             void onMessage(Actor origin, Object message) {
-                if (message.getClass().id == "mdk_discovery.RegisterNode") {
+                String klass = message.getClass().id;
+                // Someone wants to register a node with discovery server:
+                if (klass == "mdk_discovery.RegisterNode") {
                     RegisterNode register = ?message;
                     _register(register.node);
                     return;
                 }
-                super.onMessage(origin, message);
-            }
-
-            String url() {
-                return self._url;
-            }
-
-            String token() {
-                return self._token;
-            }
-
-            bool isStarted() {
-                return self._started;
+                // WSClient has connected to the server:
+                if (klass == "mdk_protocol.WSConnected") {
+                    WSConnected connected = ?message;
+                    self.sock = message.websock;
+                    heartbeat();
+                }
+                // The WSClient is telling us we can send periodic messages:
+                if (klass == "mdk_protocol.Pump") {
+                    long rightNow = (self.timeService.time()*1000.0).round();
+                    long heartbeatInterval = 15000; // XXX half of Protocol ttl, refer to that
+                    if (rightNow - self.lastHeartbeat >= heartbeatInterval) {
+                        self.lastHeartbeat = (self.timeService.time()*1000.0).round();
+                        heartbeat();
+                    }
+                    return;
+                }
+                // The WSClient has received a message:
+                if (klass == "mdk_runtime.WSMessage") {
+                    WSMessage wsmessage = ?message;
+                    onWSMessage(wsmessage.body);
+                    return;
+                }
             }
 
             @doc("Register a node with the remote Discovery server.")
@@ -145,10 +149,7 @@ namespace mdk_discovery {
                 // ???
             }
 
-            void startup() {
-                heartbeat();
-            }
-
+            @doc("Send all registered services.")
             void heartbeat() {
                 List<String> services = self.registered.keys();
                 int idx = 0;
