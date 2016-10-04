@@ -377,56 +377,6 @@ namespace mdk_protocol {
 
     @doc("Common protocol machinery for web socket based protocol clients.")
     class WSClient extends ProtocolHandler, Actor {
-
-        /*
-
-          # WSClient state machine
-
-          ## External entity calls subclass.onStart()
-
-          - subclass.onStart() or something else arranges for subclass.isStarted() to return true
-          - WSClient.onStart() schedules .onExecute()
-          - the Runtime delivers Hapenning message to .onMessage(), whihc calls .onScheduledEvent()
-          - .onScheduledEvent() notices not .isConnected() and subclass.isStarted() so eventually calls .doOpen(),
-            then schedules itself for execution again
-          - .doOpen() calls .open() using subclass.url() and manages retries/backoff
-          - .open() calls subclass.token() and constructs a real URL, then calls WebSockets.connect()
-          - the resulting promise calls .onWSConnected()
-          - .onWSConnected() saves the socket for .isConnected() to check,
-            then sends an Open protocol oevent, calls subclass.startup(), calls subclass.pump()
-          - the ScheduleActor send a Happening message to .onMessage(), which calls onScheduledEvent
-          - .onScheduledEvent() notices .isConnected() and subclass.isStarted() so
-            calls subclass.pump() and maybe .doHeartbeat()
-            then schedules itself for execution again
-          - .doHeartbeat() calls subclass.heartbeat() and tracks heartbeat timing
-
-          ## ELB or something kills the connection randomly
-
-          - the Runtime maybe calls .onWSError()
-          - .onWSError() logs and calls .doBackoff()
-          - .doBackoff() computes backoff timing stuff
-          - the Runtime maybe calls .onWSClosed(), which does nothing
-          - the Runtime calls .onWSFinal()
-          - .onWSFinal() nulls out the saved socket so .isConnected() will return false
-          - the ScheduleActor sends message to .onMessage(), which calls .onScheduledEvent()
-          - .onScheduledEvent() notices not .isConnected() and subclass.isStarted() so eventually calls .doOpen(),
-            then schedules itself for execution again -- see above
-
-          Note that subclass.shutdown() is not called in this case, but subclass.startup() is called.
-
-          ## Something arranges for subclass.isStarted() to return false
-
-          - the ScheduleActor sends message to .onMessage(), which calls onScheduledEvent()
-          - onScheduledEvent() notices .isConnected() and not .isStarted() so
-            it calls subclass.shutdown(), closes the socket, and
-            nulls out the saved socket so .isConnected() will return false
-            then does not schedule itself for execution again
-
-          Must override: .isStarted(), .url(), .token()
-          May Override: .startup(), .pump(), .heartbeat(), .onWSMessage()
-
-        */
-
         Logger logger = new Logger("protocol");
 
         float firstDelay = 1.0;
@@ -510,7 +460,6 @@ namespace mdk_protocol {
         void onStop() {
             self._started = false;
             if (isConnected()) {
-                shutdown();
                 self.dispatcher.tell(self, new WSClose(), sock);
                 sock = null;
             }
@@ -611,8 +560,6 @@ namespace mdk_protocol {
                 idx = idx + 1;
             }
         }
-
-        void shutdown() {}
 
         void onWSConnected(WSActor socket) {
             // Whenever we (re)connect, notify the server of any

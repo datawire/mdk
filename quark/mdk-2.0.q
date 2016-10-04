@@ -251,6 +251,7 @@ namespace mdk {
         Map<String,Object> _reflection_hack = null;
 
         MDKRuntime _runtime;
+        WSClient _wsclient;
         Discovery _disco;
         DiscoverySource _discoSource;
         Tracer _tracer = null;
@@ -265,7 +266,7 @@ namespace mdk {
             }
             DiscoverySourceFactory result = null;
             if (config.startsWith("datawire:")) {
-                result = new DiscoClientFactory(config.substring(9, config.size()));
+                result = new DiscoClientFactory(_wsclient);
             } else {
                 if (config.startsWith("synapse:path=")) {
                     result = mdk_discovery.synapse.Synapse(config.substring(13, config.size()));
@@ -292,6 +293,26 @@ namespace mdk {
             }
         }
 
+        @doc("Get a WSClient, unless env variables suggest the user doesn't want one.")
+        WSClient getWSClient(MDKRuntime runtime) {
+            EnvironmentVariables env = runtime.getEnvVarsService();
+            // If we have token we can start WSClient, otherwise we can't:
+            String token = env.var("DATAWIRE_TOKEN").orElseGet("");
+            String disco_config = env.var("MDK_DISCOVERY_SOURCE").orElseGet("");
+            if (token == "") {
+                // Another place we can get the token:
+                if (disco_config.startswith("datawire:")) {
+                    token = config.substring(9, config.size());
+                } else {
+                    return null;
+                }
+            }
+
+            EnvironmentVariable ddu = env.var("MDK_MCP_URL");
+            String url = ddu.orElseGet("wss://discovery.datawire.io/ws/v1");
+            return new WSClient(runtime, url, token);
+        }
+
         MDKImpl(MDKRuntime runtime) {
             _reflection_hack = new Map<String,Object>();
             _runtime = runtime;
@@ -300,22 +321,17 @@ namespace mdk {
                                                      getFailurePolicy(runtime));
             }
             _disco = new Discovery(runtime);
-            // Tracing won't work if there's no DATAWIRE_TOKEN, but will try
-            // anyway. A later branch will make this better.
+            _wsclient = getWSClient(runtime);
             EnvironmentVariables env = runtime.getEnvVarsService();
-            String token = env.var("DATAWIRE_TOKEN").orElseGet("");
             DiscoverySourceFactory discoFactory = getDiscoveryFactory(env);
             _discoSource = discoFactory.create(_disco, runtime);
             if (discoFactory.isRegistrar()) {
                 runtime.dependencies.registerService("discovery_registrar", _discoSource);
             }
-            if (token != "") {
-                String tracingURL = _get(env, "MDK_TRACING_URL", "wss://tracing.datawire.io/ws/v1");
+            if (_wsclient != null) {
                 String tracingQueryURL = _get(env, "MDK_TRACING_API_URL", "https://tracing.datawire.io/api/v1/logs");
-                _tracer = Tracer(runtime);
-                _tracer.url = tracingURL;
+                _tracer = Tracer(runtime, _wsclient);
                 _tracer.queryURL = tracingQueryURL;
-                _tracer.token = token;
                 _tracer.initContext();
             }
         }
@@ -326,35 +342,20 @@ namespace mdk {
 
         void start() {
             self._running = true;
+            _runtime.dispatcher.startActor(_wsclient);
             _runtime.dispatcher.startActor(_disco);
             _runtime.dispatcher.startActor(_discoSource);
-
-            // Tracer is written to start up automatically as needed.
-            // However, the current implementation leads to a deadlock
-            // in certain conditions. Force Tracer to start on startup
-            // to avoid this problem for now. We should fix this a
-            // better way later, i.e. by removing the on-demand
-            // startup code or by fixing the deadlock.
-            //
-            // In summary, calling log(...) does a _startIfNeeded(),
-            // which starts an actor sometimes. That start causes the
-            // dispatcher queue to get processed, which sometimes hits
-            // a schedule event. The protocol schedule event handler
-            // does an isStarted(). Both _startIfNeeded and isStarted
-            // try to hold the same lock on the TracingClient
-            // instance. It boils down to _startIfNeeded() calling out
-            // to other code while holding the lock.
-            if (_tracer != null) {
-                _tracer._openIfNeeded();
-                _tracer._client._startIfNeeded();
-            }
+            _runtime.dispatcher.startActor(_tracer);
         }
 
         void stop() {
             self._running = false;
-            _runtime.dispatcher.stopActor(_disco);
+            // Make sure we shut down discovery source/registrar first, as it
+            // may wish to senf some unregistration messages:
             _runtime.dispatcher.stopActor(_discoSource);
-            _tracer.stop();
+            _runtime.dispatcher.stopActor(_disco);
+            _runtime.dispatcher.stopActor(_tracer);
+            _runtime.dispatcher.stopActor(_wsclient);
             _runtime.stop();
         }
 

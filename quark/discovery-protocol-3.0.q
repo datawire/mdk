@@ -15,16 +15,14 @@ namespace mdk_discovery {
         register it with the MDK.
         """)
         class DiscoClientFactory extends DiscoverySourceFactory {
-            String token;
+            WSClient wsclient;
 
-            DiscoClientFactory(String token) {
-                self.token = token;
+            DiscoClientFactory(WSClient wsclient) {
+                self.wsclient = wsclient;
             }
 
             DiscoverySource create(Actor subscriber, MDKRuntime runtime) {
-                EnvironmentVariable ddu = runtime.getEnvVarsService().var("MDK_DISCOVERY_URL");
-                String url = ddu.orElseGet("wss://discovery.datawire.io/ws/v1");
-                return new DiscoClient(subscriber, token, url, runtime);
+                return new DiscoClient(subscriber, wsclient, runtime);
             }
 
             bool isRegistrar() {
