@@ -5,6 +5,7 @@ package datawire_mdk_tracing 2.0.14;
 include protocol-1.0.q;
 include introspection-1.0.q;
 
+import mdk_runtime.actors;
 import mdk_protocol;
 import mdk_introspection;
 import mdk_tracing.protocol;
@@ -46,27 +47,27 @@ namespace mdk_tracing {
         }
     }
 
-    class Tracer {
+    class Tracer extends Actor {
         Logger logger = new Logger("MDK Tracer");
 
-        String url = "wss://tracing.datawire.io/ws/v1";
         String queryURL = "https://tracing.datawire.io/api/v1/logs";
 
-        String token;
         long lastPoll = 0L;
 
         TLS<SharedContext> _context = new TLS<SharedContext>(new SharedContextInitializer());
         protocol.TracingClient _client;
         MDKRuntime runtime;
 
-        Tracer(MDKRuntime runtime) {
+        Tracer(MDKRuntime runtime, WSClient wsclient) {
             self.runtime = runtime;
+            self._client = new protocol.TracingClient(self, wsclient);
         }
 
         static Tracer withURLsAndToken(String url, String queryURL, String token) {
-            Tracer newTracer = new Tracer(defaultRuntime());
-
-            newTracer.url = url;
+            MDKRuntime runtime = defaultRuntime();
+            WSClient client = new WSClient(runtime, url, token);
+            runtime.dispatcher.startActor(client);
+            Tracer newTracer = new Tracer(runtime, wsclient);
 
             if ((queryURL == null) || (queryURL.size() == 0)) {
                 URL parsedURL = URL.parse(url);
@@ -84,26 +85,16 @@ namespace mdk_tracing {
             } else {
                 newTracer.queryURL = queryURL;
             }
-
-            newTracer.token = token;
-
+            runtime.dispatcher.startActor(newTracer);
             return newTracer;
         }
 
-        void _openIfNeeded() {
-            if (_client == null) {
-                _client = new protocol.TracingClient(self, runtime);
-            }
-
-            if (token == null) {
-                token = DatawireToken.getToken(runtime.getEnvVarsService());
-            }
+        void onStart(MessageDispatcher dispatcher) {
+            dispatcher.startActor(_client);
         }
 
-        void stop() {
-            if (_client != null) {
-                runtime.dispatcher.stopActor(_client);
-            }
+        void onStop() {
+            runtime.dispatcher.stopActor(_client);
         }
 
         void initContext() {
@@ -137,9 +128,8 @@ namespace mdk_tracing {
             _context.setValue(self.getContext().finish_span());
         }
 
+        @doc("Send a log message to the server.")
         void log(String procUUID, String level, String category, String text) {
-            self._openIfNeeded();
-
             SharedContext ctx = self.getContext();
             ctx.tick();
             logger.trace("CTX " + ctx.toString());
@@ -167,9 +157,6 @@ namespace mdk_tracing {
         }
 
         Promise poll() {
-            // XXX: this shouldn't really be necessary
-            self._openIfNeeded();
-
             logger.trace("Polling for logs...");
 
             long rightNow = now();
@@ -179,7 +166,6 @@ namespace mdk_tracing {
         }
 
         void subscribe(UnaryCallable handler) {
-            _openIfNeeded();
             _client.subscribe(handler);
         }
 
@@ -414,7 +400,7 @@ namespace mdk_tracing {
 
         }
 
-        class TracingClient extends WSClient, TracingHandler {
+        class TracingClient extends TracingHandler {
 
             Tracer _tracer;
             bool _started = false;
@@ -433,57 +419,57 @@ namespace mdk_tracing {
             long _recorded = 0L;            // count of events that were acknowledged by the server
             long _lastSyncTime = 0L;        // when the last sync request was sent
 
+            WSClient _wsclient; // The WSClient we will use
+            Actor _sock = null; // The websocket we're connected to, if any
+
             Logger _myLog = new Logger("TracingClient");
             void _debug(String message) {
                 String s = "[" + _buffered.size().toString() + " buf, " + _inFlight.size().toString() + " inf] ";
                 _myLog.debug(s + message);
             }
 
-            TracingClient(Tracer tracer, MDKRuntime runtime) {
-                super(runtime);
-                self._dispatcher = runtime.dispatcher;
+            TracingClient(Tracer tracer, WSClient wsclient) {
                 _tracer = tracer;
+                _wsclient = wsclient;
             }
 
-            String url() {
-                return _tracer.url;
-            }
-
-            String token() {
-                return _tracer.token;
-            }
-
-            bool isStarted() {
-                _mutex.acquire();
-                bool result = _started || _buffered.size() > 0 || _handler != null;
-                _mutex.release();
-                return result;
-            }
-
-            void _startIfNeeded() {
-                if (!_started) {
-                    self._dispatcher.startActor(self);
-                    _started = true;
-                }
-            }
-
+            @doc("Attach a subscriber that will receive results of queries.")
             void subscribe(UnaryCallable handler) {
                 _mutex.acquire();
                 _handler = handler;
-                _startIfNeeded();
                 _mutex.release();
             }
 
             void onStart(MessageDispatcher dispatcher) {
-                super.onStart(dispatcher);
+                self._dispatcher = dispatcher;
+                // Tell WSClient we want to subscribe to messages
+                self._dispatcher.tell(self, new SubscribeToWSClient(), self._wsclient);
             }
 
-            void onStop() {
-                _started = false;
-                super.onStop();
+            void onStop() {}
+
+            void onMessage(Actor origin, Object message) {
+                String klass = message.getClass().id;
+                // WSClient has connected to the server:
+                if (klass == "mdk_protocol.WSConnected") {
+                    WSConnected connected = ?message;
+                    self._sock = message.websock;
+                    onConnect();
+                }
+                // The WSClient is telling us we can send periodic messages:
+                if (klass == "mdk_protocol.Pump") {
+                    onPump();
+                    return;
+                }
+                // The WSClient has received a message:
+                if (klass == "mdk_runtime.WSMessage") {
+                    WSMessage wsmessage = ?message;
+                    onWSMessage(wsmessage.body);
+                    return;
+                }
             }
 
-            void startup() {
+            void onConnect() {
                 _mutex.acquire();
                 // Move in-flight messages back into the outgoing buffer to retry later
                 while (_inFlight.size() > 0) {
@@ -492,14 +478,14 @@ namespace mdk_tracing {
                     _failedSends = _failedSends + 1;
                     _debug("no ack for #" + evt.sequence.toString());
                 }
-                _debug("Starting up! with connection " + self.sock.toString());
+                _debug("Starting up! with connection " + self._sock.toString());
                 if (_handler != null) {
-                    self.dispatcher.tell(self, new Subscribe().encode(), self.sock);
+                    self.dispatcher.tell(self, new Subscribe().encode(), self._sock);
                 }
                 _mutex.release();
             }
 
-            void pump() {
+            void onPump() {
                 _mutex.acquire();
                 // Send buffered messages and move them to the in-flight queue
                 // Set the sync flag as appropriate
@@ -513,11 +499,11 @@ namespace mdk_tracing {
                         _lastSyncTime = evt.timestamp;
                         debugSuffix = " with sync set";
                     }
-                    self.dispatcher.tell(self, evt.encode(), self.sock);
+                    self.dispatcher.tell(self, evt.encode(), self._sock);
                     evt.sync = 0;
                     _sent = _sent + 1;
                     _debug("sent #" + evt.sequence.toString() + debugSuffix +
-                           " to " + self.sock.toString());
+                           " to " + self._sock.toString());
                 }
                 _mutex.release();
             }
@@ -557,6 +543,7 @@ namespace mdk_tracing {
                 _mutex.release();
             }
 
+            @doc("Queue a log message for delivery to the server.")
             void log(LogEvent evt) {
                 _mutex.acquire();
                 // Add log event to the outgoing buffer and make sure it has the newest sequence number.
@@ -565,7 +552,6 @@ namespace mdk_tracing {
                 _logged = _logged + 1;
                 _buffered.add(evt);
                 _debug("logged #" + evt.sequence.toString());
-                _startIfNeeded();
                 _mutex.release();
             }
 
