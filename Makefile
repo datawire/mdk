@@ -92,7 +92,7 @@ test-python:
 
 .PHONY: test-python3
 test-python3: guard-token
-	virtualenv3/bin/py.test -n 4 -v --timeout=180 unittests functionaltests
+	virtualenv3/bin/py.test -n 4 -v --timeout=180 --timeout_method=thread unittests functionaltests
 
 release-minor:
 	virtualenv/bin/python scripts/release.py minor
