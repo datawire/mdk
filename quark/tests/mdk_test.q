@@ -82,7 +82,7 @@ class TracingTest {
     }
 
     Tracer newTracer(String url) {
-        new Tracer(runtime, new WSClient(runtime, url, "the_token"));
+        return new Tracer(runtime, new WSClient(runtime, url, "the_token"));
     }
 
     FakeWSActor startTracer(Tracer tracer) {
@@ -223,6 +223,7 @@ class DiscoveryTest {
     Discovery createDisco() {
         Discovery disco = new Discovery(runtime);
         WSClient wsclient = new WSClient(runtime, "http://url/", "");
+        runtime.dispatcher.startActor(wsclient);
         self.client = ?new mdk_discovery.protocol.DiscoClientFactory(wsclient).create(disco, self.runtime);
         runtime.dependencies.registerService("discovery_registrar", self.client);
         return disco;

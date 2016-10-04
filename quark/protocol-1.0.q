@@ -386,7 +386,6 @@ namespace mdk_protocol {
         float tick = 1.0;
 
         WSActor sock = null;
-        String sockUrl = null;
 
         long lastConnectAttempt = 0L;
 
@@ -525,20 +524,15 @@ namespace mdk_protocol {
         }
 
         void doOpen() {
-            open(url());
             lastConnectAttempt = (self.timeService.time()*1000.0).round();
-        }
-
-        void open(String url) {
-            sockUrl = url;
-            String tok = token();
-            if (tok != null) {
-                url = url + "?token=" + tok;
+            String sockUrl = url;
+            if (token != null) {
+                sockUrl = sockUrl + "?token=" + token;
             }
 
-            logger.info("opening " + sockUrl);
+            logger.info("opening " + url);
 
-            self.websockets.connect(url, self)
+            self.websockets.connect(sockUrl, self)
                 .andEither(bind(self, "onWSConnected", []),
                            bind(self, "onWSError", []));
         }
@@ -564,7 +558,7 @@ namespace mdk_protocol {
         void onWSConnected(WSActor socket) {
             // Whenever we (re)connect, notify the server of any
             // nodes we have registered.
-            logger.info("connected to " + sockUrl + " via " + socket.toString());
+            logger.info("connected to " + url + " via " + socket.toString());
 
             reconnectDelay = firstDelay;
             sock = socket;
@@ -583,7 +577,7 @@ namespace mdk_protocol {
         }
 
         void onWSClosed() {
-            logger.info("closed " + sockUrl);
+            logger.info("closed " + url);
             sock = null;
         }
     }
