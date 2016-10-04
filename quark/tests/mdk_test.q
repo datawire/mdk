@@ -77,19 +77,21 @@ class TracingTest {
     /////////////////
     // Tests
 
-    void testLog() {
-        doTestLog(null);
-    }
-
     void testLogCustomURL() {
         doTestLog("custom");
     }
 
+    Tracer newTracer(String url) {
+        new Tracer(runtime, new WSClient(runtime, url, "the_token"));
+    }
+
     FakeWSActor startTracer(Tracer tracer) {
+        runtime.dispatcher.startActor(tracer._client._wsclient);
+        runtime.dispatcher.startActor(tracer);
         tracer.initContext();
         tracer.log("procUUID", "DEBUG", "blah", "testing...");
         self.pump();
-        FakeWSActor sev = expectSocket(self.runtime, tracer.url + "?token=" + tracer.token);
+        FakeWSActor sev = expectSocket(self.runtime, tracer._client._wsclient.url + "?token=" + tracer._client._wsclient.token);
         if (sev == null) {
             check(false, "No FakeWSActor returned.");
             return null;
@@ -103,12 +105,7 @@ class TracingTest {
     }
 
     void doTestLog(String url) {
-        Tracer tracer = new Tracer(runtime);
-        if (url != null) {
-            tracer.url = url;
-        } else {
-            url = tracer.url;
-        }
+        Tracer tracer = newTracer(url);
         FakeWSActor sev = startTracer(tracer);
         if (sev == null) { return; }
         LogEvent evt = expectLogEvent(sev);
@@ -120,7 +117,7 @@ class TracingTest {
 
     // Unexpected messages are ignored.
     void testUnexpectedMessage() {
-        Tracer tracer = new Tracer(runtime);
+        Tracer tracer = newTracer("http://url/");
         FakeWSActor sev = startTracer(tracer);
         if (sev == null) { return; }
         sev.send("{\"type\": \"UnknownMessage\"}");
@@ -133,11 +130,11 @@ class TracingTest {
     }
 
     void testSubscribe() {
-        Tracer tracer = new Tracer(runtime);
+        Tracer tracer = newTracer("http://url/");
         List<LogEvent> events = [];
         tracer.subscribe(bind(self, "_subhandler", [events]));
         self.pump();
-        FakeWSActor sev = expectSocket(self.runtime, tracer.url + "?token=" + tracer.token);
+        FakeWSActor sev = expectSocket(self.runtime, tracer._client._wsclient.url + "?token=" + tracer._client._wsclient.token);
         if (sev == null) { return; }
         sev.accept();
         self.pump();
@@ -225,7 +222,8 @@ class DiscoveryTest {
 
     Discovery createDisco() {
         Discovery disco = new Discovery(runtime);
-        self.client = ?new mdk_discovery.protocol.DiscoClientFactory("").create(disco, self.runtime);
+        WSClient wsclient = new WSClient(runtime, "http://url/", "");
+        self.client = ?new mdk_discovery.protocol.DiscoClientFactory(wsclient).create(disco, self.runtime);
         runtime.dependencies.registerService("discovery_registrar", self.client);
         return disco;
     }
@@ -234,7 +232,7 @@ class DiscoveryTest {
         self.runtime.dispatcher.startActor(disco);
         self.runtime.dispatcher.startActor(self.client);
         self.pump();
-        FakeWSActor sev = expectSocket(self.runtime, self.client.url());
+        FakeWSActor sev = expectSocket(self.runtime, self.client._wsclient.url);
         if (sev == null) {
             check(false, "No FakeWSActor returned.");
             return null;
