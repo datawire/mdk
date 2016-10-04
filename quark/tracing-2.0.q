@@ -306,7 +306,7 @@ namespace mdk_tracing {
 
         }
 
-        class TracingClient extends TracingHandler {
+        class TracingClient extends Actor, TracingHandler {
 
             Tracer _tracer;
             bool _started = false;
@@ -359,7 +359,7 @@ namespace mdk_tracing {
                 // WSClient has connected to the server:
                 if (klass == "mdk_protocol.WSConnected") {
                     WSConnected connected = ?message;
-                    self._sock = message.websock;
+                    self._sock = connected.websock;
                     onConnect();
                 }
                 // The WSClient is telling us we can send periodic messages:
@@ -386,7 +386,7 @@ namespace mdk_tracing {
                 }
                 _debug("Starting up! with connection " + self._sock.toString());
                 if (_handler != null) {
-                    self.dispatcher.tell(self, new Subscribe().encode(), self._sock);
+                    self._dispatcher.tell(self, new Subscribe().encode(), self._sock);
                 }
                 _mutex.release();
             }
@@ -405,7 +405,7 @@ namespace mdk_tracing {
                         _lastSyncTime = evt.timestamp;
                         debugSuffix = " with sync set";
                     }
-                    self.dispatcher.tell(self, evt.encode(), self._sock);
+                    self._dispatcher.tell(self, evt.encode(), self._sock);
                     evt.sync = 0;
                     _sent = _sent + 1;
                     _debug("sent #" + evt.sequence.toString() + debugSuffix +

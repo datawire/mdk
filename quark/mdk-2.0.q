@@ -301,8 +301,8 @@ namespace mdk {
             String disco_config = env.var("MDK_DISCOVERY_SOURCE").orElseGet("");
             if (token == "") {
                 // Another place we can get the token:
-                if (disco_config.startswith("datawire:")) {
-                    token = config.substring(9, config.size());
+                if (disco_config.startsWith("datawire:")) {
+                    token = disco_config.substring(9, disco_config.size());
                 } else {
                     return null;
                 }

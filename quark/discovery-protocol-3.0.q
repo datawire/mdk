@@ -38,6 +38,7 @@ namespace mdk_discovery {
         class DiscoClient extends DiscoHandler, DiscoverySource, DiscoveryRegistrar {
             FailurePolicyFactory _failurePolicyFactory;
             MessageDispatcher _dispatcher;
+            Time _timeService;
             Actor _subscriber;  // We will send discovery events here
             WSClient _wsclient; // The WSClient we will use
             // Clusters we advertise to the disco service.
@@ -52,6 +53,7 @@ namespace mdk_discovery {
                 self._subscriber = disco_subscriber;
                 self._wsclient = wsclient;
                 self._failurePolicyFactory = ?runtime.dependencies.getService("failurepolicy_factory");
+                self._timeService = runtime.getTimeService();
             }
 
             void onStart(MessageDispatcher dispatcher) {
@@ -73,15 +75,15 @@ namespace mdk_discovery {
                 // WSClient has connected to the server:
                 if (klass == "mdk_protocol.WSConnected") {
                     WSConnected connected = ?message;
-                    self.sock = message.websock;
+                    self.sock = connected.websock;
                     heartbeat();
                 }
                 // The WSClient is telling us we can send periodic messages:
                 if (klass == "mdk_protocol.Pump") {
-                    long rightNow = (self.timeService.time()*1000.0).round();
-                    long heartbeatInterval = 15000; // XXX half of Protocol ttl, refer to that
+                    long rightNow = (self._timeService.time()*1000.0).round();
+                    long heartbeatInterval = (self._wsclient.ttl/2.0*1000.0).round();
                     if (rightNow - self.lastHeartbeat >= heartbeatInterval) {
-                        self.lastHeartbeat = (self.timeService.time()*1000.0).round();
+                        self.lastHeartbeat = rightNow;
                         heartbeat();
                     }
                     return;
@@ -105,7 +107,7 @@ namespace mdk_discovery {
                 // Trigger send of delta if we are connected, otherwise do
                 // nothing because the full set of nodes will be resent
                 // when we connect/reconnect.
-                if (self.isConnected()) {
+                if (self._wsclient.isConnected()) {
                     active(node);
                 }
             }
@@ -113,15 +115,15 @@ namespace mdk_discovery {
             void active(Node node) {
                 Active active = new Active();
                 active.node = node;
-                active.ttl = self.ttl;
-                self.dispatcher.tell(self, active.encode(), self.sock);
+                active.ttl = self._wsclient.ttl;
+                self._dispatcher.tell(self, active.encode(), self.sock);
                 dlog.info("active " + node.toString());
             }
 
             void expire(Node node) {
                 Expire expire = new Expire();
                 expire.node = node;
-                self.dispatcher.tell(self, expire.encode(), self.sock);
+                self._dispatcher.tell(self, expire.encode(), self.sock);
                 dlog.info("expire " + node.toString());
             }
 
