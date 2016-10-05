@@ -160,6 +160,7 @@ namespace mdk_runtime {
         PromiseResolver factory;
         Actor originator;
         String url;
+        String shortURL;
         MessageDispatcher dispatcher;
         String state = "CONNECTING";
 
@@ -167,12 +168,19 @@ namespace mdk_runtime {
             self.url = url;
             self.originator = originator;
             self.factory = factory;
+
+            List<String> pieces = url.split("?");
+            self.shortURL = pieces[0];
+            if (pieces.size() > 1) {
+                self.shortURL = self.shortURL + "?" + pieces[1].substring(0, 8);
+            }
         }
 
         // Debugging
         void logTS(String message) {
             long now = Context.runtime().now();
             int tenths = (now.truncateToInt() / 100) % 100000;  // in tenths of seconds
+            if (tenths < 0) { tenths = tenths + 100000; }
             float seconds = tenths.toFloat() / 10.0;
             logger.debug(seconds.toString() + " " + message);
         }
@@ -186,7 +194,7 @@ namespace mdk_runtime {
                   ", current state " + self.state +
                   ", originator " + self.originator.toString() +
                   ", I am " + self.toString() +
-                  " [" + self.url + "]" +
+                  " [" + self.shortURL + "]" +
                   disMessage);
         }
 
