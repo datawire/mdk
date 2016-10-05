@@ -82,6 +82,8 @@ namespace mdk_tracing {
             runtime.dispatcher.stopActor(_client);
         }
 
+        void onMessage(Actor origin, Object mesage) {}
+
         void initContext() {
             // Implicitly creates a span for you.
             _context.setValue(new SharedContext());

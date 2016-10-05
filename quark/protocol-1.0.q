@@ -399,6 +399,8 @@ namespace mdk_protocol {
             self._dispatcher.tell(self, new Open().encode(), websocket);
         }
 
+        void onPump() {}
+
         // WebSocket message handlers:
         void onOpen() {
             // Should assert version here ...
