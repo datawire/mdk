@@ -15,7 +15,7 @@ from sys import exit
 
 def main():
     diff = check_output(["git", "diff", "HEAD^", ".bumpversion.cfg"])
-    if "current_version = " in diff:
+    if b"current_version = " in diff:
         print("Version changed in .bumpversion.cfg, that means this is a release.")
         exit(0)
     else:
