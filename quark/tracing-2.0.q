@@ -200,39 +200,8 @@ namespace mdk_tracing {
 
     namespace protocol {
 
-        interface TracingHandler extends ProtocolHandler {
-            void onLogEvent(LogEvent event) {}
-            void onLogAck(LogAck ack) {}
-            void onSubscribe(Subscribe sub) {}
-        }
-
-        @doc("""A single event in the stream that Tracing has to manage.""")
-        class TracingEvent extends ProtocolEvent {
-
-            static ProtocolEvent construct(String type) {
-                ProtocolEvent result = ProtocolEvent.construct(type);
-                if (result != null) { return result; }
-                if (LogEvent._discriminator.matches(type)) { return new LogEvent(); }
-                if (LogAck._discriminator.matches(type)) { return new LogAck(); }
-                if (Subscribe._discriminator.matches(type)) { return new Subscribe(); }
-                return null;
-            }
-
-            static ProtocolEvent decode(String encoded) {
-                return ?Serializable.decodeClassName("mdk_tracing.protocol.TracingEvent", encoded);
-            }
-
-            void dispatch(ProtocolHandler handler) {
-                dispatchTracingEvent(?handler);
-            }
-
-            void dispatchTracingEvent(TracingHandler handler);
-
-        }
-
-        class LogEvent extends TracingEvent {
-
-            static Discriminator _discriminator = anyof(["log"]);
+        class LogEvent extends Serializable {
+            static String _json_type = "log";
 
             @doc("""Shared context""")
             SharedContext context;
@@ -265,10 +234,6 @@ namespace mdk_tracing {
             @doc("Should the server send an acknowledgement?")
             int sync;
 
-            void dispatchTracingEvent(TracingHandler handler) {
-                handler.onLogEvent(self);
-            }
-
             String toString() {
                 return "<LogEvent " + sequence.toString() + " @" + timestamp.toString() + " " + context.toString() +
                     ", " + node + ", " + level + ", " + category + ", " + contentType + ", " + text + ">";
@@ -276,29 +241,19 @@ namespace mdk_tracing {
 
         }
 
-        class Subscribe extends TracingEvent {
-
-            static Discriminator _discriminator = anyof(["subscribe"]);
-
-            void dispatchTracingEvent(TracingHandler handler) {
-                handler.onSubscribe(self);
-            }
+        class Subscribe extends Serializable {
+            static String _json_type = "subscribe";
 
             String toString() {
                 return "<Subscribe>";
             }
         }
 
-        class LogAck extends TracingEvent {
-
-            static Discriminator _discriminator = anyof(["logack", "mdk_tracing.protocol.LogAckEvent"]);
+        class LogAck extends Serializable {
+            static String _json_type = "logack";
 
             @doc("Sequence number of the last log message being acknowledged.")
             long sequence;
-
-            void dispatchTracingEvent(TracingHandler handler) {
-                handler.onLogAck(self);
-            }
 
             String toString() {
                 return "<LogAck " + sequence.toString() + ">";
@@ -306,7 +261,7 @@ namespace mdk_tracing {
 
         }
 
-        class TracingClient extends Actor, TracingHandler {
+        class TracingClient extends WSClientSubscriber {
 
             Tracer _tracer;
             bool _started = false;
@@ -354,28 +309,12 @@ namespace mdk_tracing {
             void onStop() {}
 
             void onMessage(Actor origin, Object message) {
-                String klass = message.getClass().id;
-                // WSClient has connected to the server:
-                if (klass == "mdk_protocol.WSConnected") {
-                    WSConnected connected = ?message;
-                    self._sock = connected.websock;
-                    onConnect();
-                }
-                // The WSClient is telling us we can send periodic messages:
-                if (klass == "mdk_protocol.Pump") {
-                    onPump();
-                    return;
-                }
-                // The WSClient has received a message:
-                if (klass == "mdk_runtime.WSMessage") {
-                    WSMessage wsmessage = ?message;
-                    onWSMessage(wsmessage.body);
-                    return;
-                }
+                subscriberDispatch(self, message);
             }
 
-            void onConnect() {
+            void onWSConnected(Actor websock) {
                 _mutex.acquire();
+                self._sock = websock;
                 // Move in-flight messages back into the outgoing buffer to retry later
                 while (_inFlight.size() > 0) {
                     LogEvent evt = _inFlight.remove(_inFlight.size() - 1);
@@ -413,15 +352,21 @@ namespace mdk_tracing {
                 _mutex.release();
             }
 
-            void onWSMessage(String message) {
-                // Decode and dispatch incoming messages.
-                ProtocolEvent event = TracingEvent.decode(message);
-                if (event == null) {
-                    // Unknown message, drop it on the floor. The decoding will
-                    // already have logged it.
+            void onMessageFromServer(JSONObject message) {
+                String type = message["type"];
+                if (type == "log") {
+                    LogEvent event = new LogEvent();
+                    parseJSON(event.getClass(), event, message);
+                    onLogEvent(event);
                     return;
                 }
-                event.dispatch(self);
+                if (contains(["logack", "mdk_tracing.protocol.LogAckEvent"],
+                             type)) {
+                    LogAck ack = new LogAck();
+                    parseJSON(ack.getClass(), ack, message);
+                    self.onLogAck(ack);
+                    return;
+                }
             }
 
             void onLogEvent(LogEvent evt) {
