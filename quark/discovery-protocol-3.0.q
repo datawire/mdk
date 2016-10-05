@@ -35,7 +35,7 @@ namespace mdk_discovery {
 
         Also supports registering discovery information with the server.
         """)
-        class DiscoClient extends DiscoHandler, DiscoverySource, DiscoveryRegistrar {
+        class DiscoClient extends WSClientSubscriber, DiscoverySource, DiscoveryRegistrar {
             FailurePolicyFactory _failurePolicyFactory;
             MessageDispatcher _dispatcher;
             Time _timeService;
@@ -71,27 +71,38 @@ namespace mdk_discovery {
                     _register(register.node);
                     return;
                 }
-                // WSClient has connected to the server:
-                if (klass == "mdk_protocol.WSConnected") {
-                    WSConnected connected = ?message;
-                    self.sock = connected.websock;
+                subscriberDispatch(self, message);
+            }
+
+            void onMessageFromServer(JSONObject message) {
+                String type = message["type"];
+                if (contains(["active", "discovery.protocol.Active"], type)) {
+                    Active active = new Active();
+                    parseJSON(active.getClass(), active, message);
+                    onActive(active);
+                    return;
+                }
+                if (contains(["expire", "discovery.protocol.Expire"],
+                             type)) {
+                    Expire expire = new Expire();
+                    parseJSON(expire.getClass(), expire, message);
+                    self.onExpire(expire);
+                    return;
+                }
+                // XXX we don't handle Clear yet.
+            }
+
+            void onWSConnected(Actor websocket) {
+                self.sock = websocket;
+                heartbeat();
+            }
+
+            void onPump() {
+                long rightNow = (self._timeService.time()*1000.0).round();
+                long heartbeatInterval = (self._wsclient.ttl/2.0*1000.0).round();
+                if (rightNow - self.lastHeartbeat >= heartbeatInterval) {
+                    self.lastHeartbeat = rightNow;
                     heartbeat();
-                }
-                // The WSClient is telling us we can send periodic messages:
-                if (klass == "mdk_protocol.Pump") {
-                    long rightNow = (self._timeService.time()*1000.0).round();
-                    long heartbeatInterval = (self._wsclient.ttl/2.0*1000.0).round();
-                    if (rightNow - self.lastHeartbeat >= heartbeatInterval) {
-                        self.lastHeartbeat = rightNow;
-                        heartbeat();
-                    }
-                    return;
-                }
-                // The WSClient has received a message:
-                if (klass == "mdk_runtime.WSMessage") {
-                    WSMessage wsmessage = ?message;
-                    onWSMessage(wsmessage.body);
-                    return;
                 }
             }
 
@@ -144,10 +155,6 @@ namespace mdk_discovery {
                 self._dispatcher.tell(self, new NodeExpired(expire.node), self._subscriber);
             }
 
-            void onClear(Clear reset) {
-                // ???
-            }
-
             @doc("Send all registered services.")
             void heartbeat() {
                 List<String> services = self.registered.keys();
@@ -191,59 +198,25 @@ namespace mdk_discovery {
 
         }
 
-        interface DiscoHandler extends ProtocolHandler {
-            void onActive(Active active);
-            void onExpire(Expire expire);
-            void onClear(Clear reset);
-        }
-
-        class DiscoveryEvent extends ProtocolEvent {
-
-            static ProtocolEvent construct(String type) {
-                ProtocolEvent result = ProtocolEvent.construct(type);
-                if (result != null) { return result; }
-                if (Active._discriminator.matches(type)) { return new Active(); }
-                if (Expire._discriminator.matches(type)) { return new Expire(); }
-                if (Clear._discriminator.matches(type)) { return new Clear(); }
-                return null;
-            }
-
-            static ProtocolEvent decode(String message) {
-                return ?Serializable.decodeClassName("mdk_discovery.protocol.DiscoveryEvent", message);
-            }
-
-            void dispatch(ProtocolHandler handler) {
-                dispatchDiscoveryEvent(?handler);
-            }
-
-            void dispatchDiscoveryEvent(DiscoHandler handler);
-        }
-
         /*@doc("""
           Advertise a node as being active. This can be used to register a
           new node or to heartbeat an existing node. The receiver must
           consider the node to be available for the duration of the
           specified ttl.
           """)*/
-        class Active extends DiscoveryEvent {
-
-            static Discriminator _discriminator = anyof(["active", "discovery.protocol.Active"]);
+        class Active extends Serializable {
+            static String _json_type = "active";
 
             @doc("The advertised node.")
             Node node;
             @doc("The ttl of the node in seconds.")
             float ttl;
-
-            void dispatchDiscoveryEvent(DiscoHandler handler) {
-                handler.onActive(self);
-            }
-
         }
 
         @doc("Expire a node.")
-        class Expire extends DiscoveryEvent {
-
-            static Discriminator _discriminator = anyof(["expire", "discovery.protocol.Expire"]);
+        class Expire extends Serializable {
+            static String _json_type = "expire";
+            static Discriminator _discriminator = anyof();
 
             Node node;
 
