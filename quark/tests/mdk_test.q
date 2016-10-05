@@ -85,7 +85,9 @@ class TracingTest {
     }
 
     FakeWSActor startTracer(Tracer tracer) {
+        OpenCloseSubscriber openclose = new OpenCloseSubscriber(tracer._client._wsclient);
         runtime.dispatcher.startActor(tracer._client._wsclient);
+        runtime.dispatcher.startActor(openclose);
         runtime.dispatcher.startActor(tracer);
         tracer.initContext();
         tracer.log("procUUID", "DEBUG", "blah", "testing...");
@@ -133,10 +135,8 @@ class TracingTest {
         List<LogEvent> events = [];
         tracer.subscribe(bind(self, "_subhandler", [events]));
         self.pump();
-        FakeWSActor sev = expectSocket(self.runtime, tracer._client._wsclient.url + "?token=" + tracer._client._wsclient.token);
+        FakeWSActor sev = startTracer(tracer);
         if (sev == null) { return; }
-        sev.accept();
-        self.pump();
         Open open = expectOpen(sev);
         if (open == null) { return; }
         Subscribe sub = expectSubscribe(sev);
@@ -154,22 +154,6 @@ class TracingTest {
 
 import mdk_discovery;
 import mdk_discovery.protocol;
-
-
-class UnSerializable extends Serializable {
-    static UnSerializable construct() {
-        return null;
-    }
-}
-
-class SerializableTest {
-    // Unexpected messages result in a null, not in a panic
-    void testUnexpected() {
-        Object result = Serializable.decodeClassName("datawire_mdk_test.UnSerializable",
-                                                     "{\"type\": \"UnSerializable\"}");
-        checkEqual(null, result);
-    }
-}
 
 class DiscoveryTest {
     MDKRuntime runtime;
@@ -207,7 +191,9 @@ class DiscoveryTest {
     Discovery createDisco() {
         Discovery disco = new Discovery(runtime);
         WSClient wsclient = new WSClient(runtime, "http://url/", "");
+        OpenCloseSubscriber openclose = new OpenCloseSubscriber(wsclient);
         runtime.dispatcher.startActor(wsclient);
+        runtime.dispatcher.startActor(openclose);
         self.client = ?new mdk_discovery.protocol.DiscoClientFactory(wsclient).create(disco, self.runtime);
         runtime.dependencies.registerService("discovery_registrar", self.client);
         return disco;
@@ -494,6 +480,7 @@ class DiscoveryTest {
 
         runtime.dispatcher.stopActor(disco);
         runtime.dispatcher.stopActor(client);
+        runtime.dispatcher.stopActor(client._wsclient);
         runtime.stop();
         // Might take some cleanup to stop everything:
         timeService.advance(15.0);
