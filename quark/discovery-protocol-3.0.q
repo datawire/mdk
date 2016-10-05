@@ -71,21 +71,21 @@ namespace mdk_discovery {
                     _register(register.node);
                     return;
                 }
-                subscriberDispatch(self, message);
+                _subscriberDispatch(self, message);
             }
 
             void onMessageFromServer(JSONObject message) {
                 String type = message["type"];
                 if (contains(["active", "discovery.protocol.Active"], type)) {
                     Active active = new Active();
-                    parseJSON(active.getClass(), active, message);
+                    fromJSON(active.getClass(), active, message);
                     onActive(active);
                     return;
                 }
                 if (contains(["expire", "discovery.protocol.Expire"],
                              type)) {
                     Expire expire = new Expire();
-                    parseJSON(expire.getClass(), expire, message);
+                    fromJSON(expire.getClass(), expire, message);
                     self.onExpire(expire);
                     return;
                 }
@@ -183,19 +183,6 @@ namespace mdk_discovery {
                     idx = idx + 1;
                 }
             }
-
-            void onWSMessage(String message) {
-                // Decode and dispatch incoming messages.
-                ProtocolEvent event = DiscoveryEvent.decode(message);
-                if (event == null) {
-                    // Unknown message, drop it on the floor. The decoding will
-                    // already have logged it.
-                    return;
-                }
-
-                event.dispatch(self);
-            }
-
         }
 
         /*@doc("""
@@ -216,23 +203,13 @@ namespace mdk_discovery {
         @doc("Expire a node.")
         class Expire extends Serializable {
             static String _json_type = "expire";
-            static Discriminator _discriminator = anyof();
 
             Node node;
-
-            void dispatchDiscoveryEvent(DiscoHandler handler) {
-                handler.onExpire(self);
-            }
         }
 
         @doc("Expire all nodes.")
-        class Clear extends DiscoveryEvent {
-
-            static Discriminator _discriminator = anyof(["clear", "discovery.protocol.Clear"]);
-
-            void dispatchDiscoveryEvent(DiscoHandler handler) {
-                handler.onClear(self);
-            }
+        class Clear extends Serializable {
+            static String _json_type = "clear";
         }
     }
 }

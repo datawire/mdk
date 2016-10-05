@@ -34,7 +34,7 @@ namespace mdk_protocol {
         static Serializable decodeClassName(String name, String encoded) {
             JSONObject json = encoded.parseJSON();
             Class clazz = Class.get(name);
-            obj = ?clazz.construct([]);
+            Serializable obj = ?clazz.construct([]);
             if (obj == null) {
                 panic("could not construct " + clazz.getName() + " from this json: " + encoded);
             }
@@ -351,7 +351,7 @@ namespace mdk_protocol {
         if (klass == "mdk_runtime.WSMessage") {
             WSMessage wsmessage = ?message;
             JSONObject json = wsmessage.body.parseJSON();
-            onMessageFromServer(json);
+            subscriber.onMessageFromServer(json);
             return;
         }
     }
@@ -359,11 +359,11 @@ namespace mdk_protocol {
     @doc("Handle Open and Close messages.")
     class OpenCloseSubscriber extends WSClientSubscriber {
         MessageDispatcher _dispatcher;
-        WSClient _client;
+        WSClient _wsclient;
 
         OpenCloseSubscriber(WSClient client) {
-            self._client = client;
-            self._client.subscribe(self);
+            self._wsclient = client;
+            self._wsclient.subscribe(self);
         }
 
         // Actor implementation
@@ -372,7 +372,7 @@ namespace mdk_protocol {
         }
 
         void onMessage(Actor origin, Object message) {
-            subscriberDispatch(self, message);
+            _subscriberDispatch(self, message);
         }
 
         void onStop() {}
@@ -388,7 +388,7 @@ namespace mdk_protocol {
             if (contains(["close", "mdk.protocol.Close", "discovery.protocol.Close"],
                          type)) {
                 Close close = new Close();
-                parseJSON(closs.getClass(), close, message);
+                fromJSON(close.getClass(), close, message);
                 self.onClose(close);
                 return;
             }
@@ -405,14 +405,13 @@ namespace mdk_protocol {
         }
 
         void onClose(Close close) {
-            logger.info("close: " + close.toString());
             self._wsclient.onClose(close.error != null);
         }
 
     }
 
     @doc("Common protocol machinery for web socket based protocol clients.")
-    class WSClient extends ProtocolHandler, Actor {
+    class WSClient extends Actor {
         Logger logger = new Logger("protocol");
 
         float firstDelay = 1.0;
@@ -456,7 +455,7 @@ namespace mdk_protocol {
         WSClient, as well as a periodic Pump message.
         """)
         void subscribe(Actor subscriber) {
-            self.subscribers.add(origin);
+            self.subscribers.add(subscriber);
         }
 
         bool isStarted() {
@@ -477,6 +476,7 @@ namespace mdk_protocol {
 
         @doc("Called when the connection is closed via message by the server.")
         void onClose(bool error) {
+            logger.info("close!");
             if (error) {
                 doBackoff();
             } else {

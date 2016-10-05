@@ -30,6 +30,21 @@ FakeWSActor expectSocket(MDKRuntime runtime, String url) {
     }
 }
 
+Serializable expectSerializable(FakeWSActor sev, String expectedType) {
+    String msg = sev.expectTextMessage();
+    if (msg == null) {
+        check(false, "No message sent.");
+        return null;
+    }
+    Object evt = Serializable.decodeClassName(expectedType, msg);
+    String type = evt.getClass().getName();
+    if (check(type == expectedType, "expected " + expectedType + " event, got " + type)) {
+        return ?evt;
+    } else {
+        return null;
+    }
+}
+
 class TracingTest {
     MDKRuntime runtime;
 
@@ -46,32 +61,16 @@ class TracingTest {
 
     /////////////////
     // Helpers
-
-    ProtocolEvent expectTracingEvent(FakeWSActor sev, String expectedType) {
-        String msg = sev.expectTextMessage();
-        if (msg == null) {
-            check(false, "No message sent.");
-            return null;
-        }
-        ProtocolEvent evt = TracingEvent.decode(msg);
-        String type = evt.getClass().getName();
-        if (check(type == expectedType, "expected " + expectedType + " event, got " + type)) {
-            return ?evt;
-        } else {
-            return null;
-        }
-    }
-
     Open expectOpen(FakeWSActor evt) {
-        return ?expectTracingEvent(evt, "mdk_protocol.Open");
+        return ?expectSerializable(evt, "mdk_protocol.Open");
     }
 
     LogEvent expectLogEvent(FakeWSActor evt) {
-        return ?expectTracingEvent(evt, "mdk_tracing.protocol.LogEvent");
+        return ?expectSerializable(evt, "mdk_tracing.protocol.LogEvent");
     }
 
     Subscribe expectSubscribe(FakeWSActor evt) {
-        return ?expectTracingEvent(evt, "mdk_tracing.protocol.Subscribe");
+        return ?expectSerializable(evt, "mdk_tracing.protocol.Subscribe");
     }
 
     /////////////////
@@ -166,8 +165,8 @@ class UnSerializable extends Serializable {
 class SerializableTest {
     // Unexpected messages result in a null, not in a panic
     void testUnexpected() {
-        Object result = Serializable.decodeClass(Class.get("datawire_mdk_test.UnSerializable"),
-                                                 "{\"type\": \"UnSerializable\"}");
+        Object result = Serializable.decodeClassName("datawire_mdk_test.UnSerializable",
+                                                     "{\"type\": \"UnSerializable\"}");
         checkEqual(null, result);
     }
 }
@@ -190,27 +189,12 @@ class DiscoveryTest {
     /////////////////
     // Helpers
 
-    ProtocolEvent expectDiscoveryEvent(FakeWSActor sev, String expectedType) {
-        String msg = sev.expectTextMessage();
-        if (msg == null) {
-            check(false, "No discovery event sent at all.");
-            return null;
-        }
-        ProtocolEvent evt = DiscoveryEvent.decode(msg);
-        String type = evt.getClass().getName();
-        if (check(type == expectedType, "expected " + expectedType + " event, got " + type)) {
-            return ?evt;
-        } else {
-            return null;
-        }
-    }
-
     Open expectOpen(FakeWSActor evt) {
-        return ?expectDiscoveryEvent(evt, "mdk_protocol.Open");
+        return ?expectSerializable(evt, "mdk_protocol.Open");
     }
 
     Active expectActive(FakeWSActor evt) {
-        return ?expectDiscoveryEvent(evt, "mdk_discovery.protocol.Active");
+        return ?expectSerializable(evt, "mdk_discovery.protocol.Active");
     }
 
     void checkEqualNodes(Node expected, Node actual) {

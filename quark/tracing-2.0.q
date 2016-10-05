@@ -309,7 +309,7 @@ namespace mdk_tracing {
             void onStop() {}
 
             void onMessage(Actor origin, Object message) {
-                subscriberDispatch(self, message);
+                _subscriberDispatch(self, message);
             }
 
             void onWSConnected(Actor websock) {
@@ -356,14 +356,14 @@ namespace mdk_tracing {
                 String type = message["type"];
                 if (type == "log") {
                     LogEvent event = new LogEvent();
-                    parseJSON(event.getClass(), event, message);
+                    fromJSON(event.getClass(), event, message);
                     onLogEvent(event);
                     return;
                 }
                 if (contains(["logack", "mdk_tracing.protocol.LogAckEvent"],
                              type)) {
                     LogAck ack = new LogAck();
-                    parseJSON(ack.getClass(), ack, message);
+                    fromJSON(ack.getClass(), ack, message);
                     self.onLogAck(ack);
                     return;
                 }
