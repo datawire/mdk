@@ -26,6 +26,7 @@ clean:
 
 virtualenv:
 	virtualenv -p python2 virtualenv
+	virtualenv/bin/pip install -U pip
 
 .PHONY: python-dependencies
 python-dependencies: virtualenv
@@ -33,9 +34,11 @@ python-dependencies: virtualenv
 
 virtualenv3:
 	virtualenv -p python3 virtualenv3
+	virtualenv3/bin/pip install -U pip
 
 django110env:
 	virtualenv -p python3 django110env
+	django110env/bin/pip install -U pip
 
 .PHONY: python3-dependencies
 python3-dependencies: virtualenv3 django110env
