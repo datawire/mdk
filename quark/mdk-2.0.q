@@ -252,6 +252,7 @@ namespace mdk {
 
         MDKRuntime _runtime;
         WSClient _wsclient;
+        OpenCloseSubscriber _openclose;
         Discovery _disco;
         DiscoverySource _discoSource;
         Tracer _tracer = null;
@@ -322,6 +323,7 @@ namespace mdk {
             }
             _disco = new Discovery(runtime);
             _wsclient = getWSClient(runtime);
+            _openclose = new OpenCloseSubscriber(_wsclient);
             EnvironmentVariables env = runtime.getEnvVarsService();
             DiscoverySourceFactory discoFactory = getDiscoveryFactory(env);
             _discoSource = discoFactory.create(_disco, runtime);
@@ -340,7 +342,12 @@ namespace mdk {
 
         void start() {
             self._running = true;
+            // XXX maybe decouple starting WSClient from actually connecting,
+            // since that's race-condition-y, e.g. if it connects fast enough it
+            // could deliver messages to disco source actor that hasn't started
+            // yet.
             _runtime.dispatcher.startActor(_wsclient);
+            _runtime.dispatcher.startActor(_openclose);
             _runtime.dispatcher.startActor(_disco);
             _runtime.dispatcher.startActor(_discoSource);
             _runtime.dispatcher.startActor(_tracer);
@@ -349,10 +356,11 @@ namespace mdk {
         void stop() {
             self._running = false;
             // Make sure we shut down discovery source/registrar first, as it
-            // may wish to senf some unregistration messages:
+            // may wish to send some unregistration messages:
             _runtime.dispatcher.stopActor(_discoSource);
             _runtime.dispatcher.stopActor(_disco);
             _runtime.dispatcher.stopActor(_tracer);
+            _runtime.dispatcher.stopActor(_openclose);
             _runtime.dispatcher.stopActor(_wsclient);
             _runtime.stop();
         }

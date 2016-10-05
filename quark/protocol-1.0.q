@@ -12,69 +12,42 @@ import mdk_runtime.actors;
 
 namespace mdk_protocol {
 
-    class Discriminator {
-        List<String> values;
-
-        Discriminator(List<String> values) {
-            self.values = values;
-        }
-
-        bool matches(String value) {
-            int idx = 0;
-            while (idx < values.size()) {
-                if (value == values[idx]) {
-                    return true;
-                }
-                idx = idx + 1;
+    @doc("Returns whether a list contains a given value.")
+    bool contains(List<String> values, String value) {
+        int idx = 0;
+        while (idx < values.size()) {
+            if (value == values[idx]) {
+                return true;
             }
-            return false;
+            idx = idx + 1;
         }
+        return false;
     }
 
-    Discriminator anyof(List<String> values) {
-        return new Discriminator(values);
-    }
+    @doc("""JSON serializable object.
 
+    If it has have a String field called _json_type, that will be set as the
+    'type' field in serialized JSON.
+    """)
     class Serializable {
-        @doc("""
-        The given class must have a construct() static method that takes the JSON-encoded type,
-        or a constructor that takes no arguments.
-        """)
-        static Serializable decodeClass(Class clazz, String encoded) {
-            JSONObject json = encoded.parseJSON();
-            String type = json["type"];
-            Method meth = clazz.getMethod("construct");
-            Serializable obj;
-            if (meth != null) {
-                obj = ?meth.invoke(null, [type]);
-                if (obj == null) {
-                    Logger logger = new Logger("protocol");
-                    logger.warn(clazz.getName() + "." + meth.getName() + " could not understand this json: " + encoded);
-                    return null;
-                }
-                clazz = obj.getClass();
-            } else {
-                obj = ?clazz.construct([]);
-                if (obj == null) {
-                    panic("could not construct " + clazz.getName() + " from this json: " + encoded);
-                }
-            }
-
-            fromJSON(clazz, obj, json);
-
-            return obj;
-        }
-
+        @doc("Decode JSON into a particular class. XXX TURN INTO FUNCTION")
         static Serializable decodeClassName(String name, String encoded) {
-            return decodeClass(Class.get(name), encoded);
+            JSONObject json = encoded.parseJSON();
+            Class clazz = Class.get(name);
+            obj = ?clazz.construct([]);
+            if (obj == null) {
+                panic("could not construct " + clazz.getName() + " from this json: " + encoded);
+            }
+            fromJSON(clazz, obj, json);
+            return obj;
         }
 
         String encode() {
             Class clazz = self.getClass();
             JSONObject json = toJSON(self, clazz);
-            Discriminator desc = ?self.getField("_discriminator");
-            if (desc != null) {
-                json["type"] = desc.values[0];
+            String jsonType = ?self.getField("_json_type");
+            if (jsonType != null) {
+                json["type"] = jsonType;
             }
             String encoded = json.toString();
             return encoded;
@@ -300,31 +273,12 @@ namespace mdk_protocol {
         }
     }
 
-    interface ProtocolHandler {
-        void onOpen(Open open);
-        void onClose(Close close);
-    }
-
-    class ProtocolEvent extends Serializable {
-        static ProtocolEvent construct(String type) {
-            if (Open._discriminator.matches(type)) { return new Open(); }
-            if (Close._discriminator.matches(type)) { return new Close(); }
-            return null;
-        }
-        void dispatch(ProtocolHandler handler);
-    }
-
-    class Open extends ProtocolEvent {
-
-        // Allow the old "mdk.protocol.Open" to work here.
-        static Discriminator _discriminator = anyof(["open", "mdk.protocol.Open", "discovery.protocol.Open"]);
+    @doc("A message sent whenever a new connection is opened, by both sides.")
+    class Open extends Serializable {
+        static String _json_type = "open";
 
         String version = "2.0.0";
         Map<String,String> properties = {};
-
-        void dispatch(ProtocolHandler handler) {
-            handler.onOpen(self);
-        }
     }
 
     // XXX: this should probably go somewhere in the library
@@ -344,24 +298,11 @@ namespace mdk_protocol {
     }
 
     @doc("Close the event stream.")
-    class Close extends ProtocolEvent {
-
-        // Allow the old "mdk.protocol.Close" to work here.
-        static Discriminator _discriminator = anyof(["close", "mdk.protocol.Close", "discovery.protocol.Close"]);
+    class Close extends Serializable {
+        static String _json_type = "close";
 
         ProtocolError error;
-
-        void dispatch(ProtocolHandler handler) {
-            handler.onClose(self);
-        }
     }
-
-    @doc("""A message to send to WSClient.
-
-    The sending Actor subscribes to WSConnected, all WSMessage received by the
-    WSClient, as well as a periodic Pump message.
-    """)
-    class SubscribeToWSClient {}
 
     @doc("Sent to a subscriber every once in a while, to tell subscribers they can send data.")
     class Pump {}
@@ -373,6 +314,101 @@ namespace mdk_protocol {
         WSConnected(Actor websock) {
             self.websock = websock;
         }
+    }
+
+    @doc("Higher-level interface for subscribers, to be utilized with _subscriberDispatch.")
+    interface WSClientSubscriber extends Actor {
+        @doc("Handle an incoming JSON message received from the server.")
+        void onMessageFromServer(JSONObject message);
+
+        @doc("Called with WebSocket actor when the WSClient connects to the server.")
+        void onWSConnected(Actor websocket);
+
+        @doc("Called when the WSClient notifies the subscriber it can send data.")
+        void onPump();
+    }
+
+    @doc("""Dispatch actor messages to a WSClientSubscriber.
+
+    Call this in onMessage to handle WSMessage, WSConnected and Pump messages
+    from the WSClient.
+    """)
+    void _subscriberDispatch(WSClientSubscriber subscriber, Object message) {
+        String klass = message.getClass().id;
+        // WSClient has connected to the server:
+        if (klass == "mdk_protocol.WSConnected") {
+            WSConnected connected = ?message;
+            subscriber.onWSConnected(connected.websock);
+            return;
+        }
+        // The WSClient is telling us we can send periodic messages:
+        if (klass == "mdk_protocol.Pump") {
+
+            subscriber.onPump();
+            return;
+        }
+        // The WSClient has received a message:
+        if (klass == "mdk_runtime.WSMessage") {
+            WSMessage wsmessage = ?message;
+            JSONObject json = wsmessage.body.parseJSON();
+            onMessageFromServer(json);
+            return;
+        }
+    }
+
+    @doc("Handle Open and Close messages.")
+    class OpenCloseSubscriber extends WSClientSubscriber {
+        MessageDispatcher _dispatcher;
+        WSClient _client;
+
+        OpenCloseSubscriber(WSClient client) {
+            self._client = client;
+            self._client.subscribe(self);
+        }
+
+        // Actor implementation
+        void onStart(MessageDispatcher dispatcher) {
+            self._dispatcher = dispatcher;
+        }
+
+        void onMessage(Actor origin, Object message) {
+            subscriberDispatch(self, message);
+        }
+
+        void onStop() {}
+
+        // WSClientSubscriber implementation
+        void onMessageFromServer(JSONObject message) {
+            String type = message["type"];
+            if (contains(["open", "mdk.protocol.Open", "discovery.protocol.Open"],
+                         type)) {
+                self.onOpen();
+                return;
+            }
+            if (contains(["close", "mdk.protocol.Close", "discovery.protocol.Close"],
+                         type)) {
+                Close close = new Close();
+                parseJSON(closs.getClass(), close, message);
+                self.onClose(close);
+                return;
+            }
+        }
+
+        void onWSConnected(Actor websocket) {
+            // Send Open message to the server:
+            self._dispatcher.tell(self, new Open().encode(), websocket);
+        }
+
+        // WebSocket message handlers:
+        void onOpen() {
+            // Should assert version here ...
+        }
+
+        void onClose(Close close) {
+            logger.info("close: " + close.toString());
+            self._wsclient.onClose(close.error != null);
+        }
+
     }
 
     @doc("Common protocol machinery for web socket based protocol clients.")
@@ -412,6 +448,17 @@ namespace mdk_protocol {
             self.token = token;
         }
 
+        @doc("""Subscribe to messages from the server.
+
+        Do this before starting the WSClient.
+
+        The given Actor subscribes to WSConnected, all WSMessage received by the
+        WSClient, as well as a periodic Pump message.
+        """)
+        void subscribe(Actor subscriber) {
+            self.subscribers.add(origin);
+        }
+
         bool isStarted() {
             return _started;
         }
@@ -428,8 +475,13 @@ namespace mdk_protocol {
             schedule(reconnectDelay);
         }
 
-        void onOpen(Open open) {
-            // Should assert version here ...
+        @doc("Called when the connection is closed via message by the server.")
+        void onClose(bool error) {
+            if (error) {
+                doBackoff();
+            } else {
+                reconnectDelay = firstDelay;
+            }
         }
 
         void doBackoff() {
@@ -439,15 +491,6 @@ namespace mdk_protocol {
                 reconnectDelay = maxDelay;
             }
             logger.info("backing off, reconnecting in " + reconnectDelay.toString() + " seconds");
-        }
-
-        void onClose(Close close) {
-            logger.info("close: " + close.toString());
-            if (close.error == null) {
-                reconnectDelay = firstDelay;
-            } else {
-                doBackoff();
-            }
         }
 
         // Actor interface:
@@ -481,10 +524,6 @@ namespace mdk_protocol {
                     self.dispatcher.tell(self, message, self.subscribers[idx]);
                     idx = idx + 1;
                 }
-                return;
-            }
-            if (typeId == "mdk_protocol.SubscribeToWSClient") {
-                self.subscribers.add(origin);
                 return;
             }
         }
@@ -562,8 +601,6 @@ namespace mdk_protocol {
 
             reconnectDelay = firstDelay;
             sock = socket;
-
-            self.dispatcher.tell(self, new Open().encode(), sock);
 
             startup();
             pump();

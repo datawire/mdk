@@ -337,6 +337,7 @@ namespace mdk_tracing {
             TracingClient(Tracer tracer, WSClient wsclient) {
                 _tracer = tracer;
                 _wsclient = wsclient;
+                wsclient.subscribe(self);
             }
 
             @doc("Attach a subscriber that will receive results of queries.")
@@ -348,8 +349,6 @@ namespace mdk_tracing {
 
             void onStart(MessageDispatcher dispatcher) {
                 self._dispatcher = dispatcher;
-                // Tell WSClient we want to subscribe to messages
-                self._dispatcher.tell(self, new SubscribeToWSClient(), self._wsclient);
             }
 
             void onStop() {}

@@ -52,14 +52,13 @@ namespace mdk_discovery {
             DiscoClient(Actor disco_subscriber, WSClient wsclient, MDKRuntime runtime) {
                 self._subscriber = disco_subscriber;
                 self._wsclient = wsclient;
+                self._wsclient.subscribe(self);
                 self._failurePolicyFactory = ?runtime.dependencies.getService("failurepolicy_factory");
                 self._timeService = runtime.getTimeService();
             }
 
             void onStart(MessageDispatcher dispatcher) {
                 self._dispatcher = dispatcher;
-                // Tell WSClient we want to subscribe to messages
-                self._dispatcher.tell(self, new SubscribeToWSClient(), self._wsclient);
             }
 
             void onStop() {}
