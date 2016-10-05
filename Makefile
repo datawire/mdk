@@ -4,7 +4,7 @@ SHELL=/bin/bash
 default:
 	echo "You can run:"
 	echo "* 'make setup' to setup the environment"
-	echo "* 'make test' to run tests (requires setup)"
+	echo "* 'make test' to run tests (requires setup and DATAWIRE_TOKEN)"
 	echo "* 'make packages' to build packages (.whl, .gem, etc.)"
 	echo "* 'make release-patch' to do a patch release (2.0.x)"
 	echo "* 'make release-minor' to do a minor release (2.x.0)"
@@ -18,13 +18,15 @@ clean:
 	rm -rf django110env
 	rm -fr output
 	rm -fr dist
-	rm -f quark/*.qc
+	rm -f quark/*.qc quark/tests/*.qc
 	rm -fr ~/.m2/repository/datawire_mdk
 	rm -fr ~/.m2/repository/io/datawire/mdk
 	rm -rf node_modules
+	find . -name "__pycache__" -print0 | xargs -0 rm -fr
 
 virtualenv:
 	virtualenv -p python2 virtualenv
+	virtualenv/bin/pip install -U pip
 
 .PHONY: python-dependencies
 python-dependencies: virtualenv
@@ -32,9 +34,11 @@ python-dependencies: virtualenv
 
 virtualenv3:
 	virtualenv -p python3 virtualenv3
+	virtualenv3/bin/pip install -U pip
 
 django110env:
 	virtualenv -p python3 django110env
+	django110env/bin/pip install -U pip
 
 .PHONY: python3-dependencies
 python3-dependencies: virtualenv3 django110env
@@ -76,6 +80,13 @@ install-mdk: packages $(wildcard javascript/datawire_mdk_express/*)
 .PHONY: test
 test: install-mdk test-python test-python3
 
+.PHONY: guard-token
+guard-token:
+	@ if [ "${DATAWIRE_TOKEN}" = "" ]; then \
+	    echo "DATAWIRE_TOKEN not set"; \
+	    exit 1; \
+	fi
+
 .PHONY: test-python
 test-python:
 	# Functional tests don't benefit from being run in another language, so
@@ -83,8 +94,8 @@ test-python:
 	virtualenv/bin/py.test -n 4 -v unittests
 
 .PHONY: test-python3
-test-python3:
-	virtualenv3/bin/py.test -n 4 -v unittests functionaltests
+test-python3: guard-token
+	virtualenv3/bin/py.test -n 4 -v --timeout=180 --timeout_method=thread unittests functionaltests
 
 release-minor:
 	virtualenv/bin/python scripts/release.py minor

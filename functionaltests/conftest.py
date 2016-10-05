@@ -31,11 +31,13 @@ def run(filepath, language):
         maybe_sudo = []
     else:
         maybe_sudo = ["sudo"]
-    check_call(maybe_sudo +
-               ["docker", "run",
+    command = (maybe_sudo +
+               ["docker", "run", "--rm",
                 # Mount volume into container so Docker can access quark files:
                 "-v", ROOT_DIR + ":/code",] +
-                ["datawire/quark-run:" + QUARK_VERSION, "--" + language, '--verbose', docker_path])
+               ["datawire/quark-run:" + QUARK_VERSION, "--" + language, '--verbose', docker_path])
+    print(" ".join(command))
+    check_call(command)
 
 @pytest.fixture
 def quark_run(request):
