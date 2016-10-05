@@ -77,8 +77,15 @@ install-mdk: packages $(wildcard javascript/datawire_mdk_express/*)
 	npm install javascript/datawire_mdk_express/
 	cd output/java/mdk-2.0 && mvn install
 
+.PHONY: setup-docker
+setup-docker: docker
+	# Set up special docker image for `quark run`ning tests
+	# Need `quark install --online` and additional build environment stuff for MDK Runtime
+	cd docker && docker build -t datawire/mdk-quark-run -f Dockerfile .
+	cd docker && docker tag datawire/mdk-quark-run datawire/mdk-quark-run:`sed s/v//g < ../QUARK_VERSION.txt`
+
 .PHONY: test
-test: install-mdk test-python test-python3
+test: install-mdk setup-docker test-python test-python3
 
 .PHONY: guard-token
 guard-token:
