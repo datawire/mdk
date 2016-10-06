@@ -7,11 +7,11 @@ namespace promise {
 
     @doc("Resolve a Promise with a result.")
     void _fullfilPromise(Promise promise, Object value) {
-	if (reflect.Class.ERROR.hasInstance(value)) {
-	    promise._reject(?value);
-	} else {
-	    promise._resolve(value);
-	}
+        if (reflect.Class.ERROR.hasInstance(value)) {
+            promise._reject(?value);
+        } else {
+            promise._resolve(value);
+        }
     }
 
     // Called when Promise we're waiting on has result, allowing us to hand it
@@ -147,11 +147,11 @@ namespace promise {
         bool _hasResult;
         List<_Callback> _successCallbacks;
         List<_Callback> _failureCallbacks;
-	MessageDispatcher _dispatcher;
+        MessageDispatcher _dispatcher;
 
         // Private constructor, don't use externally.
         Promise(MessageDispatcher dispatcher) {
-	    self._dispatcher = dispatcher;
+            self._dispatcher = dispatcher;
             self._lock = new quark.concurrent.Lock();
             self._hasResult = false;
             self._successResult = null;

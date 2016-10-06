@@ -105,7 +105,7 @@ release-patch:
 
 # Packaging commands:
 output: $(wildcard quark/*.q) $(wildcard python/*.py) dist
-	rm -rf output output.temp
+	rm -rf output output.temp quark/*.qc quark/tests/*.qc
 	# Use installed Quark if we don't already have quark cli in PATH:
 	which quark || source ~/.quark/config.sh; quark compile --include-stdlib -o output.temp quark/mdk-2.0.q
 	cp python/*.py output.temp/py/mdk-2.0/mdk/
