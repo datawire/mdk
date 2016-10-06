@@ -78,8 +78,10 @@ def webserver(request, port_number):
     # Wait for web server to come up:
     for i in range(10):
         try:
-            requests.get(get_url(port_number, "/"))
+            requests.get(get_url(port_number, "/"), timeout=0.1)
         except:
+            if p.poll() is not None:
+                raise AssertionError("Webserver exited prematurely.")
             sleep(1.0)
         else:
             break
@@ -98,7 +100,8 @@ def test_session_with_context(webserver, port_number):
     """
     context = run_python(sys.executable, "create-context.py", output=True)
     returned_context = requests.get(get_url(port_number, "/context"),
-                                    headers={"X-MDK-CONTEXT": context}).json()
+                                    headers={"X-MDK-CONTEXT": context},
+                                    timeout=5).json()
     assert loads(context.decode("utf-8"))["traceId"] == returned_context["traceId"]
 
 
@@ -108,7 +111,7 @@ def test_session_without_context(webserver, port_number):
     session.
     """
     context = run_python(sys.executable, "create-context.py", output=True)
-    returned_context = requests.get(get_url(port_number, "/context")).json()
+    returned_context = requests.get(get_url(port_number, "/context"), timeout=5).json()
     assert loads(context.decode("utf-8"))["traceId"] != returned_context["traceId"]
 
 
@@ -130,15 +133,15 @@ def test_interaction(webserver, port_number):
     successes and single failure for address1.
     """
     url = get_url(port_number, "/resolve")
-    result1 = requests.get(url).json()
+    result1 = requests.get(url, timeout=5).json()
     assert result1 == {"address1": [0, 0]}
     assert requests.get(url + "?error=1").status_code in (500, 503)
 
-    result2 = requests.get(url).json()
+    result2 = requests.get(url, timeout=5).json()
     # One success from first query, onse failure from second query:
     assert result2 == {"address1": [1, 1]}
 
-    result3 = requests.get(url).json()
+    result3 = requests.get(url, timeout=5).json()
     # One success from first query, onse failure from second query, one success
     # from third query:
     assert result3 == {"address1": [2, 1]}
