@@ -7,6 +7,7 @@ import time
 from random import random
 from subprocess import Popen, check_call, check_output
 from unittest import TestCase
+from json import dumps
 
 from utils import CODE_PATH, ROOT_PATH, run_python
 
@@ -68,9 +69,14 @@ class Python2Tests(TestCase):
         One process can start a session context and a second one can join it,
         and they both get logged together.
         """
-        context_id = run_python(self.python_binary, "start_trace.py", output=True)
+        context_id = run_python(self.python_binary, "create_trace.py", output=True)
+        expected_messages = dumps([("process1", "hello"), ("process2", "world")])
+        p = Popen([sys.executable, os.path.join(CODE_PATH, "read_logs.py"),
+                   context_id, expected_messages])
         print("context_id", context_id)
+        context_id = run_python(self.python_binary, "start_trace.py", [context_id], output=True)
         run_python(self.python_binary, "continue_trace.py", [context_id])
+        assert p.wait() == 0
 
 
 class Python3Tests(Python2Tests):

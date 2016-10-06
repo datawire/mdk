@@ -1,4 +1,4 @@
-"""Write some logs."""
+"""Write some logs to the given tracing session."""
 
 import sys
 import time
@@ -8,9 +8,10 @@ mdk = start()
 
 
 def main():
-    session = mdk.session()
+    context = sys.argv[1]
+    session = mdk.join(context)
     session.info("process1", "hello")
-    time.sleep(5)
+    time.sleep(3)  # make sure it's written
     sys.stdout.write(session.inject())
     sys.stdout.flush()
     mdk.stop()
