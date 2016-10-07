@@ -61,7 +61,9 @@ namespace mdk_discovery {
                 self._dispatcher = dispatcher;
             }
 
-            void onStop() {}
+            void onStop() {
+                shutdown();
+            }
 
             void onMessage(Actor origin, Object message) {
                 String klass = message.getClass().id;
