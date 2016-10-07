@@ -4,6 +4,7 @@ package datawire_mdk_tracing 2.0.15;
 
 include protocol-1.0.q;
 include introspection-1.0.q;
+include mcp.q;
 
 import mdk_runtime.actors;
 import mdk_protocol;
@@ -67,7 +68,7 @@ namespace mdk_tracing {
 
         static Tracer withURLAndToken(String url, String token) {
             MDKRuntime runtime = defaultRuntime();
-            WSClient wsclient = new WSClient(runtime, url, token);
+            WSClient wsclient = new WSClient(runtime, mdk_mcp_protocol.getMCPParser(), url, token);
             runtime.dispatcher.startActor(wsclient);
             Tracer newTracer = new Tracer(runtime, wsclient);
             runtime.dispatcher.startActor(newTracer);
@@ -354,18 +355,15 @@ namespace mdk_tracing {
                 _mutex.release();
             }
 
-            void onMessageFromServer(JSONObject message) {
-                String type = message["type"];
-                if (type == "log") {
-                    LogEvent event = new LogEvent();
-                    fromJSON(event.getClass(), event, message);
+            void onMessageFromServer(Object message) {
+                String type = message.getClass().id;
+                if (type == "mdk_tracing.protocol.LogEvent") {
+                    LogEvent event = ?message;
                     onLogEvent(event);
                     return;
                 }
-                if (contains(["logack", "mdk_tracing.protocol.LogAckEvent"],
-                             type)) {
-                    LogAck ack = new LogAck();
-                    fromJSON(ack.getClass(), ack, message);
+                if (type == "mdk_tracing.protocol.LogAck") {
+                    LogAck ack = ?message;
                     self.onLogAck(ack);
                     return;
                 }

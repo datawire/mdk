@@ -316,10 +316,19 @@ namespace mdk_protocol {
         }
     }
 
+    @doc("Sent to a subscriber when a message is received.")
+    class DecodedMessage {
+        Object message; // The result of decoding the JSON
+
+        DecodedMessage(Object message) {
+            self.message = message;
+        }
+    }
+
     @doc("Higher-level interface for subscribers, to be utilized with _subscriberDispatch.")
     interface WSClientSubscriber extends Actor {
-        @doc("Handle an incoming JSON message received from the server.")
-        void onMessageFromServer(JSONObject message);
+        @doc("Handle an incoming decoded JSON message received from the server.")
+        void onMessageFromServer(Object message);
 
         @doc("Called with WebSocket actor when the WSClient connects to the server.")
         void onWSConnected(Actor websocket);
@@ -330,7 +339,7 @@ namespace mdk_protocol {
 
     @doc("""Dispatch actor messages to a WSClientSubscriber.
 
-    Call this in onMessage to handle WSMessage, WSConnected and Pump messages
+    Call this in onMessage to handle DecodedMessage, WSConnected and Pump messages
     from the WSClient.
     """)
     void _subscriberDispatch(WSClientSubscriber subscriber, Object message) {
@@ -343,15 +352,13 @@ namespace mdk_protocol {
         }
         // The WSClient is telling us we can send periodic messages:
         if (klass == "mdk_protocol.Pump") {
-
             subscriber.onPump();
             return;
         }
         // The WSClient has received a message:
-        if (klass == "mdk_runtime.WSMessage") {
-            WSMessage wsmessage = ?message;
-            JSONObject json = wsmessage.body.parseJSON();
-            subscriber.onMessageFromServer(json);
+        if (klass == "mdk_protocol.DecodedMessage") {
+            DecodedMessage decoded = ?message;
+            subscriber.onMessageFromServer(decoded.message);
             return;
         }
     }
@@ -378,17 +385,14 @@ namespace mdk_protocol {
         void onStop() {}
 
         // WSClientSubscriber implementation
-        void onMessageFromServer(JSONObject message) {
-            String type = message["type"];
-            if (contains(["open", "mdk.protocol.Open", "discovery.protocol.Open"],
-                         type)) {
+        void onMessageFromServer(Object message) {
+            String type = message.getClass().id;
+            if (type == "mdk_protocol.Open") {
                 self.onOpen();
                 return;
             }
-            if (contains(["close", "mdk.protocol.Close", "discovery.protocol.Close"],
-                         type)) {
-                Close close = new Close();
-                fromJSON(close.getClass(), close, message);
+            if (type == "mdk_protocol.Close") {
+                Close close = ?message;
                 self.onClose(close);
                 return;
             }
@@ -411,6 +415,30 @@ namespace mdk_protocol {
         }
 
     }
+
+
+    @doc("Convert JSON-encoded strings into objects.")
+    class JSONParser {
+        Map<String,Class> _typeToClass = {};
+
+        @doc("Register a type field and the corresponding class.")
+        void register(String type, Class cls) {
+            self._typeToClass[type] = cls;
+        }
+
+        @doc("Decode a String into an Object.")
+        Object decode(String message) {
+            JSONObject json = message.parseJSON();
+            Class cls = self._typeToClass[json.getObjectItem("type")];
+            if (cls == null) {
+                return null;
+            }
+            Object instance = cls.construct([]);
+            fromJSON(cls, instance, json);
+            return instance;
+        }
+    }
+
 
     @doc("Common protocol machinery for web socket based protocol clients.")
     class WSClient extends Actor {
@@ -439,14 +467,17 @@ namespace mdk_protocol {
         List<Actor> subscribers = [];
         // True if we are started:
         bool _started = false;
+        // Convert JSON to objects
+        JSONParser _parser;
 
-        WSClient(MDKRuntime runtime, String url, String token) {
+        WSClient(MDKRuntime runtime, JSONParser parser, String url, String token) {
             self.dispatcher = runtime.dispatcher;
             self.timeService = runtime.getTimeService();
             self.schedulingActor = runtime.getScheduleService();
             self.websockets = runtime.getWebSocketsService();
             self.url = url;
             self.token = token;
+            self._parser = parser;
         }
 
         @doc("""Subscribe to messages from the server.
@@ -520,10 +551,17 @@ namespace mdk_protocol {
                 return;
             }
             if (typeId == "mdk_runtime.WSMessage") {
-                // Send WSMessage on to subscribers; one of them will handle it:
+                WSMessage wsmessage = ?message;
+                Object parsed = self._parser.decode(wsmessage.body);
+                if (parsed == null) {
+                    // Unknown message, drop it on the floor.
+                    return;
+                }
+                DecodedMessage decoded = new DecodedMessage(parsed);
+                // Send DecodedMessage on to subscribers; one of them will handle it:
                 int idx = 0;
                 while (idx < self.subscribers.size()) {
-                    self.dispatcher.tell(self, message, self.subscribers[idx]);
+                    self.dispatcher.tell(self, decoded, self.subscribers[idx]);
                     idx = idx + 1;
                 }
                 return;

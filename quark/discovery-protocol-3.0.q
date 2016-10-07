@@ -76,18 +76,15 @@ namespace mdk_discovery {
                 _subscriberDispatch(self, message);
             }
 
-            void onMessageFromServer(JSONObject message) {
-                String type = message["type"];
-                if (contains(["active", "discovery.protocol.Active"], type)) {
-                    Active active = new Active();
-                    fromJSON(active.getClass(), active, message);
+            void onMessageFromServer(Object message) {
+                String type = message.getClass().id;
+                if (type == "mdk_discovery.protocol.Active") {
+                    Active active = ?message;
                     onActive(active);
                     return;
                 }
-                if (contains(["expire", "discovery.protocol.Expire"],
-                             type)) {
-                    Expire expire = new Expire();
-                    fromJSON(expire.getClass(), expire, message);
+                if (type == "mdk_discovery.protocol.Expire") {
+                    Expire expire = ?message;
                     self.onExpire(expire);
                     return;
                 }
