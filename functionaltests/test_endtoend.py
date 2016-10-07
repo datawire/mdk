@@ -74,6 +74,8 @@ class Python2Tests(TestCase):
         p = Popen([sys.executable, os.path.join(CODE_PATH, "read_logs.py"),
                    context_id, expected_messages])
         print("context_id", context_id)
+        # Ensure the subscription is in place before we send messages:
+        time.sleep(5)
         context_id = run_python(self.python_binary, "start_trace.py", [context_id], output=True)
         run_python(self.python_binary, "continue_trace.py", [context_id])
         assert p.wait() == 0
