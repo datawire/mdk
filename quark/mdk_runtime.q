@@ -149,11 +149,13 @@ namespace mdk_runtime {
     @doc("On Python, log to a per-process file if MDK_LOG_MESSAGES env variable is set.")
     void log_to_file(String s) {
         if (Environment.getEnvironment()["MDK_LOG_MESSAGES"] != null) {
-            _log_to_file(s);
+            Object o = _log_to_file(s);
         }
     }
 
-    macro void _log_to_file(String s) $py{open("/tmp/mdk-messages-pid-%s.log" % __import__("os").getpid(), "a", 1).write($s + "\n\n")};
+    macro Object _log_to_file(String s)
+        $py{open("/tmp/mdk-messages-pid-%s.log" % __import__("os").getpid(), "a", 1).write($s + "\n\n")}
+    $rb{""} $js{""} $java{""} ;
 
     @doc("""
     WSActor that uses current Quark runtime as temporary expedient.
