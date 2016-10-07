@@ -146,6 +146,15 @@ namespace mdk_runtime {
     @doc("Notify of WebSocket connection having closed.")
     class WSClosed {}
 
+    @doc("On Python, log to a per-process file if MDK_LOG_MESSAGES env variable is set.")
+    void log_to_file(String s) {
+        if (Environment.getEnvironment()["MDK_LOG_MESSAGES"] != null) {
+            _log_to_file(s);
+        }
+    }
+
+    macro void _log_to_file(String s) $py{open("/tmp/mdk-messages-pid-%s.log" % __import__("os").getpid(), "a", 1).write($s + "\n\n")};
+
     @doc("""
     WSActor that uses current Quark runtime as temporary expedient.
 
@@ -212,6 +221,7 @@ namespace mdk_runtime {
             if (message.getClass().id == "quark.String"
                 && self.state == "CONNECTED") {
                 logTS("   send-ish, message is: " + message.toString());
+                log_to_file("sending: " + ?message);
                 self.socket.send(?message);
                 return;
             }
@@ -253,6 +263,7 @@ namespace mdk_runtime {
         void onWSMessage(WebSocket socket, String message) {
             logPrologue("onWSMessage");
             logTS("onWSMessage, message is: " + message);
+            log_to_file("received: " + message);
             self.dispatcher.tell(self, new WSMessage(message), self.originator);
         }
 
