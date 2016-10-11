@@ -154,7 +154,7 @@ namespace mdk_runtime {
     }
 
     macro Object _log_to_file(String s)
-        $py{open("/tmp/mdk-messages-pid-%s.log" % __import__("os").getpid(), "a", 1).write($s + "\n\n")}
+        $py{open("/tmp/mdk-messages-pid-%s.log" % __import__("os").getpid(), "a", 1).write(__import__("time").asctime() + ">   " + $s + "\n\n")}
     $rb{""} $js{""} $java{""} ;
 
     @doc("""
