@@ -312,7 +312,7 @@ namespace mdk {
             }
 
             EnvironmentVariable ddu = env.var("MDK_MCP_URL");
-            String url = ddu.orElseGet("wss://discovery.datawire.io/ws/v1");
+            String url = ddu.orElseGet("wss://mcp.datawire.io/rtp");
             return new WSClient(runtime, getMCPParser(), url, token);
         }
 
