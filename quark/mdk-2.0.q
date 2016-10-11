@@ -243,6 +243,29 @@ namespace mdk {
              """)
         void interact(UnaryCallable callable);
 
+        @doc("""
+             Set how many seconds the session is expected to live from this point.
+
+             If a timeout has previously been set the new timeout will only be
+             used if it is lower than the existing timeout.
+
+             The MDK will not enforce the timeout. Rather, it provides the
+             information to any process or server in the same session (even if
+             they are on different machines). By passing this timeout to
+             blocking APIs you can ensure timeouts are enforced across a whole
+             distributed session.
+             """)
+        void setTimeout(float seconds);
+
+        @doc("""
+             Return how many seconds until the session ought to end.
+
+             This will only be accurate across multiple servers insofar as their
+             clocks are in sync.
+
+             If a timeout has not been set the result will be null.
+             """)
+        float getSecondsToTimeout();
     }
 
     class MDKImpl extends MDK {
@@ -425,6 +448,25 @@ namespace mdk {
 
         bool has(String property) {
             return _context.properties.contains(property);
+        }
+
+        void setTimeout(float timeout) {
+            float current = getSecondsToTimeout();
+            if (current == null) {
+                current = timeout;
+            }
+            if (timeout > current) {
+                timeout = current;
+            }
+            set("timeout",  _mdk._runtime.getTimeService().time() + timeout);
+        }
+
+        float getSecondsToTimeout() {
+            float deadline = ?get("timeout");
+            if (deadline == null) {
+                return null;
+            }
+            return deadline - _mdk._runtime.getTimeService().time();
         }
 
         void route(String service, String version, String target, String targetVersion) {

@@ -232,3 +232,40 @@ class InteractionTestCase(TestCase):
             self.assertEqual((policy.successes, policy.failures),
                              (expected_success_nodes[node],
                               expected_failed_nodes[node]))
+
+
+class SessionTimeoutTests(TestCase):
+    """Tests for the session timeout."""
+
+    def setUp(self):
+        """Initialize an empty environment."""
+        # Initialize runtime and MDK:
+        self.runtime = fakeRuntime()
+        self.runtime.getEnvVarsService().set("DATAWIRE_TOKEN", "")
+        self.mdk = MDKImpl(self.runtime)
+        self.mdk.start()
+        self.session = self.mdk.session()
+
+    def test_setTimeout(self):
+        """A set timeout can be retrieved."""
+        self.session.setTimeout(13.5)
+        self.assertEqual(13.5, self.session.getSecondsToTimeout())
+
+    def test_notSetTimeout(self):
+        """Timeout is null if not set."""
+        self.assertEqual(None, self.session.getSecondsToTimeout())
+
+    def test_timeoutChangesAsTimePasses(self):
+        """If time passes the timeout goes down."""
+        self.session.setTimeout(13.5)
+        self.runtime.getTimeService().advance(2.0)
+        self.assertEqual(11.5, self.session.getSecondsToTimeout())
+
+    def test_setTimeoutTwice(self):
+        """Timeouts can be decreased by setting, but not increased."""
+        self.session.setTimeout(10.0)
+        self.session.setTimeout(9.0)
+        decreased = self.session.getSecondsToTimeout()
+        self.session.setTimeout(11.0)
+        still_decreased = self.session.getSecondsToTimeout()
+        self.assertEqual((decreased, still_decreased), (9.0, 9.0))
