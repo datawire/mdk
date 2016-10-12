@@ -6,6 +6,11 @@ process.on('exit', function () {
     mdk.stop();
 });
 
+// Configure the default timeout for MDK sessions.
+exports.configure = function (timeout) {
+    mdk.setDefaultTimeout(timeout);
+};
+
 // Start an interaction for each request, end it when the response finishes.
 exports.mdkSessionStart = function (req, res, next) {
     var header = req.get(datawire_mdk.mdk.MDK.CONTEXT_HEADER);
