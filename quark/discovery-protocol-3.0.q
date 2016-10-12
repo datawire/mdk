@@ -15,16 +15,14 @@ namespace mdk_discovery {
         register it with the MDK.
         """)
         class DiscoClientFactory extends DiscoverySourceFactory {
-            String token;
+            WSClient wsclient;
 
-            DiscoClientFactory(String token) {
-                self.token = token;
+            DiscoClientFactory(WSClient wsclient) {
+                self.wsclient = wsclient;
             }
 
             DiscoverySource create(Actor subscriber, MDKRuntime runtime) {
-                EnvironmentVariable ddu = runtime.getEnvVarsService().var("MDK_DISCOVERY_URL");
-                String url = ddu.orElseGet("wss://discovery.datawire.io/ws/v1");
-                return new DiscoClient(subscriber, token, url, runtime);
+                return new DiscoClient(subscriber, wsclient, runtime);
             }
 
             bool isRegistrar() {
@@ -37,59 +35,74 @@ namespace mdk_discovery {
 
         Also supports registering discovery information with the server.
         """)
-        class DiscoClient extends WSClient, DiscoHandler, DiscoverySource, DiscoveryRegistrar {
-            bool _started = false;
-            String _token;
-            String _url;
+        class DiscoClient extends WSClientSubscriber, DiscoverySource, DiscoveryRegistrar {
             FailurePolicyFactory _failurePolicyFactory;
             MessageDispatcher _dispatcher;
+            Time _timeService;
             Actor _subscriber;  // We will send discovery events here
-
+            WSClient _wsclient; // The WSClient we will use
             // Clusters we advertise to the disco service.
             Map<String, Cluster> registered = new Map<String, Cluster>();
 
             Logger dlog = new Logger("discovery");
 
-            DiscoClient(Actor subscriber, String token, String url, MDKRuntime runtime) {
-                super(runtime);
-                self._subscriber = subscriber;
+            long lastHeartbeat = 0L;
+            Actor sock; // Websocket actor for the WS connection
+
+            DiscoClient(Actor disco_subscriber, WSClient wsclient, MDKRuntime runtime) {
+                self._subscriber = disco_subscriber;
+                self._wsclient = wsclient;
+                self._wsclient.subscribe(self);
                 self._failurePolicyFactory = ?runtime.dependencies.getService("failurepolicy_factory");
-                self._token = token;
-                self._url = url;
+                self._timeService = runtime.getTimeService();
             }
 
-            // Actor interface; placeholder for when we stop using WSClient as
-            // a superclass.
             void onStart(MessageDispatcher dispatcher) {
                 self._dispatcher = dispatcher;
-                self._started = true;
-                super.onStart(dispatcher);
             }
 
             void onStop() {
-                self._started = false;
-                super.onStop();
+                shutdown();
             }
 
             void onMessage(Actor origin, Object message) {
-                if (message.getClass().id == "mdk_discovery.RegisterNode") {
+                String klass = message.getClass().id;
+                // Someone wants to register a node with discovery server:
+                if (klass == "mdk_discovery.RegisterNode") {
                     RegisterNode register = ?message;
                     _register(register.node);
                     return;
                 }
-                super.onMessage(origin, message);
+                _subscriberDispatch(self, message);
             }
 
-            String url() {
-                return self._url;
+            void onMessageFromServer(Object message) {
+                String type = message.getClass().id;
+                if (type == "mdk_discovery.protocol.Active") {
+                    Active active = ?message;
+                    onActive(active);
+                    return;
+                }
+                if (type == "mdk_discovery.protocol.Expire") {
+                    Expire expire = ?message;
+                    self.onExpire(expire);
+                    return;
+                }
+                // XXX we don't handle Clear yet.
             }
 
-            String token() {
-                return self._token;
+            void onWSConnected(Actor websocket) {
+                self.sock = websocket;
+                heartbeat();
             }
 
-            bool isStarted() {
-                return self._started;
+            void onPump() {
+                long rightNow = (self._timeService.time()*1000.0).round();
+                long heartbeatInterval = (self._wsclient.ttl/2.0*1000.0).round();
+                if (rightNow - self.lastHeartbeat >= heartbeatInterval) {
+                    self.lastHeartbeat = rightNow;
+                    heartbeat();
+                }
             }
 
             @doc("Register a node with the remote Discovery server.")
@@ -103,7 +116,7 @@ namespace mdk_discovery {
                 // Trigger send of delta if we are connected, otherwise do
                 // nothing because the full set of nodes will be resent
                 // when we connect/reconnect.
-                if (self.isConnected()) {
+                if (self._wsclient.isConnected()) {
                     active(node);
                 }
             }
@@ -111,15 +124,15 @@ namespace mdk_discovery {
             void active(Node node) {
                 Active active = new Active();
                 active.node = node;
-                active.ttl = self.ttl;
-                self.dispatcher.tell(self, active.encode(), self.sock);
+                active.ttl = self._wsclient.ttl;
+                self._dispatcher.tell(self, active.encode(), self.sock);
                 dlog.info("active " + node.toString());
             }
 
             void expire(Node node) {
                 Expire expire = new Expire();
                 expire.node = node;
-                self.dispatcher.tell(self, expire.encode(), self.sock);
+                self._dispatcher.tell(self, expire.encode(), self.sock);
                 dlog.info("expire " + node.toString());
             }
 
@@ -141,14 +154,7 @@ namespace mdk_discovery {
                 self._dispatcher.tell(self, new NodeExpired(expire.node), self._subscriber);
             }
 
-            void onClear(Clear reset) {
-                // ???
-            }
-
-            void startup() {
-                heartbeat();
-            }
-
+            @doc("Send all registered services.")
             void heartbeat() {
                 List<String> services = self.registered.keys();
                 int idx = 0;
@@ -176,47 +182,6 @@ namespace mdk_discovery {
                     idx = idx + 1;
                 }
             }
-
-            void onWSMessage(String message) {
-                // Decode and dispatch incoming messages.
-                ProtocolEvent event = DiscoveryEvent.decode(message);
-                if (event == null) {
-                    // Unknown message, drop it on the floor. The decoding will
-                    // already have logged it.
-                    return;
-                }
-
-                event.dispatch(self);
-            }
-
-        }
-
-        interface DiscoHandler extends ProtocolHandler {
-            void onActive(Active active);
-            void onExpire(Expire expire);
-            void onClear(Clear reset);
-        }
-
-        class DiscoveryEvent extends ProtocolEvent {
-
-            static ProtocolEvent construct(String type) {
-                ProtocolEvent result = ProtocolEvent.construct(type);
-                if (result != null) { return result; }
-                if (Active._discriminator.matches(type)) { return new Active(); }
-                if (Expire._discriminator.matches(type)) { return new Expire(); }
-                if (Clear._discriminator.matches(type)) { return new Clear(); }
-                return null;
-            }
-
-            static ProtocolEvent decode(String message) {
-                return ?Serializable.decodeClassName("mdk_discovery.protocol.DiscoveryEvent", message);
-            }
-
-            void dispatch(ProtocolHandler handler) {
-                dispatchDiscoveryEvent(?handler);
-            }
-
-            void dispatchDiscoveryEvent(DiscoHandler handler);
         }
 
         /*@doc("""
@@ -225,41 +190,25 @@ namespace mdk_discovery {
           consider the node to be available for the duration of the
           specified ttl.
           """)*/
-        class Active extends DiscoveryEvent {
-
-            static Discriminator _discriminator = anyof(["active", "discovery.protocol.Active"]);
+        class Active extends Serializable {
+            static String _json_type = "active";
 
             @doc("The advertised node.")
             Node node;
             @doc("The ttl of the node in seconds.")
             float ttl;
-
-            void dispatchDiscoveryEvent(DiscoHandler handler) {
-                handler.onActive(self);
-            }
-
         }
 
         @doc("Expire a node.")
-        class Expire extends DiscoveryEvent {
-
-            static Discriminator _discriminator = anyof(["expire", "discovery.protocol.Expire"]);
+        class Expire extends Serializable {
+            static String _json_type = "expire";
 
             Node node;
-
-            void dispatchDiscoveryEvent(DiscoHandler handler) {
-                handler.onExpire(self);
-            }
         }
 
         @doc("Expire all nodes.")
-        class Clear extends DiscoveryEvent {
-
-            static Discriminator _discriminator = anyof(["clear", "discovery.protocol.Clear"]);
-
-            void dispatchDiscoveryEvent(DiscoHandler handler) {
-                handler.onClear(self);
-            }
+        class Clear extends Serializable {
+            static String _json_type = "clear";
         }
     }
 }

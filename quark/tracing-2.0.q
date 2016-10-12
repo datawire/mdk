@@ -4,7 +4,9 @@ package datawire_mdk_tracing 2.0.15;
 
 include protocol-1.0.q;
 include introspection-1.0.q;
+include rtp.q;
 
+import mdk_runtime.actors;
 import mdk_protocol;
 import mdk_introspection;
 import mdk_tracing.protocol;
@@ -46,65 +48,42 @@ namespace mdk_tracing {
         }
     }
 
-    class Tracer {
+    class Tracer extends Actor {
         Logger logger = new Logger("MDK Tracer");
-
-        String url = "wss://tracing.datawire.io/ws/v1";
-        String queryURL = "https://tracing.datawire.io/api/v1/logs";
-
-        String token;
         long lastPoll = 0L;
 
         TLS<SharedContext> _context = new TLS<SharedContext>(new SharedContextInitializer());
         protocol.TracingClient _client;
         MDKRuntime runtime;
 
-        Tracer(MDKRuntime runtime) {
+        Tracer(MDKRuntime runtime, WSClient wsclient) {
             self.runtime = runtime;
+            self._client = new protocol.TracingClient(self, wsclient);
         }
 
+        @doc("Backwards compatibility.")
         static Tracer withURLsAndToken(String url, String queryURL, String token) {
-            Tracer newTracer = new Tracer(defaultRuntime());
+            return withURLAndToken(url, token);
+        }
 
-            newTracer.url = url;
-
-            if ((queryURL == null) || (queryURL.size() == 0)) {
-                URL parsedURL = URL.parse(url);
-
-                if (parsedURL.scheme == "ws") {
-                    parsedURL.scheme = "http";
-                }
-                else {
-                    parsedURL.scheme = "https";
-                }
-
-                parsedURL.path = "/api/v1/logs";
-
-                newTracer.queryURL = parsedURL.toString();
-            } else {
-                newTracer.queryURL = queryURL;
-            }
-
-            newTracer.token = token;
-
+        static Tracer withURLAndToken(String url, String token) {
+            MDKRuntime runtime = defaultRuntime();
+            WSClient wsclient = new WSClient(runtime, mdk_rtp.getRTPParser(), url, token);
+            runtime.dispatcher.startActor(wsclient);
+            Tracer newTracer = new Tracer(runtime, wsclient);
+            runtime.dispatcher.startActor(newTracer);
             return newTracer;
         }
 
-        void _openIfNeeded() {
-            if (_client == null) {
-                _client = new protocol.TracingClient(self, runtime);
-            }
-
-            if (token == null) {
-                token = DatawireToken.getToken(runtime.getEnvVarsService());
-            }
+        void onStart(MessageDispatcher dispatcher) {
+            dispatcher.startActor(_client);
         }
 
-        void stop() {
-            if (_client != null) {
-                runtime.dispatcher.stopActor(_client);
-            }
+        void onStop() {
+            runtime.dispatcher.stopActor(_client);
         }
+
+        void onMessage(Actor origin, Object mesage) {}
 
         void initContext() {
             // Implicitly creates a span for you.
@@ -137,9 +116,8 @@ namespace mdk_tracing {
             _context.setValue(self.getContext().finish_span());
         }
 
+        @doc("Send a log message to the server.")
         void log(String procUUID, String level, String category, String text) {
-            self._openIfNeeded();
-
             SharedContext ctx = self.getContext();
             ctx.tick();
             logger.trace("CTX " + ctx.toString());
@@ -166,91 +144,8 @@ namespace mdk_tracing {
             _client.log(evt);
         }
 
-        Promise poll() {
-            // XXX: this shouldn't really be necessary
-            self._openIfNeeded();
-
-            logger.trace("Polling for logs...");
-
-            long rightNow = now();
-            Promise result = query(lastPoll, rightNow);
-            lastPoll = rightNow;
-            return result.andThen(bind(self, "deresultify", []));
-        }
-
         void subscribe(UnaryCallable handler) {
-            _openIfNeeded();
             _client.subscribe(handler);
-        }
-
-        List<LogEvent> deresultify(api.GetLogEventsResult result) {
-            logger.trace("got " + result.result.size().toString() + " log events");
-            return result.result;
-        }
-
-        @doc("Query the trace logs. startTimeMillis and endTimeMillis are milliseconds since the UNIX epoch.")
-        Promise query(long startTimeMillis, long endTimeMillis) {
-            // Set up args.
-            List<String> args = [];
-            String reqID = "Query ";
-
-            if (startTimeMillis >= 0) {
-                args.add("startTime=" + startTimeMillis.toString());
-                reqID = reqID + startTimeMillis.toString();
-            }
-
-            reqID = reqID + "-";
-
-            if (endTimeMillis >= 0) {
-                args.add("endTime=" + endTimeMillis.toString());
-                reqID = reqID + endTimeMillis.toString();
-            }
-
-            // Grab the full URL...
-
-            String url = self.queryURL;
-
-            if (args.size() > 0) {
-                url = url + "?" + "&".join(args);
-            }
-
-            // Off we go.
-            HTTPRequest req = new HTTPRequest(url);
-
-            req.setMethod("GET");
-            req.setHeader("Content-Type", "application/json");
-            req.setHeader("Authorization", "Bearer " + self.token);
-
-            return IO.httpRequest(req).andThen(bind(self, "handleQueryResponse", []));
-        }
-
-        Object handleQueryResponse(HTTPResponse response) {
-            int code = response.getCode();      // HTTP status code
-            String body = response.getBody();   // just to save keystrokes later
-
-            if (code == 200) {
-                // All good. Parse the JSON in the body...
-                return api.GetLogEventsResult.decode(body);
-            }
-            else {
-                // Per the HTTP status code, something has gone wrong. Try to pull a
-                // sensible error out of the body...
-                String error = "";
-
-                if (body.size() > 0) {
-                    error = body;
-                }
-
-                // In any case, if we have no error, synthesize something from the
-                // status code.
-                if (error.size() < 1) {
-                    error = "HTTP response " + code.toString();
-                }
-
-                logger.error("query failure: " + error);
-
-                return new HTTPError(error);
-            }
         }
     }
 
@@ -308,39 +203,8 @@ namespace mdk_tracing {
 
     namespace protocol {
 
-        interface TracingHandler extends ProtocolHandler {
-            void onLogEvent(LogEvent event) {}
-            void onLogAck(LogAck ack) {}
-            void onSubscribe(Subscribe sub) {}
-        }
-
-        @doc("""A single event in the stream that Tracing has to manage.""")
-        class TracingEvent extends ProtocolEvent {
-
-            static ProtocolEvent construct(String type) {
-                ProtocolEvent result = ProtocolEvent.construct(type);
-                if (result != null) { return result; }
-                if (LogEvent._discriminator.matches(type)) { return new LogEvent(); }
-                if (LogAck._discriminator.matches(type)) { return new LogAck(); }
-                if (Subscribe._discriminator.matches(type)) { return new Subscribe(); }
-                return null;
-            }
-
-            static ProtocolEvent decode(String encoded) {
-                return ?Serializable.decodeClassName("mdk_tracing.protocol.TracingEvent", encoded);
-            }
-
-            void dispatch(ProtocolHandler handler) {
-                dispatchTracingEvent(?handler);
-            }
-
-            void dispatchTracingEvent(TracingHandler handler);
-
-        }
-
-        class LogEvent extends TracingEvent {
-
-            static Discriminator _discriminator = anyof(["log"]);
+        class LogEvent extends Serializable {
+            static String _json_type = "log";
 
             @doc("""Shared context""")
             SharedContext context;
@@ -373,10 +237,6 @@ namespace mdk_tracing {
             @doc("Should the server send an acknowledgement?")
             int sync;
 
-            void dispatchTracingEvent(TracingHandler handler) {
-                handler.onLogEvent(self);
-            }
-
             String toString() {
                 return "<LogEvent " + sequence.toString() + " @" + timestamp.toString() + " " + context.toString() +
                     ", " + node + ", " + level + ", " + category + ", " + contentType + ", " + text + ">";
@@ -384,29 +244,19 @@ namespace mdk_tracing {
 
         }
 
-        class Subscribe extends TracingEvent {
-
-            static Discriminator _discriminator = anyof(["subscribe"]);
-
-            void dispatchTracingEvent(TracingHandler handler) {
-                handler.onSubscribe(self);
-            }
+        class Subscribe extends Serializable {
+            static String _json_type = "subscribe";
 
             String toString() {
                 return "<Subscribe>";
             }
         }
 
-        class LogAck extends TracingEvent {
-
-            static Discriminator _discriminator = anyof(["logack", "mdk_tracing.protocol.LogAckEvent"]);
+        class LogAck extends Serializable {
+            static String _json_type = "logack";
 
             @doc("Sequence number of the last log message being acknowledged.")
             long sequence;
-
-            void dispatchTracingEvent(TracingHandler handler) {
-                handler.onLogAck(self);
-            }
 
             String toString() {
                 return "<LogAck " + sequence.toString() + ">";
@@ -414,7 +264,7 @@ namespace mdk_tracing {
 
         }
 
-        class TracingClient extends WSClient, TracingHandler {
+        class TracingClient extends WSClientSubscriber {
 
             Tracer _tracer;
             bool _started = false;
@@ -433,58 +283,41 @@ namespace mdk_tracing {
             long _recorded = 0L;            // count of events that were acknowledged by the server
             long _lastSyncTime = 0L;        // when the last sync request was sent
 
+            WSClient _wsclient; // The WSClient we will use
+            Actor _sock = null; // The websocket we're connected to, if any
+
             Logger _myLog = new Logger("TracingClient");
             void _debug(String message) {
                 String s = "[" + _buffered.size().toString() + " buf, " + _inFlight.size().toString() + " inf] ";
                 _myLog.debug(s + message);
             }
 
-            TracingClient(Tracer tracer, MDKRuntime runtime) {
-                super(runtime);
-                self._dispatcher = runtime.dispatcher;
+            TracingClient(Tracer tracer, WSClient wsclient) {
                 _tracer = tracer;
+                _wsclient = wsclient;
+                wsclient.subscribe(self);
             }
 
-            String url() {
-                return _tracer.url;
-            }
-
-            String token() {
-                return _tracer.token;
-            }
-
-            bool isStarted() {
-                _mutex.acquire();
-                bool result = _started || _buffered.size() > 0 || _handler != null;
-                _mutex.release();
-                return result;
-            }
-
-            void _startIfNeeded() {
-                if (!_started) {
-                    self._dispatcher.startActor(self);
-                    _started = true;
-                }
-            }
-
+            @doc("Attach a subscriber that will receive results of queries.")
             void subscribe(UnaryCallable handler) {
                 _mutex.acquire();
                 _handler = handler;
-                _startIfNeeded();
                 _mutex.release();
             }
 
             void onStart(MessageDispatcher dispatcher) {
-                super.onStart(dispatcher);
+                self._dispatcher = dispatcher;
             }
 
-            void onStop() {
-                _started = false;
-                super.onStop();
+            void onStop() {}
+
+            void onMessage(Actor origin, Object message) {
+                _subscriberDispatch(self, message);
             }
 
-            void startup() {
+            void onWSConnected(Actor websock) {
                 _mutex.acquire();
+                self._sock = websock;
                 // Move in-flight messages back into the outgoing buffer to retry later
                 while (_inFlight.size() > 0) {
                     LogEvent evt = _inFlight.remove(_inFlight.size() - 1);
@@ -492,14 +325,14 @@ namespace mdk_tracing {
                     _failedSends = _failedSends + 1;
                     _debug("no ack for #" + evt.sequence.toString());
                 }
-                _debug("Starting up! with connection " + self.sock.toString());
+                _debug("Starting up! with connection " + self._sock.toString());
                 if (_handler != null) {
-                    self.dispatcher.tell(self, new Subscribe().encode(), self.sock);
+                    self._dispatcher.tell(self, new Subscribe().encode(), self._sock);
                 }
                 _mutex.release();
             }
 
-            void pump() {
+            void onPump() {
                 _mutex.acquire();
                 // Send buffered messages and move them to the in-flight queue
                 // Set the sync flag as appropriate
@@ -513,24 +346,27 @@ namespace mdk_tracing {
                         _lastSyncTime = evt.timestamp;
                         debugSuffix = " with sync set";
                     }
-                    self.dispatcher.tell(self, evt.encode(), self.sock);
+                    self._dispatcher.tell(self, evt.encode(), self._sock);
                     evt.sync = 0;
                     _sent = _sent + 1;
                     _debug("sent #" + evt.sequence.toString() + debugSuffix +
-                           " to " + self.sock.toString());
+                           " to " + self._sock.toString());
                 }
                 _mutex.release();
             }
 
-            void onWSMessage(String message) {
-                // Decode and dispatch incoming messages.
-                ProtocolEvent event = TracingEvent.decode(message);
-                if (event == null) {
-                    // Unknown message, drop it on the floor. The decoding will
-                    // already have logged it.
+            void onMessageFromServer(Object message) {
+                String type = message.getClass().id;
+                if (type == "mdk_tracing.protocol.LogEvent") {
+                    LogEvent event = ?message;
+                    onLogEvent(event);
                     return;
                 }
-                event.dispatch(self);
+                if (type == "mdk_tracing.protocol.LogAck") {
+                    LogAck ack = ?message;
+                    self.onLogAck(ack);
+                    return;
+                }
             }
 
             void onLogEvent(LogEvent evt) {
@@ -557,6 +393,7 @@ namespace mdk_tracing {
                 _mutex.release();
             }
 
+            @doc("Queue a log message for delivery to the server.")
             void log(LogEvent evt) {
                 _mutex.acquire();
                 // Add log event to the outgoing buffer and make sure it has the newest sequence number.
@@ -565,7 +402,6 @@ namespace mdk_tracing {
                 _logged = _logged + 1;
                 _buffered.add(evt);
                 _debug("logged #" + evt.sequence.toString());
-                _startIfNeeded();
                 _mutex.release();
             }
 

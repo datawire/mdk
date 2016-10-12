@@ -12,69 +12,42 @@ import mdk_runtime.actors;
 
 namespace mdk_protocol {
 
-    class Discriminator {
-        List<String> values;
-
-        Discriminator(List<String> values) {
-            self.values = values;
-        }
-
-        bool matches(String value) {
-            int idx = 0;
-            while (idx < values.size()) {
-                if (value == values[idx]) {
-                    return true;
-                }
-                idx = idx + 1;
+    @doc("Returns whether a list contains a given value.")
+    bool contains(List<String> values, String value) {
+        int idx = 0;
+        while (idx < values.size()) {
+            if (value == values[idx]) {
+                return true;
             }
-            return false;
+            idx = idx + 1;
         }
+        return false;
     }
 
-    Discriminator anyof(List<String> values) {
-        return new Discriminator(values);
-    }
+    @doc("""JSON serializable object.
 
+    If it has have a String field called _json_type, that will be set as the
+    'type' field in serialized JSON.
+    """)
     class Serializable {
-        @doc("""
-        The given class must have a construct() static method that takes the JSON-encoded type,
-        or a constructor that takes no arguments.
-        """)
-        static Serializable decodeClass(Class clazz, String encoded) {
-            JSONObject json = encoded.parseJSON();
-            String type = json["type"];
-            Method meth = clazz.getMethod("construct");
-            Serializable obj;
-            if (meth != null) {
-                obj = ?meth.invoke(null, [type]);
-                if (obj == null) {
-                    Logger logger = new Logger("protocol");
-                    logger.warn(clazz.getName() + "." + meth.getName() + " could not understand this json: " + encoded);
-                    return null;
-                }
-                clazz = obj.getClass();
-            } else {
-                obj = ?clazz.construct([]);
-                if (obj == null) {
-                    panic("could not construct " + clazz.getName() + " from this json: " + encoded);
-                }
-            }
-
-            fromJSON(clazz, obj, json);
-
-            return obj;
-        }
-
+        @doc("Decode JSON into a particular class. XXX TURN INTO FUNCTION")
         static Serializable decodeClassName(String name, String encoded) {
-            return decodeClass(Class.get(name), encoded);
+            JSONObject json = encoded.parseJSON();
+            Class clazz = Class.get(name);
+            Serializable obj = ?clazz.construct([]);
+            if (obj == null) {
+                panic("could not construct " + clazz.getName() + " from this json: " + encoded);
+            }
+            fromJSON(clazz, obj, json);
+            return obj;
         }
 
         String encode() {
             Class clazz = self.getClass();
             JSONObject json = toJSON(self, clazz);
-            Discriminator desc = ?self.getField("_discriminator");
-            if (desc != null) {
-                json["type"] = desc.values[0];
+            String jsonType = ?self.getField("_json_type");
+            if (jsonType != null) {
+                json["type"] = jsonType;
             }
             String encoded = json.toString();
             return encoded;
@@ -300,31 +273,12 @@ namespace mdk_protocol {
         }
     }
 
-    interface ProtocolHandler {
-        void onOpen(Open open);
-        void onClose(Close close);
-    }
-
-    class ProtocolEvent extends Serializable {
-        static ProtocolEvent construct(String type) {
-            if (Open._discriminator.matches(type)) { return new Open(); }
-            if (Close._discriminator.matches(type)) { return new Close(); }
-            return null;
-        }
-        void dispatch(ProtocolHandler handler);
-    }
-
-    class Open extends ProtocolEvent {
-
-        // Allow the old "mdk.protocol.Open" to work here.
-        static Discriminator _discriminator = anyof(["open", "mdk.protocol.Open", "discovery.protocol.Open"]);
+    @doc("A message sent whenever a new connection is opened, by both sides.")
+    class Open extends Serializable {
+        static String _json_type = "open";
 
         String version = "2.0.0";
         Map<String,String> properties = {};
-
-        void dispatch(ProtocolHandler handler) {
-            handler.onOpen(self);
-        }
     }
 
     // XXX: this should probably go somewhere in the library
@@ -344,70 +298,150 @@ namespace mdk_protocol {
     }
 
     @doc("Close the event stream.")
-    class Close extends ProtocolEvent {
-
-        // Allow the old "mdk.protocol.Close" to work here.
-        static Discriminator _discriminator = anyof(["close", "mdk.protocol.Close", "discovery.protocol.Close"]);
+    class Close extends Serializable {
+        static String _json_type = "close";
 
         ProtocolError error;
+    }
 
-        void dispatch(ProtocolHandler handler) {
-            handler.onClose(self);
+    @doc("Sent to a subscriber every once in a while, to tell subscribers they can send data.")
+    class Pump {}
+
+    @doc("Sent to a subscriber when connection happens.")
+    class WSConnected {
+        Actor websock;
+
+        WSConnected(Actor websock) {
+            self.websock = websock;
         }
     }
 
+    @doc("Sent to a subscriber when a message is received.")
+    class DecodedMessage {
+        Object message; // The result of decoding the JSON
+
+        DecodedMessage(Object message) {
+            self.message = message;
+        }
+    }
+
+    @doc("Higher-level interface for subscribers, to be utilized with _subscriberDispatch.")
+    interface WSClientSubscriber extends Actor {
+        @doc("Handle an incoming decoded JSON message received from the server.")
+        void onMessageFromServer(Object message);
+
+        @doc("Called with WebSocket actor when the WSClient connects to the server.")
+        void onWSConnected(Actor websocket);
+
+        @doc("Called when the WSClient notifies the subscriber it can send data.")
+        void onPump();
+    }
+
+    @doc("""Dispatch actor messages to a WSClientSubscriber.
+
+    Call this in onMessage to handle DecodedMessage, WSConnected and Pump messages
+    from the WSClient.
+    """)
+    void _subscriberDispatch(WSClientSubscriber subscriber, Object message) {
+        String klass = message.getClass().id;
+        // WSClient has connected to the server:
+        if (klass == "mdk_protocol.WSConnected") {
+            WSConnected connected = ?message;
+            subscriber.onWSConnected(connected.websock);
+            return;
+        }
+        // The WSClient is telling us we can send periodic messages:
+        if (klass == "mdk_protocol.Pump") {
+            subscriber.onPump();
+            return;
+        }
+        // The WSClient has received a message:
+        if (klass == "mdk_protocol.DecodedMessage") {
+            DecodedMessage decoded = ?message;
+            subscriber.onMessageFromServer(decoded.message);
+            return;
+        }
+    }
+
+    @doc("Handle Open and Close messages.")
+    class OpenCloseSubscriber extends WSClientSubscriber {
+        MessageDispatcher _dispatcher;
+        WSClient _wsclient;
+
+        OpenCloseSubscriber(WSClient client) {
+            self._wsclient = client;
+            self._wsclient.subscribe(self);
+        }
+
+        // Actor implementation
+        void onStart(MessageDispatcher dispatcher) {
+            self._dispatcher = dispatcher;
+        }
+
+        void onMessage(Actor origin, Object message) {
+            _subscriberDispatch(self, message);
+        }
+
+        void onStop() {}
+
+        // WSClientSubscriber implementation
+        void onMessageFromServer(Object message) {
+            String type = message.getClass().id;
+            if (type == "mdk_protocol.Open") {
+                self.onOpen();
+                return;
+            }
+            if (type == "mdk_protocol.Close") {
+                Close close = ?message;
+                self.onClose(close);
+                return;
+            }
+        }
+
+        void onWSConnected(Actor websocket) {
+            // Send Open message to the server:
+            self._dispatcher.tell(self, new Open().encode(), websocket);
+        }
+
+        void onPump() {}
+
+        // WebSocket message handlers:
+        void onOpen() {
+            // Should assert version here ...
+        }
+
+        void onClose(Close close) {
+            self._wsclient.onClose(close.error != null);
+        }
+
+    }
+
+
+    @doc("Convert JSON-encoded strings into objects.")
+    class JSONParser {
+        Map<String,Class> _typeToClass = {};
+
+        @doc("Register a type field and the corresponding class.")
+        void register(String type, Class cls) {
+            self._typeToClass[type] = cls;
+        }
+
+        @doc("Decode a String into an Object.")
+        Object decode(String message) {
+            JSONObject json = message.parseJSON();
+            Class cls = self._typeToClass[json.getObjectItem("type")];
+            if (cls == null) {
+                return null;
+            }
+            Object instance = cls.construct([]);
+            fromJSON(cls, instance, json);
+            return instance;
+        }
+    }
+
+
     @doc("Common protocol machinery for web socket based protocol clients.")
-    class WSClient extends ProtocolHandler, Actor {
-
-        /*
-
-          # WSClient state machine
-
-          ## External entity calls subclass.onStart()
-
-          - subclass.onStart() or something else arranges for subclass.isStarted() to return true
-          - WSClient.onStart() schedules .onExecute()
-          - the Runtime delivers Hapenning message to .onMessage(), whihc calls .onScheduledEvent()
-          - .onScheduledEvent() notices not .isConnected() and subclass.isStarted() so eventually calls .doOpen(),
-            then schedules itself for execution again
-          - .doOpen() calls .open() using subclass.url() and manages retries/backoff
-          - .open() calls subclass.token() and constructs a real URL, then calls WebSockets.connect()
-          - the resulting promise calls .onWSConnected()
-          - .onWSConnected() saves the socket for .isConnected() to check,
-            then sends an Open protocol oevent, calls subclass.startup(), calls subclass.pump()
-          - the ScheduleActor send a Happening message to .onMessage(), which calls onScheduledEvent
-          - .onScheduledEvent() notices .isConnected() and subclass.isStarted() so
-            calls subclass.pump() and maybe .doHeartbeat()
-            then schedules itself for execution again
-          - .doHeartbeat() calls subclass.heartbeat() and tracks heartbeat timing
-
-          ## ELB or something kills the connection randomly
-
-          - the Runtime maybe calls .onWSError()
-          - .onWSError() logs and calls .doBackoff()
-          - .doBackoff() computes backoff timing stuff
-          - the Runtime maybe calls .onWSClosed(), which does nothing
-          - the Runtime calls .onWSFinal()
-          - .onWSFinal() nulls out the saved socket so .isConnected() will return false
-          - the ScheduleActor sends message to .onMessage(), which calls .onScheduledEvent()
-          - .onScheduledEvent() notices not .isConnected() and subclass.isStarted() so eventually calls .doOpen(),
-            then schedules itself for execution again -- see above
-
-          Note that subclass.shutdown() is not called in this case, but subclass.startup() is called.
-
-          ## Something arranges for subclass.isStarted() to return false
-
-          - the ScheduleActor sends message to .onMessage(), which calls onScheduledEvent()
-          - onScheduledEvent() notices .isConnected() and not .isStarted() so
-            it calls subclass.shutdown(), closes the socket, and
-            nulls out the saved socket so .isConnected() will return false
-            then does not schedule itself for execution again
-
-          Must override: .isStarted(), .url(), .token()
-          May Override: .startup(), .pump(), .heartbeat(), .onWSMessage()
-
-        */
-
+    class WSClient extends Actor {
         Logger logger = new Logger("protocol");
 
         float firstDelay = 1.0;
@@ -417,26 +451,49 @@ namespace mdk_protocol {
         float tick = 1.0;
 
         WSActor sock = null;
-        String sockUrl = null;
 
         long lastConnectAttempt = 0L;
-        long lastHeartbeat = 0L;
 
         Time timeService;
         Actor schedulingActor;
         WebSockets websockets;
         MessageDispatcher dispatcher;
 
-        WSClient(MDKRuntime runtime) {
+        // URL to connect to
+        String url;
+        // Token to send for authentication
+        String token;
+        // Actors subscribed to Pump and passed on WSMessage messages:
+        List<Actor> subscribers = [];
+        // True if we are started:
+        bool _started = false;
+        // Convert JSON to objects
+        JSONParser _parser;
+
+        WSClient(MDKRuntime runtime, JSONParser parser, String url, String token) {
             self.dispatcher = runtime.dispatcher;
             self.timeService = runtime.getTimeService();
             self.schedulingActor = runtime.getScheduleService();
             self.websockets = runtime.getWebSocketsService();
+            self.url = url;
+            self.token = token;
+            self._parser = parser;
         }
 
-        String url();
-        String token();
-        bool isStarted();
+        @doc("""Subscribe to messages from the server.
+
+        Do this before starting the WSClient.
+
+        The given Actor subscribes to WSConnected, all WSMessage received by the
+        WSClient, as well as a periodic Pump message.
+        """)
+        void subscribe(Actor subscriber) {
+            self.subscribers.add(subscriber);
+        }
+
+        bool isStarted() {
+            return _started;
+        }
 
         bool isConnected() {
             return sock != null;
@@ -450,8 +507,14 @@ namespace mdk_protocol {
             schedule(reconnectDelay);
         }
 
-        void onOpen(Open open) {
-            // Should assert version here ...
+        @doc("Called when the connection is closed via message by the server.")
+        void onClose(bool error) {
+            logger.info("close!");
+            if (error) {
+                doBackoff();
+            } else {
+                reconnectDelay = firstDelay;
+            }
         }
 
         void doBackoff() {
@@ -463,23 +526,15 @@ namespace mdk_protocol {
             logger.info("backing off, reconnecting in " + reconnectDelay.toString() + " seconds");
         }
 
-        void onClose(Close close) {
-            logger.info("close: " + close.toString());
-            if (close.error == null) {
-                reconnectDelay = firstDelay;
-            } else {
-                doBackoff();
-            }
-        }
-
         // Actor interface:
         void onStart(MessageDispatcher dispatcher) {
+            self._started = true;
             schedule(0.0);
         }
 
         void onStop() {
+            self._started = false;
             if (isConnected()) {
-                shutdown();
                 self.dispatcher.tell(self, new WSClose(), sock);
                 sock = null;
             }
@@ -497,7 +552,18 @@ namespace mdk_protocol {
             }
             if (typeId == "mdk_runtime.WSMessage") {
                 WSMessage wsmessage = ?message;
-                self.onWSMessage(wsmessage.body);
+                Object parsed = self._parser.decode(wsmessage.body);
+                if (parsed == null) {
+                    // Unknown message, drop it on the floor.
+                    return;
+                }
+                DecodedMessage decoded = new DecodedMessage(parsed);
+                // Send DecodedMessage on to subscribers; one of them will handle it:
+                int idx = 0;
+                while (idx < self.subscribers.size()) {
+                    self.dispatcher.tell(self, decoded, self.subscribers[idx]);
+                    idx = idx + 1;
+                }
                 return;
             }
         }
@@ -518,17 +584,12 @@ namespace mdk_protocol {
               - If we haven't sent a heartbeat recently enough, then
               do that.
             */
-
             long rightNow = (self.timeService.time()*1000.0).round();
-            long heartbeatInterval = ((ttl/2.0)*1000.0).round();
             long reconnectInterval = (reconnectDelay*1000.0).round();
 
             if (isConnected()) {
                 if (isStarted()) {
                     pump();
-                    if (rightNow - lastHeartbeat >= heartbeatInterval) {
-                        doHeartbeat();
-                    }
                 }
             } else {
                 if (isStarted() && (rightNow - lastConnectAttempt) >= reconnectInterval) {
@@ -542,50 +603,44 @@ namespace mdk_protocol {
         }
 
         void doOpen() {
-            open(url());
             lastConnectAttempt = (self.timeService.time()*1000.0).round();
-        }
-
-        void doHeartbeat() {
-            heartbeat();
-            lastHeartbeat = (self.timeService.time()*1000.0).round();
-        }
-
-        void open(String url) {
-            sockUrl = url;
-            String tok = token();
-            if (tok != null) {
-                url = url + "?token=" + tok;
+            String sockUrl = url;
+            if (token != null) {
+                sockUrl = sockUrl + "?token=" + token;
             }
 
-            logger.info("opening " + sockUrl);
+            logger.info("opening " + url);
 
-            self.websockets.connect(url, self)
+            self.websockets.connect(sockUrl, self)
                 .andEither(bind(self, "onWSConnected", []),
                            bind(self, "onWSError", []));
         }
 
-        void startup() {}
+        void startup() {
+            WSConnected message = new WSConnected(self.sock);
+            int idx = 0;
+            while (idx < subscribers.size()) {
+                self.dispatcher.tell(self, message, subscribers[idx]);
+                idx = idx + 1;
+            }
+        }
 
-        void pump() {}
-
-        void heartbeat() {}
-
-        void shutdown() {}
-
-        void onWSMessage(String message) {
-            // Override in subclasses
+        void pump() {
+            Pump message = new Pump();
+            int idx = 0;
+            while (idx < subscribers.size()) {
+                self.dispatcher.tell(self, message, subscribers[idx]);
+                idx = idx + 1;
+            }
         }
 
         void onWSConnected(WSActor socket) {
             // Whenever we (re)connect, notify the server of any
             // nodes we have registered.
-            logger.info("connected to " + sockUrl + " via " + socket.toString());
+            logger.info("connected to " + url + " via " + socket.toString());
 
             reconnectDelay = firstDelay;
             sock = socket;
-
-            self.dispatcher.tell(self, new Open().encode(), sock);
 
             startup();
             pump();
@@ -599,7 +654,7 @@ namespace mdk_protocol {
         }
 
         void onWSClosed() {
-            logger.info("closed " + sockUrl);
+            logger.info("closed " + url);
             sock = null;
         }
     }

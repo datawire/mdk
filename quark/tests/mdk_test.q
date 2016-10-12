@@ -13,6 +13,7 @@ import mdk_tracing;
 import mdk_tracing.protocol;
 import mdk_runtime;
 import mdk_discovery;
+import mdk_rtp;
 
 void main(List<String> args) {
     test.run(args);
@@ -27,6 +28,21 @@ FakeWSActor expectSocket(MDKRuntime runtime, String url) {
         return null;
     } else {
         return actor;
+    }
+}
+
+Serializable expectSerializable(FakeWSActor sev, String expectedType) {
+    String msg = sev.expectTextMessage();
+    if (msg == null) {
+        check(false, "No message sent.");
+        return null;
+    }
+    Object evt = Serializable.decodeClassName(expectedType, msg);
+    String type = evt.getClass().getName();
+    if (check(type == expectedType, "expected " + expectedType + " event, got " + type)) {
+        return ?evt;
+    } else {
+        return null;
     }
 }
 
@@ -46,50 +62,38 @@ class TracingTest {
 
     /////////////////
     // Helpers
-
-    ProtocolEvent expectTracingEvent(FakeWSActor sev, String expectedType) {
-        String msg = sev.expectTextMessage();
-        if (msg == null) {
-            check(false, "No message sent.");
-            return null;
-        }
-        ProtocolEvent evt = TracingEvent.decode(msg);
-        String type = evt.getClass().getName();
-        if (check(type == expectedType, "expected " + expectedType + " event, got " + type)) {
-            return ?evt;
-        } else {
-            return null;
-        }
-    }
-
     Open expectOpen(FakeWSActor evt) {
-        return ?expectTracingEvent(evt, "mdk_protocol.Open");
+        return ?expectSerializable(evt, "mdk_protocol.Open");
     }
 
     LogEvent expectLogEvent(FakeWSActor evt) {
-        return ?expectTracingEvent(evt, "mdk_tracing.protocol.LogEvent");
+        return ?expectSerializable(evt, "mdk_tracing.protocol.LogEvent");
     }
 
     Subscribe expectSubscribe(FakeWSActor evt) {
-        return ?expectTracingEvent(evt, "mdk_tracing.protocol.Subscribe");
+        return ?expectSerializable(evt, "mdk_tracing.protocol.Subscribe");
     }
 
     /////////////////
     // Tests
 
-    void testLog() {
-        doTestLog(null);
-    }
-
     void testLogCustomURL() {
         doTestLog("custom");
     }
 
+    Tracer newTracer(String url) {
+        return new Tracer(runtime, new WSClient(runtime, getRTPParser(), url, "the_token"));
+    }
+
     FakeWSActor startTracer(Tracer tracer) {
+        OpenCloseSubscriber openclose = new OpenCloseSubscriber(tracer._client._wsclient);
+        runtime.dispatcher.startActor(tracer._client._wsclient);
+        runtime.dispatcher.startActor(openclose);
+        runtime.dispatcher.startActor(tracer);
         tracer.initContext();
         tracer.log("procUUID", "DEBUG", "blah", "testing...");
         self.pump();
-        FakeWSActor sev = expectSocket(self.runtime, tracer.url + "?token=" + tracer.token);
+        FakeWSActor sev = expectSocket(self.runtime, tracer._client._wsclient.url + "?token=" + tracer._client._wsclient.token);
         if (sev == null) {
             check(false, "No FakeWSActor returned.");
             return null;
@@ -103,12 +107,7 @@ class TracingTest {
     }
 
     void doTestLog(String url) {
-        Tracer tracer = new Tracer(runtime);
-        if (url != null) {
-            tracer.url = url;
-        } else {
-            url = tracer.url;
-        }
+        Tracer tracer = newTracer(url);
         FakeWSActor sev = startTracer(tracer);
         if (sev == null) { return; }
         LogEvent evt = expectLogEvent(sev);
@@ -120,7 +119,7 @@ class TracingTest {
 
     // Unexpected messages are ignored.
     void testUnexpectedMessage() {
-        Tracer tracer = new Tracer(runtime);
+        Tracer tracer = newTracer("http://url/");
         FakeWSActor sev = startTracer(tracer);
         if (sev == null) { return; }
         sev.send("{\"type\": \"UnknownMessage\"}");
@@ -133,14 +132,12 @@ class TracingTest {
     }
 
     void testSubscribe() {
-        Tracer tracer = new Tracer(runtime);
+        Tracer tracer = newTracer("http://url/");
         List<LogEvent> events = [];
         tracer.subscribe(bind(self, "_subhandler", [events]));
         self.pump();
-        FakeWSActor sev = expectSocket(self.runtime, tracer.url + "?token=" + tracer.token);
+        FakeWSActor sev = startTracer(tracer);
         if (sev == null) { return; }
-        sev.accept();
-        self.pump();
         Open open = expectOpen(sev);
         if (open == null) { return; }
         Subscribe sub = expectSubscribe(sev);
@@ -158,22 +155,6 @@ class TracingTest {
 
 import mdk_discovery;
 import mdk_discovery.protocol;
-
-
-class UnSerializable extends Serializable {
-    static UnSerializable construct() {
-        return null;
-    }
-}
-
-class SerializableTest {
-    // Unexpected messages result in a null, not in a panic
-    void testUnexpected() {
-        Object result = Serializable.decodeClass(Class.get("datawire_mdk_test.UnSerializable"),
-                                                 "{\"type\": \"UnSerializable\"}");
-        checkEqual(null, result);
-    }
-}
 
 class DiscoveryTest {
     MDKRuntime runtime;
@@ -193,27 +174,12 @@ class DiscoveryTest {
     /////////////////
     // Helpers
 
-    ProtocolEvent expectDiscoveryEvent(FakeWSActor sev, String expectedType) {
-        String msg = sev.expectTextMessage();
-        if (msg == null) {
-            check(false, "No discovery event sent at all.");
-            return null;
-        }
-        ProtocolEvent evt = DiscoveryEvent.decode(msg);
-        String type = evt.getClass().getName();
-        if (check(type == expectedType, "expected " + expectedType + " event, got " + type)) {
-            return ?evt;
-        } else {
-            return null;
-        }
-    }
-
     Open expectOpen(FakeWSActor evt) {
-        return ?expectDiscoveryEvent(evt, "mdk_protocol.Open");
+        return ?expectSerializable(evt, "mdk_protocol.Open");
     }
 
     Active expectActive(FakeWSActor evt) {
-        return ?expectDiscoveryEvent(evt, "mdk_discovery.protocol.Active");
+        return ?expectSerializable(evt, "mdk_discovery.protocol.Active");
     }
 
     void checkEqualNodes(Node expected, Node actual) {
@@ -225,7 +191,11 @@ class DiscoveryTest {
 
     Discovery createDisco() {
         Discovery disco = new Discovery(runtime);
-        self.client = ?new mdk_discovery.protocol.DiscoClientFactory("").create(disco, self.runtime);
+        WSClient wsclient = new WSClient(runtime, getRTPParser(), "http://url/", "");
+        OpenCloseSubscriber openclose = new OpenCloseSubscriber(wsclient);
+        runtime.dispatcher.startActor(wsclient);
+        runtime.dispatcher.startActor(openclose);
+        self.client = ?new mdk_discovery.protocol.DiscoClientFactory(wsclient).create(disco, self.runtime);
         runtime.dependencies.registerService("discovery_registrar", self.client);
         return disco;
     }
@@ -234,7 +204,7 @@ class DiscoveryTest {
         self.runtime.dispatcher.startActor(disco);
         self.runtime.dispatcher.startActor(self.client);
         self.pump();
-        FakeWSActor sev = expectSocket(self.runtime, self.client.url());
+        FakeWSActor sev = expectSocket(self.runtime, self.client._wsclient.url);
         if (sev == null) {
             check(false, "No FakeWSActor returned.");
             return null;
@@ -511,6 +481,7 @@ class DiscoveryTest {
 
         runtime.dispatcher.stopActor(disco);
         runtime.dispatcher.stopActor(client);
+        runtime.dispatcher.stopActor(client._wsclient);
         runtime.stop();
         // Might take some cleanup to stop everything:
         timeService.advance(15.0);
