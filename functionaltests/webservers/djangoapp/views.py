@@ -18,3 +18,5 @@ def resolve(request):
     else:
         return HttpResponse(result)
 
+def timeout(request):
+    return HttpResponse(dumps(request.mdk_session.getSecondsToTimeout()))

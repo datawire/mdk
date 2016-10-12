@@ -26,6 +26,10 @@ app.get('/resolve', function (req, res) {
         }, function (err) {});
 });
 
+app.get('/timeout', function (req, res) {
+    res.json(req.mdk_session.getSecondsToTimeout());
+});
+
 app.use(mdk_express.mdkErrorHandler);
 
 app.listen(process.argv[2], function () {

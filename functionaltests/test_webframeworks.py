@@ -18,6 +18,8 @@ setup:
    exception). Otherwise the result returned as a JSON object mapping resulting
    address to a list with first value being number of successes, second value
    being number of failures recorded.
+4. A default timeout of 10 seconds.
+5. An endpoint /timeout that returns the MDK session seconds to timeout as JSON.
 """
 
 import pathlib
@@ -145,3 +147,19 @@ def test_interaction(webserver, port_number):
     # One success from first query, onse failure from second query, one success
     # from third query:
     assert result3 == {"address1": [2, 1]}
+
+
+def test_timeout(webserver, port_number):
+    """
+    The web framework integration has a default MDK session that can be
+    overriden by the timeout in the MDK context sent to it.
+    """
+    url = get_url(port_number, "/timeout")
+
+    default = requests.get(url, timeout=5).json()
+    assert abs(10 - default) < 1
+
+    context = run_python(sys.executable, "create-context.py", output=True)
+    overriden = requests.get(url, headers={"X-MDK-CONTEXT": context},
+                             timeout=5).json()
+    assert abs(5 - overriden) < 1

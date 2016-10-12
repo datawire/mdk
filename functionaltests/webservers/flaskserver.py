@@ -28,6 +28,10 @@ def resolve():
     else:
         return result
 
+@app.route("/timeout")
+def timeout():
+    return dumps(g.mdk_session.getSecondsToTimeout())
+
 
 if __name__ == '__main__':
     mdk_setup(app)
