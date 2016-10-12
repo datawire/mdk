@@ -5,10 +5,10 @@ include protocol-1.0.q;
 import mdk_protocol;
 import quark.reflect;
 
-namespace mdk_mcp_protocol {
+namespace mdk_rtp {
 
     @doc("Create a JSONParser that can read all messages to/from the MCP.")
-    JSONParser getMCPParser() {
+    JSONParser getRTPParser() {
         JSONParser parser = new JSONParser();
         // Open/close protocol
         parser.register("open", Class.get("mdk_protocol.Open"));

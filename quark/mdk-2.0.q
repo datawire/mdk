@@ -9,7 +9,7 @@ include util-1.0.q;
 include introspection-1.0.q;
 include discovery-3.0.q;
 include tracing-2.0.q;
-include mcp.q;
+include rtp.q;
 
 import mdk_discovery;
 import mdk_tracing;
@@ -17,7 +17,7 @@ import mdk_introspection;
 import mdk_util;
 import mdk_runtime;
 import quark.concurrent;
-import mdk_mcp_protocol;
+import mdk_rtp;
 import mdk_runtime.promise;
 
 @doc("Microservices Development Kit -- obtain a reference using MDK.init()")
@@ -311,9 +311,9 @@ namespace mdk {
                 }
             }
 
-            EnvironmentVariable ddu = env.var("MDK_MCP_URL");
+            EnvironmentVariable ddu = env.var("MDK_SERVER_URL");
             String url = ddu.orElseGet("wss://mcp.datawire.io/rtp");
-            return new WSClient(runtime, getMCPParser(), url, token);
+            return new WSClient(runtime, getRTPParser(), url, token);
         }
 
         MDKImpl(MDKRuntime runtime) {

@@ -4,7 +4,7 @@ package datawire_mdk_tracing 2.0.15;
 
 include protocol-1.0.q;
 include introspection-1.0.q;
-include mcp.q;
+include rtp.q;
 
 import mdk_runtime.actors;
 import mdk_protocol;
@@ -68,7 +68,7 @@ namespace mdk_tracing {
 
         static Tracer withURLAndToken(String url, String token) {
             MDKRuntime runtime = defaultRuntime();
-            WSClient wsclient = new WSClient(runtime, mdk_mcp_protocol.getMCPParser(), url, token);
+            WSClient wsclient = new WSClient(runtime, mdk_rtp.getRTPParser(), url, token);
             runtime.dispatcher.startActor(wsclient);
             Tracer newTracer = new Tracer(runtime, wsclient);
             runtime.dispatcher.startActor(newTracer);

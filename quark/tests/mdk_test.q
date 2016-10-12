@@ -13,7 +13,7 @@ import mdk_tracing;
 import mdk_tracing.protocol;
 import mdk_runtime;
 import mdk_discovery;
-import mdk_mcp_protocol;
+import mdk_rtp;
 
 void main(List<String> args) {
     test.run(args);
@@ -82,7 +82,7 @@ class TracingTest {
     }
 
     Tracer newTracer(String url) {
-        return new Tracer(runtime, new WSClient(runtime, getMCPParser(), url, "the_token"));
+        return new Tracer(runtime, new WSClient(runtime, getRTPParser(), url, "the_token"));
     }
 
     FakeWSActor startTracer(Tracer tracer) {
@@ -191,7 +191,7 @@ class DiscoveryTest {
 
     Discovery createDisco() {
         Discovery disco = new Discovery(runtime);
-        WSClient wsclient = new WSClient(runtime, getMCPParser(), "http://url/", "");
+        WSClient wsclient = new WSClient(runtime, getRTPParser(), "http://url/", "");
         OpenCloseSubscriber openclose = new OpenCloseSubscriber(wsclient);
         runtime.dispatcher.startActor(wsclient);
         runtime.dispatcher.startActor(openclose);
