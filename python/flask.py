@@ -32,7 +32,10 @@ def _on_request_tearing_down(sender, **extra):
 
 
 def mdk_setup(app):
-    """Setup MDK integration with Flask."""
+    """Setup MDK integration with Flask.
+
+    :param app: A Flask application instance.
+    """
     app.mdk = mdk.start()
     atexit.register(app.mdk.stop)
     request_started.connect(_on_request_started, app)
