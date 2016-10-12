@@ -269,3 +269,13 @@ class SessionTimeoutTests(TestCase):
         self.session.setTimeout(11.0)
         still_decreased = self.session.getSecondsToTimeout()
         self.assertEqual((decreased, still_decreased), (9.0, 9.0))
+
+    def test_serialization(self):
+        """A serialized session preserves the timeout."""
+        self.session.setTimeout(10.0)
+        self.session.set("xx", "yy")
+        serialized = self.session.externalize()
+        print(serialized)
+        session2 = self.mdk.join(serialized)
+        print(session2.externalize())
+        self.assertEqual(session2.getSecondsToTimeout(), 10.0)
