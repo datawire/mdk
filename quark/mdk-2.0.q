@@ -86,6 +86,14 @@ namespace mdk {
         void register(String service, String version, String address);
 
         @doc("""
+             Set the default timeout for MDK sessions.
+
+             This is the maximum timeout; if a joined session has a lower
+             timeout that will be used.
+             """)
+        void setDefaultTimeout(float seconds);
+
+        @doc("""
              Creates a new Session. A Session created in this way will
              result in a new distributed trace. This should therefore
              be used primarily by edge services. Intermediary and
@@ -279,6 +287,7 @@ namespace mdk {
         Tracer _tracer = null;
         String procUUID = Context.runtime().uuid();
         bool _running = false;
+        float _defaultTimeout = null;
 
         @doc("Choose DiscoverySource based on environment variables.")
         DiscoverySourceFactory getDiscoveryFactory(EnvironmentVariables env) {
@@ -392,12 +401,24 @@ namespace mdk {
             _disco.register(node);
         }
 
+        void setDefaultTimeout(float seconds) {
+            self._defaultTimeout = seconds;
+        }
+
         Session session() {
-            return new SessionImpl(self, null);
+            SessionImpl session = new SessionImpl(self, null);
+            if (_defaultTimeout != null) {
+                session.setTimeout(_defaultTimeout);
+            }
+            return session;
         }
 
         Session join(String encodedContext) {
-            return new SessionImpl(self, encodedContext);
+            SessionImpl session = new SessionImpl(self, encodedContext);
+            if (_defaultTimeout != null) {
+                session.setTimeout(_defaultTimeout);
+            }
+            return session;
         }
 
     }

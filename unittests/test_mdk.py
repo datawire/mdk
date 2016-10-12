@@ -279,3 +279,27 @@ class SessionTimeoutTests(TestCase):
         session2 = self.mdk.join(serialized)
         print(session2.externalize())
         self.assertEqual(session2.getSecondsToTimeout(), 10.0)
+
+    def test_mdkDefault(self):
+        """The MDK can set a default timeout for new sessions."""
+        self.mdk.setDefaultTimeout(5.0)
+        session = self.mdk.session()
+        self.assertEqual(session.getSecondsToTimeout(), 5.0)
+
+    def test_mdkDefaultForJoinedSessions(self):
+        """
+        Timeouts for joined sessions are decreased to the MDK default timeout, but
+        never increased.
+        """
+        session1 = self.mdk.session()
+        session1.setTimeout(1.0)
+        encoded1 = session1.externalize()
+
+        session2 = self.mdk.session()
+        session2.setTimeout(3.0)
+        encoded2 = session2.externalize()
+
+        self.mdk.setDefaultTimeout(2.0)
+        self.assertEqual((1.0, 2.0),
+                         (self.mdk.join(encoded1).getSecondsToTimeout(),
+                          self.mdk.join(encoded2).getSecondsToTimeout()))
