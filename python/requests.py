@@ -10,10 +10,10 @@ from mdk import MDK
 from requests import Session
 from requests.adapters import HTTPAdapter
 
-__all__ = ["requestsSession"]
+__all__ = ["requests_session"]
 
 
-def requestsSession(mdk_session):
+def requests_session(mdk_session):
     """
     Create a ``requests.Session`` from an MDK session.
 
@@ -52,7 +52,8 @@ class _MDKAdapter(HTTPAdapter):
     def add_headers(self, request, **kwargs):
         """Override base class."""
         headers = (request.headers or {}).copy()
-        headers[MDK.CONTEXT_HEADER] = self._mdk_session.encode()
+        headers[MDK.CONTEXT_HEADER] = self._mdk_session.externalize()
+        request.headers = headers
 
     def _get_timeout(self, proposed_timeout):
         """
@@ -63,7 +64,7 @@ class _MDKAdapter(HTTPAdapter):
         if mdk_timeout is None:
             mdk_timeout = maxsize
         if proposed_timeout is None:
-            proposed_timeout is maxsize
+            proposed_timeout = maxsize
         result = min(mdk_timeout, proposed_timeout)
         if result == maxsize:
             result = None
