@@ -157,9 +157,9 @@ def test_timeout(webserver, port_number):
     url = get_url(port_number, "/timeout")
 
     default = requests.get(url, timeout=5).json()
-    assert abs(10 - default) < 1
+    assert abs(10 - default) < 2
 
     context = run_python(sys.executable, "create-context.py", output=True)
     overriden = requests.get(url, headers={"X-MDK-CONTEXT": context},
                              timeout=5).json()
-    assert abs(5 - overriden) < 1
+    assert abs(5 - overriden) < 2
