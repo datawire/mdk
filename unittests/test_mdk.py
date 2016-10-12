@@ -275,9 +275,7 @@ class SessionTimeoutTests(TestCase):
         self.session.setTimeout(10.0)
         self.session.set("xx", "yy")
         serialized = self.session.externalize()
-        print(serialized)
         session2 = self.mdk.join(serialized)
-        print(session2.externalize())
         self.assertEqual(session2.getSecondsToTimeout(), 10.0)
 
     def test_mdkDefault(self):
