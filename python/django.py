@@ -5,6 +5,8 @@ Django middleware that enables the MDK.
 import atexit
 from traceback import format_exception_only
 
+from django.conf import settings
+
 from mdk import start
 
 # Django 1.10 new-style middleware compatibility:
@@ -20,10 +22,16 @@ class MDKSessionMiddleware(MiddlewareMixin):
     support.
 
     The request object will get a ``mdk_session`` attribute added to it.
+
+    Set a MDK_DEFAULT_TIMEOUT variable to a number of seconds in ``settings.py``
+    if you want timeouts.
     """
     def __init__(self, *args, **kwargs):
         MiddlewareMixin.__init__(self, *args, **kwargs)
         self.mdk = start()
+        timeout = getattr(settings, "MDK_DEFAULT_TIMEOUT", None)
+        if timeout is not None:
+            self.mdk.setDefaultTimeout(timeout)
         atexit.register(self.mdk.stop)
 
     def process_request(self, request):

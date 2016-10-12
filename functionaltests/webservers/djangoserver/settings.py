@@ -51,6 +51,8 @@ MIDDLEWARE_CLASSES = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+MDK_DEFAULT_TIMEOUT = 10.0
+
 ROOT_URLCONF = 'djangoserver.urls'
 
 TEMPLATES = [
