@@ -1,6 +1,7 @@
 """
 Tests for the MDK public API that are easier to do in Python.
 """
+from time import time
 from builtins import range
 from past.builtins import unicode
 
@@ -301,3 +302,25 @@ class SessionTimeoutTests(TestCase):
         self.assertEqual((1.0, 2.0),
                          (self.mdk.join(encoded1).getSecondsToTimeout(),
                           self.mdk.join(encoded2).getSecondsToTimeout()))
+
+    def test_resolveNoTimeout(self):
+        """
+        If a timeout higher than 10 seconds was set, resolving still times out after
+        10.0 seconds.
+        """
+        self.session.setTimeout(20.0)
+        start = time()
+        with self.assertRaises(Exception):
+            self.session.resolve("unknown", "1.0")
+        self.assertAlmostEqual(time() - start, 10.0, delta=1)
+
+    def test_resolveLowerTimeout(self):
+        """
+        If a timeout lower than 10 seconds was set, resolving happens after the
+        lower timeout.
+        """
+        self.session.setTimeout(3.0)
+        start = time()
+        with self.assertRaises(Exception):
+            self.session.resolve("unknown", "1.0")
+        self.assertAlmostEqual(time() - start, 3.0, delta=1)

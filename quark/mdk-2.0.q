@@ -195,6 +195,8 @@ namespace mdk {
 
         @doc("""
              Locate a compatible service instance.
+
+             Uses a minimum of 10 seconds and the timeout set on the session.
              """)
         Node resolve(String service, String version);
 
@@ -603,7 +605,12 @@ namespace mdk {
         }
 
         Node resolve(String service, String version) {
-            return resolve_until(service, version, _mdk._timeout());
+            float timeout = _mdk._timeout();
+            float session_timeout = self.getSecondsToTimeout();
+            if (session_timeout != null && session_timeout < timeout) {
+                timeout = session_timeout;
+            }
+            return resolve_until(service, version, timeout);
         }
 
         Node resolve_until(String service, String version, float timeout) {
