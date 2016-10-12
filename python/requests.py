@@ -60,7 +60,7 @@ class _MDKAdapter(HTTPAdapter):
         Given a proposed timeout, return a timeout that takes the MDK session
         timeout into account.
         """
-        mdk_timeout = self._mdk_session.getSecondsToTimeout()
+        mdk_timeout = self._mdk_session.getRemainingTime()
         if mdk_timeout is None:
             mdk_timeout = maxsize
         if proposed_timeout is None:

@@ -19,4 +19,4 @@ def resolve(request):
         return HttpResponse(result)
 
 def timeout(request):
-    return HttpResponse(dumps(request.mdk_session.getSecondsToTimeout()))
+    return HttpResponse(dumps(request.mdk_session.getRemainingTime()))

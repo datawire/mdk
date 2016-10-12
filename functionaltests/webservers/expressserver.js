@@ -29,7 +29,7 @@ app.get('/resolve', function (req, res) {
 });
 
 app.get('/timeout', function (req, res) {
-    res.json(req.mdk_session.getSecondsToTimeout());
+    res.json(req.mdk_session.getRemainingTime());
 });
 
 app.use(mdk_express.mdkErrorHandler);

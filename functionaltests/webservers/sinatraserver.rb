@@ -24,5 +24,5 @@ get '/resolve' do
 end
 
 get '/timeout' do
-  env[:mdk_session].getSecondsToTimeout().to_json
+  env[:mdk_session].getRemainingTime().to_json
 end

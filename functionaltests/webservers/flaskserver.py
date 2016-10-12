@@ -30,7 +30,7 @@ def resolve():
 
 @app.route("/timeout")
 def timeout():
-    return dumps(g.mdk_session.getSecondsToTimeout())
+    return dumps(g.mdk_session.getRemainingTime())
 
 
 if __name__ == '__main__':

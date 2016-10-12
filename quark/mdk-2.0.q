@@ -275,7 +275,7 @@ namespace mdk {
 
              If a timeout has not been set the result will be null.
              """)
-        float getSecondsToTimeout();
+        float getRemainingTime();
     }
 
     class MDKImpl extends MDK {
@@ -474,7 +474,7 @@ namespace mdk {
         }
 
         void setTimeout(float timeout) {
-            float current = getSecondsToTimeout();
+            float current = getRemainingTime();
             if (current == null) {
                 current = timeout;
             }
@@ -484,7 +484,7 @@ namespace mdk {
             set("timeout",  _mdk._runtime.getTimeService().time() + timeout);
         }
 
-        float getSecondsToTimeout() {
+        float getRemainingTime() {
             float deadline = ?get("timeout");
             if (deadline == null) {
                 return null;
@@ -606,7 +606,7 @@ namespace mdk {
 
         Node resolve(String service, String version) {
             float timeout = _mdk._timeout();
-            float session_timeout = self.getSecondsToTimeout();
+            float session_timeout = self.getRemainingTime();
             if (session_timeout != null && session_timeout < timeout) {
                 timeout = session_timeout;
             }

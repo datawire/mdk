@@ -250,25 +250,25 @@ class SessionTimeoutTests(TestCase):
     def test_setTimeout(self):
         """A set timeout can be retrieved."""
         self.session.setTimeout(13.5)
-        self.assertEqual(13.5, self.session.getSecondsToTimeout())
+        self.assertEqual(13.5, self.session.getRemainingTime())
 
     def test_notSetTimeout(self):
         """Timeout is null if not set."""
-        self.assertEqual(None, self.session.getSecondsToTimeout())
+        self.assertEqual(None, self.session.getRemainingTime())
 
     def test_timeoutChangesAsTimePasses(self):
         """If time passes the timeout goes down."""
         self.session.setTimeout(13.5)
         self.runtime.getTimeService().advance(2.0)
-        self.assertEqual(11.5, self.session.getSecondsToTimeout())
+        self.assertEqual(11.5, self.session.getRemainingTime())
 
     def test_setTimeoutTwice(self):
         """Timeouts can be decreased by setting, but not increased."""
         self.session.setTimeout(10.0)
         self.session.setTimeout(9.0)
-        decreased = self.session.getSecondsToTimeout()
+        decreased = self.session.getRemainingTime()
         self.session.setTimeout(11.0)
-        still_decreased = self.session.getSecondsToTimeout()
+        still_decreased = self.session.getRemainingTime()
         self.assertEqual((decreased, still_decreased), (9.0, 9.0))
 
     def test_serialization(self):
@@ -277,13 +277,13 @@ class SessionTimeoutTests(TestCase):
         self.session.set("xx", "yy")
         serialized = self.session.externalize()
         session2 = self.mdk.join(serialized)
-        self.assertEqual(session2.getSecondsToTimeout(), 10.0)
+        self.assertEqual(session2.getRemainingTime(), 10.0)
 
     def test_mdkDefault(self):
         """The MDK can set a default timeout for new sessions."""
         self.mdk.setDefaultTimeout(5.0)
         session = self.mdk.session()
-        self.assertEqual(session.getSecondsToTimeout(), 5.0)
+        self.assertEqual(session.getRemainingTime(), 5.0)
 
     def test_mdkDefaultForJoinedSessions(self):
         """
@@ -300,8 +300,8 @@ class SessionTimeoutTests(TestCase):
 
         self.mdk.setDefaultTimeout(2.0)
         self.assertEqual((1.0, 2.0),
-                         (self.mdk.join(encoded1).getSecondsToTimeout(),
-                          self.mdk.join(encoded2).getSecondsToTimeout()))
+                         (self.mdk.join(encoded1).getRemainingTime(),
+                          self.mdk.join(encoded2).getRemainingTime()))
 
     def test_resolveNoTimeout(self):
         """
