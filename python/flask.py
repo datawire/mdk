@@ -31,9 +31,15 @@ def _on_request_tearing_down(sender, **extra):
     del g.mdk_session
 
 
-def mdk_setup(app):
-    """Setup MDK integration with Flask."""
+def mdk_setup(app, timeout=None):
+    """Setup MDK integration with Flask.
+
+    :param app: A Flask application instance.
+    :param timeout: Default timeout in seconds to set for the MDK session.
+    """
     app.mdk = mdk.start()
+    if timeout is not None:
+        app.mdk.setDefaultTimeout(timeout)
     atexit.register(app.mdk.stop)
     request_started.connect(_on_request_started, app)
     got_request_exception.connect(_on_request_exception, app)

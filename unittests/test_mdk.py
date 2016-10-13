@@ -1,6 +1,7 @@
 """
 Tests for the MDK public API that are easier to do in Python.
 """
+from time import time
 from builtins import range
 from past.builtins import unicode
 
@@ -232,3 +233,94 @@ class InteractionTestCase(TestCase):
             self.assertEqual((policy.successes, policy.failures),
                              (expected_success_nodes[node],
                               expected_failed_nodes[node]))
+
+
+class SessionTimeoutTests(TestCase):
+    """Tests for the session timeout."""
+
+    def setUp(self):
+        """Initialize an empty environment."""
+        # Initialize runtime and MDK:
+        self.runtime = fakeRuntime()
+        self.runtime.getEnvVarsService().set("DATAWIRE_TOKEN", "something")
+        self.mdk = MDKImpl(self.runtime)
+        self.mdk.start()
+        self.session = self.mdk.session()
+
+    def test_setTimeout(self):
+        """A set timeout can be retrieved."""
+        self.session.setTimeout(13.5)
+        self.assertEqual(13.5, self.session.getRemainingTime())
+
+    def test_notSetTimeout(self):
+        """Timeout is null if not set."""
+        self.assertEqual(None, self.session.getRemainingTime())
+
+    def test_timeoutChangesAsTimePasses(self):
+        """If time passes the timeout goes down."""
+        self.session.setTimeout(13.5)
+        self.runtime.getTimeService().advance(2.0)
+        self.assertEqual(11.5, self.session.getRemainingTime())
+
+    def test_setTimeoutTwice(self):
+        """Timeouts can be decreased by setting, but not increased."""
+        self.session.setTimeout(10.0)
+        self.session.setTimeout(9.0)
+        decreased = self.session.getRemainingTime()
+        self.session.setTimeout(11.0)
+        still_decreased = self.session.getRemainingTime()
+        self.assertEqual((decreased, still_decreased), (9.0, 9.0))
+
+    def test_serialization(self):
+        """A serialized session preserves the timeout."""
+        self.session.setTimeout(10.0)
+        self.session.set("xx", "yy")
+        serialized = self.session.externalize()
+        session2 = self.mdk.join(serialized)
+        self.assertEqual(session2.getRemainingTime(), 10.0)
+
+    def test_mdkDefault(self):
+        """The MDK can set a default timeout for new sessions."""
+        self.mdk.setDefaultTimeout(5.0)
+        session = self.mdk.session()
+        self.assertEqual(session.getRemainingTime(), 5.0)
+
+    def test_mdkDefaultForJoinedSessions(self):
+        """
+        Timeouts for joined sessions are decreased to the MDK default timeout, but
+        never increased.
+        """
+        session1 = self.mdk.session()
+        session1.setTimeout(1.0)
+        encoded1 = session1.externalize()
+
+        session2 = self.mdk.session()
+        session2.setTimeout(3.0)
+        encoded2 = session2.externalize()
+
+        self.mdk.setDefaultTimeout(2.0)
+        self.assertEqual((1.0, 2.0),
+                         (self.mdk.join(encoded1).getRemainingTime(),
+                          self.mdk.join(encoded2).getRemainingTime()))
+
+    def test_resolveNoTimeout(self):
+        """
+        If a timeout higher than 10 seconds was set, resolving still times out after
+        10.0 seconds.
+        """
+        self.session.setTimeout(20.0)
+        start = time()
+        with self.assertRaises(Exception):
+            self.session.resolve("unknown", "1.0")
+        self.assertAlmostEqual(time() - start, 10.0, delta=1)
+
+    def test_resolveLowerTimeout(self):
+        """
+        If a timeout lower than 10 seconds was set, resolving happens after the
+        lower timeout.
+        """
+        self.session.setTimeout(3.0)
+        start = time()
+        with self.assertRaises(Exception):
+            self.session.resolve("unknown", "1.0")
+        self.assertAlmostEqual(time() - start, 3.0, delta=1)

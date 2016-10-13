@@ -3,7 +3,8 @@ require 'json'
 require 'rack-mdk'
 
 use Rack::Lint
-use Rack::MDK::Session
+use Rack::MDK::Session,
+    timeout: 10.0
 
 set :port, ARGV[0]
 
@@ -22,3 +23,6 @@ get '/resolve' do
   end
 end
 
+get '/timeout' do
+  env[:mdk_session].getRemainingTime().to_json
+end

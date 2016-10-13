@@ -88,6 +88,14 @@ namespace mdk {
         void register(String service, String version, String address);
 
         @doc("""
+             Set the default timeout for MDK sessions.
+
+             This is the maximum timeout; if a joined session has a lower
+             timeout that will be used.
+             """)
+        void setDefaultTimeout(float seconds);
+
+        @doc("""
              Creates a new Session. A Session created in this way will
              result in a new distributed trace. This should therefore
              be used primarily by edge services. Intermediary and
@@ -189,6 +197,8 @@ namespace mdk {
 
         @doc("""
              Locate a compatible service instance.
+
+             Uses a minimum of 10 seconds and the timeout set on the session.
              """)
         Node resolve(String service, String version);
 
@@ -245,6 +255,29 @@ namespace mdk {
              """)
         void interact(UnaryCallable callable);
 
+        @doc("""
+             Set how many seconds the session is expected to live from this point.
+
+             If a timeout has previously been set the new timeout will only be
+             used if it is lower than the existing timeout.
+
+             The MDK will not enforce the timeout. Rather, it provides the
+             information to any process or server in the same session (even if
+             they are on different machines). By passing this timeout to
+             blocking APIs you can ensure timeouts are enforced across a whole
+             distributed session.
+             """)
+        void setTimeout(float seconds);
+
+        @doc("""
+             Return how many seconds until the session ought to end.
+
+             This will only be accurate across multiple servers insofar as their
+             clocks are in sync.
+
+             If a timeout has not been set the result will be null.
+             """)
+        float getRemainingTime();
     }
 
     class MDKImpl extends MDK {
@@ -260,6 +293,7 @@ namespace mdk {
         Tracer _tracer = null;
         String procUUID = Context.runtime().uuid();
         bool _running = false;
+        float _defaultTimeout = null;
 
         @doc("Choose DiscoverySource based on environment variables.")
         DiscoverySourceFactory getDiscoveryFactory(EnvironmentVariables env) {
@@ -384,12 +418,24 @@ namespace mdk {
             _disco.register(node);
         }
 
+        void setDefaultTimeout(float seconds) {
+            self._defaultTimeout = seconds;
+        }
+
         Session session() {
-            return new SessionImpl(self, null);
+            SessionImpl session = new SessionImpl(self, null);
+            if (_defaultTimeout != null) {
+                session.setTimeout(_defaultTimeout);
+            }
+            return session;
         }
 
         Session join(String encodedContext) {
-            return new SessionImpl(self, encodedContext);
+            SessionImpl session = new SessionImpl(self, encodedContext);
+            if (_defaultTimeout != null) {
+                session.setTimeout(_defaultTimeout);
+            }
+            return session;
         }
 
     }
@@ -440,6 +486,25 @@ namespace mdk {
 
         bool has(String property) {
             return _context.properties.contains(property);
+        }
+
+        void setTimeout(float timeout) {
+            float current = getRemainingTime();
+            if (current == null) {
+                current = timeout;
+            }
+            if (timeout > current) {
+                timeout = current;
+            }
+            set("timeout",  _mdk._runtime.getTimeService().time() + timeout);
+        }
+
+        float getRemainingTime() {
+            float deadline = ?get("timeout");
+            if (deadline == null) {
+                return null;
+            }
+            return deadline - _mdk._runtime.getTimeService().time();
         }
 
         void route(String service, String version, String target, String targetVersion) {
@@ -555,7 +620,12 @@ namespace mdk {
         }
 
         Node resolve(String service, String version) {
-            return resolve_until(service, version, _mdk._timeout());
+            float timeout = _mdk._timeout();
+            float session_timeout = self.getRemainingTime();
+            if (session_timeout != null && session_timeout < timeout) {
+                timeout = session_timeout;
+            }
+            return resolve_until(service, version, timeout);
         }
 
         Node resolve_until(String service, String version, float timeout) {

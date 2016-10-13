@@ -2,6 +2,8 @@ var process = require('process');
 var express = require('express');
 var timeout = require('connect-timeout');
 var mdk_express = require('datawire_mdk_express');
+mdk_express.configure(10.0);
+
 var app = express();
 
 app.use(timeout('1s', {respond: true}));
@@ -24,6 +26,10 @@ app.get('/resolve', function (req, res) {
                 res.json(result);
             }
         }, function (err) {});
+});
+
+app.get('/timeout', function (req, res) {
+    res.json(req.mdk_session.getRemainingTime());
 });
 
 app.use(mdk_express.mdkErrorHandler);

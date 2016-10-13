@@ -4,9 +4,12 @@ module Rack
   module MDK
 
     class Session
-      def initialize(app)
+      def initialize(app, params={})
         @app = app
         @mdk = ::Quark::Mdk.start
+        if params[:timeout] != nil
+          @mdk.setDefaultTimeout(params[:timeout])
+        end
         at_exit do
           @mdk.stop
         end

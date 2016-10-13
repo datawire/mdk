@@ -28,7 +28,11 @@ def resolve():
     else:
         return result
 
+@app.route("/timeout")
+def timeout():
+    return dumps(g.mdk_session.getRemainingTime())
+
 
 if __name__ == '__main__':
-    mdk_setup(app)
+    mdk_setup(app, timeout=10.0)
     app.run(port=int(sys.argv[1]))

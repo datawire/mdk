@@ -9,6 +9,8 @@ from mdk import start
 
 if __name__ == '__main__':
     mdk = start()
-    sys.stdout.write(mdk.session().externalize())
+    session = mdk.session()
+    session.setTimeout(5.0)
+    sys.stdout.write(session.externalize())
     sys.stdout.flush()
     mdk.stop()
