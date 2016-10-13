@@ -69,7 +69,9 @@ def webserver():
         stop()
 
 @pytest.fixture(params=[
-    [sys.executable, str(WEBCLIENTS_ROOT / "requeststest.py")]])
+    [sys.executable, str(WEBCLIENTS_ROOT / "requeststest.py")],
+    ["ruby", str(WEBCLIENTS_ROOT / "faraday.rb")],
+])
 def webclient(request):
     def client(url):
         return check_call(request.param + [url])
