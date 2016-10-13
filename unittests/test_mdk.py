@@ -78,7 +78,7 @@ class InteractionTestCase(TestCase):
         """Initialize an empty environment."""
         # Initialize runtime and MDK:
         self.runtime = fakeRuntime()
-        self.runtime.getEnvVarsService().set("DATAWIRE_TOKEN", "")
+        self.runtime.getEnvVarsService().set("DATAWIRE_TOKEN", "somevalue")
         self.runtime.dependencies.registerService("failurepolicy_factory",
                                                   RecordingFailurePolicyFactory())
         self.mdk = MDKImpl(self.runtime)
