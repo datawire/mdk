@@ -242,7 +242,7 @@ class SessionTimeoutTests(TestCase):
         """Initialize an empty environment."""
         # Initialize runtime and MDK:
         self.runtime = fakeRuntime()
-        self.runtime.getEnvVarsService().set("DATAWIRE_TOKEN", "")
+        self.runtime.getEnvVarsService().set("DATAWIRE_TOKEN", "something")
         self.mdk = MDKImpl(self.runtime)
         self.mdk.start()
         self.session = self.mdk.session()
