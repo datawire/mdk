@@ -44,7 +44,8 @@ def upload_gem():
     Upload gem to rubygems.org.
     """
     gem, = glob("dist/datawire_mdk*.gem")
-    gem2, = glob("dist/rack*.gem")
+    gem_rack, = glob("dist/rack*.gem")
+    gem_faraday, = glob("dist/faraday_mdk*.gem")
     directory = os.path.expanduser("~/.gem")
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -55,8 +56,8 @@ def upload_gem():
             with open(creds, "w") as f:
                 f.write(GEM_CONFIG.format(os.environ["RUBYGEMS_API_KEY"]))
             os.chmod(creds, 0o600)
-        check_call(["gem", "push", gem])
-        check_call(["gem", "push", gem2])
+        for g in [gem, gem_rack, gem_faraday]:
+            check_call(["gem", "push", g])
     finally:
         if not creds_existed:
             # Delete the file we wrote:
