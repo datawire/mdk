@@ -49,7 +49,7 @@ exports.forMDKSession = function (mdkSession, requester) {
     function optionsFactory() {
         var options = {headers: {"X-MDK-CONTEXT": mdkSession.externalize()}};
         var timeout = mdkSession.getRemainingTime() * 1000;
-        if (timeout !== nil) {
+        if (timeout !== null) {
             options["timeout"] = timeout;
         }
         return options;
