@@ -67,14 +67,16 @@ install-quark:
 		bash -s -- -q `cat QUARK_VERSION.txt`
 
 .PHONY: install-mdk
-install-mdk: packages $(wildcard javascript/datawire_mdk_express/*)
+install-mdk: packages $(wildcard javascript/**/*)
 	virtualenv/bin/pip install --upgrade dist/datawire_mdk-*-py2*-none-any.whl
 	virtualenv3/bin/pip install --upgrade dist/datawire_mdk-*-*py3-none-any.whl
 	django110env/bin/pip install --upgrade dist/datawire_mdk-*-*py3-none-any.whl
 	gem install --no-doc dist/datawire_mdk-*.gem
 	gem install --no-doc dist/rack*.gem
+	gem install --no-doc dist/faraday*.gem
 	npm install output/js/mdk-2.0
 	npm install javascript/datawire_mdk_express/
+	npm install javascript/datawire_mdk_request/
 	cd output/java/mdk-2.0 && mvn install
 
 .PHONY: test
@@ -126,6 +128,8 @@ ruby-packages: output
 	python scripts/build-packages.py rb output/rb/mdk-2.0 dist/
 	cd ruby/rack-mdk && gem build rack-mdk.gemspec
 	mv ruby/rack-mdk/*.gem dist/
+	cd ruby/faraday_mdk && gem build faraday_mdk.gemspec
+	mv ruby/faraday_mdk/*.gem dist
 
 .PHONY: javascript-packages
 javascript-packages: output
