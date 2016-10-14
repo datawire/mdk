@@ -106,9 +106,27 @@ namespace mdk {
         Session session();
 
         @doc("""
-             Create a new Session and join it to a distributed trace.
+             Create a new Session and join it to an existing distributed trace.
+
+             This should only ever be done once per an encoded context. That
+             means you should only use it for RPC or similar one-off calls. If
+             you received the encoded context via a broadcast medium (pub/sub,
+             message queues with multiple readers, etc.) you should use
+             childSession() instead.
              """)
         Session join(String encodedContext);
+
+        @doc("""
+             Create a new Session, recording that it is the child of an existing
+             distributed trace.
+
+             This is intended for use for encoded context received via a
+             broadcast medium (pub/sub, message queues with multiple readers,
+             etc.). If you know only you received the encoded context,
+             e.g. you're coding a server that receives the context from a HTTP
+             request, you should join() instead.
+             """)
+        Session childSession(String encodedContext);
 
     }
 
@@ -427,6 +445,16 @@ namespace mdk {
             if (_defaultTimeout != null) {
                 session.setTimeout(_defaultTimeout);
             }
+            return session;
+        }
+
+        Session child_session(String encodedContext) {
+            SessionImpl session = ?self.session();
+            SharedContext parent = SharedContext.decode(encodedContext);
+            session.set("parent_trace_id", parent.traceId);
+            session.set("parent_clock_level",
+                        new ListUtil<int>().slice(parent.clock.clocks, 0,
+                                                  parent.clock.clocks.size()));
             return session;
         }
 

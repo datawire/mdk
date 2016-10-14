@@ -324,3 +324,59 @@ class SessionTimeoutTests(TestCase):
         with self.assertRaises(Exception):
             self.session.resolve("unknown", "1.0")
         self.assertAlmostEqual(time() - start, 3.0, delta=1)
+
+
+class SessionCreationTests(TestCase):
+    """Tests for session creation."""
+
+    def setUp(self):
+        """Initialize an empty environment."""
+        self.runtime = fakeRuntime()
+        self.runtime.getEnvVarsService().set("DATAWIRE_TOKEN", "something")
+        self.mdk = MDKImpl(self.runtime)
+        self.mdk.start()
+
+    def assertSessionHas(self, session, trace_id, clock_level,
+                         parent_session_id=None, parent_clock=None):
+        """
+        Assert the given SessionImpl has the given trace, clock and parent
+        values.
+        """
+        self.assertEqual(session._context.traceId, trace_id)
+        self.assertEqual(session._context.clock.clocks, clock_level)
+        self.assertEqual(session.get("parent_trace_id"), parent_session_id)
+        self.assertEqual(session.get("parent_clock_level"), parent_clock)
+
+    def test_newSession(self):
+        """New sessions have different trace IDs."""
+        session = self.mdk.session()
+        session2 = self.mdk.session()
+        self.assertSessionHas(session, session._context.traceId, [0])
+        self.assertSessionHas(session2, session2._context.traceId, [0])
+        self.assertNotEqual(session._context.traceId,
+                            session2._context.traceId)
+
+    def test_joinSession(self):
+        """
+        A joined session has some trace ID and clock level as the encoded
+        session.
+        """
+        session = self.mdk.session()
+        session2 = self.mdk.join(session.externalize())
+        self.assertSessionHas(session2, session._context.traceId, [1, 0])
+
+    def test_childSession(self):
+        """
+        A child session has a new trace ID and clock level, but knows about the
+        parent session's trace ID and clock level.
+        """
+        session = self.mdk.session()
+        session._context.tick()
+        session._context.tick()
+        session._context.tick()
+        expected_clock = session._context.clock.clocks[:]
+        session2 = self.mdk.child_session(session.externalize())
+        self.assertNotEqual(session._context.traceId,
+                            session2._context.traceId)
+        self.assertSessionHas(session2, session2._context.traceId, [0],
+                              session._context.traceId, expected_clock)
