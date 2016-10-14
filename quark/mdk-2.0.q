@@ -118,7 +118,8 @@ namespace mdk {
 
         @doc("""
              Create a new Session, recording that it is the child of an existing
-             distributed trace.
+             distributed trace. All properties of the original session will be
+             inherited, e.g. timeouts and overrides.
 
              This is intended for use for encoded context received via a
              broadcast medium (pub/sub, message queues with multiple readers,
@@ -448,9 +449,10 @@ namespace mdk {
             return session;
         }
 
-        Session child_session(String encodedContext) {
+        Session childSession(String encodedContext) {
             SessionImpl session = ?self.session();
             SharedContext parent = SharedContext.decode(encodedContext);
+            session._context.properties = parent.properties;
             session.set("parent_trace_id", parent.traceId);
             session.set("parent_clock_level",
                         new ListUtil<int>().slice(parent.clock.clocks, 0,

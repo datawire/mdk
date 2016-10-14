@@ -336,16 +336,13 @@ class SessionCreationTests(TestCase):
         self.mdk = MDKImpl(self.runtime)
         self.mdk.start()
 
-    def assertSessionHas(self, session, trace_id, clock_level,
-                         parent_session_id=None, parent_clock=None):
+    def assertSessionHas(self, session, trace_id, clock_level, **properties):
         """
-        Assert the given SessionImpl has the given trace, clock and parent
-        values.
+        Assert the given SessionImpl has the given trace, clock and properties.
         """
         self.assertEqual(session._context.traceId, trace_id)
         self.assertEqual(session._context.clock.clocks, clock_level)
-        self.assertEqual(session.get("parent_trace_id"), parent_session_id)
-        self.assertEqual(session.get("parent_clock_level"), parent_clock)
+        self.assertEqual(session._context.properties, properties)
 
     def test_newSession(self):
         """New sessions have different trace IDs."""
@@ -362,21 +359,26 @@ class SessionCreationTests(TestCase):
         session.
         """
         session = self.mdk.session()
+        session.set("key", 456)
         session2 = self.mdk.join(session.externalize())
-        self.assertSessionHas(session2, session._context.traceId, [1, 0])
+        self.assertSessionHas(session2, session._context.traceId, [1, 0],
+                              key=456)
 
     def test_childSession(self):
         """
         A child session has a new trace ID and clock level, but knows about the
-        parent session's trace ID and clock level.
+        parent session's trace ID and clock level and inherits other properties.
         """
         session = self.mdk.session()
+        session.set("other", 123)
         session._context.tick()
         session._context.tick()
         session._context.tick()
         expected_clock = session._context.clock.clocks[:]
-        session2 = self.mdk.child_session(session.externalize())
+        session2 = self.mdk.childSession(session.externalize())
         self.assertNotEqual(session._context.traceId,
                             session2._context.traceId)
         self.assertSessionHas(session2, session2._context.traceId, [0],
-                              session._context.traceId, expected_clock)
+                              parent_trace_id=session._context.traceId,
+                              parent_clock_level=expected_clock,
+                              other=123)
