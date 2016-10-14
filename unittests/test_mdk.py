@@ -374,11 +374,8 @@ class SessionCreationTests(TestCase):
         session._context.tick()
         session._context.tick()
         session._context.tick()
-        expected_clock = session._context.clock.clocks[:]
         session2 = self.mdk.childSession(session.externalize())
         self.assertNotEqual(session._context.traceId,
                             session2._context.traceId)
-        self.assertSessionHas(session2, session2._context.traceId, [0],
-                              parent_trace_id=session._context.traceId,
-                              parent_clock_level=expected_clock,
+        self.assertSessionHas(session2, session2._context.traceId, [1],
                               other=123)
