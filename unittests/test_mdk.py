@@ -367,15 +367,18 @@ class SessionCreationTests(TestCase):
     def test_childSession(self):
         """
         A child session has a new trace ID and clock level, but knows about the
-        parent session's trace ID and clock level and inherits other properties.
+        parent session's trace ID and clock level and inherits properties other
+        than timeout.
         """
         session = self.mdk.session()
         session.set("other", 123)
         session._context.tick()
         session._context.tick()
         session._context.tick()
-        session2 = self.mdk.childSession(session.externalize())
+        session.setTimeout(13.0)
+        session2 = self.mdk.derive(session.externalize())
         self.assertNotEqual(session._context.traceId,
                             session2._context.traceId)
+        self.assertEqual(session2.getRemainingTime(), None)
         self.assertSessionHas(session2, session2._context.traceId, [1],
                               other=123)

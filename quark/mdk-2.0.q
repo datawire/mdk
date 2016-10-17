@@ -117,8 +117,10 @@ namespace mdk {
         Session join(String encodedContext);
 
         @doc("""
-             Create a new Session. All properties will of the given encoded
-             distributed session be inherited, e.g. timeouts and overrides.
+             Create a new Session. The given encoded distributed session's
+             properties will be used to configure the new Session,
+             e.g. overrides will be preserved. However, because this is a new
+             Session the timeout will not be copied from the encoded session.
 
              This is intended for use for encoded context received via a
              broadcast medium (pub/sub, message queues with multiple readers,
@@ -126,7 +128,7 @@ namespace mdk {
              e.g. you're coding a server that receives the context from a HTTP
              request, you should join() instead.
              """)
-        Session childSession(String encodedContext);
+        Session derive(String encodedContext);
 
     }
 
@@ -448,10 +450,13 @@ namespace mdk {
             return session;
         }
 
-        Session childSession(String encodedContext) {
+        Session derive(String encodedContext) {
             SessionImpl session = ?self.session();
             SharedContext parent = SharedContext.decode(encodedContext);
             session._context.properties = parent.properties;
+            if (session._context.properties.contains("timeout")) {
+                session._context.properties.remove("timeout");
+            }
             session.info("mdk",
                          "This session is a child of trace " + parent.traceId + " " +
                          parent.clock.clocks.toString());
