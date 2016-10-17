@@ -458,7 +458,7 @@ namespace mdk {
                 session._context.properties.remove("timeout");
             }
             session.info("mdk",
-                         "This session is a child of trace " + parent.traceId + " " +
+                         "This session is derived from trace " + parent.traceId + " " +
                          parent.clock.clocks.toString());
             return session;
         }
