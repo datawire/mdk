@@ -3,8 +3,9 @@ require 'json'
 require 'rack-mdk'
 
 use Rack::Lint
-use Rack::MDK::Session,
-    timeout: 10.0
+use Rack::MDK::Session do |mdk|
+  mdk.setDefaultTimeout 10.0
+end
 
 set :port, ARGV[0]
 
