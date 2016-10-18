@@ -93,6 +93,9 @@ namespace mdk {
              This is the maximum timeout; if a joined session has a lower
              timeout that will be used.
              """)
+        void setDefaultDeadline(float seconds);
+
+        @doc("DEPRECATED, use setDefaultDeadline().")
         void setDefaultTimeout(float seconds);
 
         @doc("""
@@ -267,6 +270,9 @@ namespace mdk {
              blocking APIs you can ensure timeouts are enforced across a whole
              distributed session.
              """)
+        void setDeadline(float seconds);
+
+        @doc("DEPRECATED, use setDeadline().")
         void setTimeout(float seconds);
 
         @doc("""
@@ -418,14 +424,18 @@ namespace mdk {
             _disco.register(node);
         }
 
-        void setDefaultTimeout(float seconds) {
+        void setDefaultDeadline(float seconds) {
             self._defaultTimeout = seconds;
+        }
+
+        void setDefaultTimeout(float seconds) {
+            setDefaultDeadline(seconds);
         }
 
         Session session() {
             SessionImpl session = new SessionImpl(self, null);
             if (_defaultTimeout != null) {
-                session.setTimeout(_defaultTimeout);
+                session.setDeadline(_defaultTimeout);
             }
             return session;
         }
@@ -433,7 +443,7 @@ namespace mdk {
         Session join(String encodedContext) {
             SessionImpl session = new SessionImpl(self, encodedContext);
             if (_defaultTimeout != null) {
-                session.setTimeout(_defaultTimeout);
+                session.setDeadline(_defaultTimeout);
             }
             return session;
         }
@@ -489,6 +499,10 @@ namespace mdk {
         }
 
         void setTimeout(float timeout) {
+            setDeadline(timeout);
+        }
+
+        void setDeadline(float timeout) {
             float current = getRemainingTime();
             if (current == null) {
                 current = timeout;

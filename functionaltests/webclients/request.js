@@ -9,7 +9,7 @@ process.on('exit', function () {
 });
 
 var mdkSession = mdk.session();
-mdkSession.setTimeout(1.0);
+mdkSession.setDeadline(1.0);
 
 var requestMDK = mdk_request.forMDKSession(mdkSession);
 requestMDK(process.argv[2], function (error, response, body) {
