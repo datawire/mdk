@@ -2,7 +2,7 @@ var process = require('process');
 var express = require('express');
 var timeout = require('connect-timeout');
 var mdk_express = require('datawire_mdk_express');
-mdk_express.configure(10.0);
+mdk_express.mdk.setDefaultTimeout(10.0);
 
 var app = express();
 

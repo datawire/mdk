@@ -1,14 +1,14 @@
 var datawire_mdk = require('datawire_mdk');
 var process = require('process');
 
-var mdk = datawire_mdk.mdk.start();
+exports.mdk = datawire_mdk.mdk.start();
 process.on('exit', function () {
-    mdk.stop();
+    exports.mdk.stop();
 });
 
 // Configure the default timeout for MDK sessions.
 exports.configure = function (timeout) {
-    mdk.setDefaultTimeout(timeout);
+    exports.mdk.setDefaultTimeout(timeout);
 };
 
 // Start an interaction for each request, end it when the response finishes.
@@ -17,7 +17,7 @@ exports.mdkSessionStart = function (req, res, next) {
     if (header === undefined) {
         header = null;
     }
-    req.mdk_session = mdk.join(header);
+    req.mdk_session = exports.mdk.join(header);
     req.mdk_session.start_interaction();
     var mdk_session = req.mdk_session;
     function endSession() {

@@ -29,8 +29,8 @@ ALLOWED_HOSTS = []
 
 
 # Application definition
-
 INSTALLED_APPS = [
+    'djangoserver.apps.MyMDKAppConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -50,8 +50,6 @@ MIDDLEWARE_CLASSES = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
-
-MDK_DEFAULT_TIMEOUT = 10.0
 
 ROOT_URLCONF = 'djangoserver.urls'
 

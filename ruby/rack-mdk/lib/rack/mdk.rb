@@ -13,6 +13,7 @@ module Rack
         at_exit do
           @mdk.stop
         end
+        yield @mdk if block_given?
       end
 
       def call(env)

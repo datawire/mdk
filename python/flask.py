@@ -36,6 +36,8 @@ def mdk_setup(app, timeout=None):
 
     :param app: A Flask application instance.
     :param timeout: Default timeout in seconds to set for the MDK session.
+
+    :return: The ``mdk.MDK`` instance.
     """
     app.mdk = mdk.start()
     if timeout is not None:
@@ -44,6 +46,7 @@ def mdk_setup(app, timeout=None):
     request_started.connect(_on_request_started, app)
     got_request_exception.connect(_on_request_exception, app)
     request_tearing_down.connect(_on_request_tearing_down, app)
+    return app.mdk
 
 
 __all__ = ["mdk_setup"]
