@@ -499,24 +499,3 @@ class DiscoveryTest {
     }
 
 }
-
-class UtilTest {
-
-    void testVersionMatch() {
-        checkEqual(true, versionMatch("1", "1.0.0"));
-        checkEqual(true, versionMatch("1.0", "1.0.0"));
-        checkEqual(true, versionMatch("1.0.0", "1.0.0"));
-        checkEqual(true, versionMatch("1.0.0", "1.0"));
-        checkEqual(true, versionMatch("1.0.0", "1"));
-
-        checkEqual(true, versionMatch("1.0", "1.1"));
-        checkEqual(true, versionMatch("1.0", "1.1.0"));
-        checkEqual(true, versionMatch("1.1", "1.1"));
-        checkEqual(true, versionMatch("1.1", "1.1.0"));
-
-        checkEqual(false, versionMatch("1.2", "1.1.0"));
-        checkEqual(false, versionMatch("2.0", "1.1.0"));
-        checkEqual(false, versionMatch("1.3", "1.2"));
-    }
-
-}

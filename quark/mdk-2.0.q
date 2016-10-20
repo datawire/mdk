@@ -58,6 +58,14 @@ namespace mdk {
          process, and one instance of the Session object per
          thread/channel/request depending on how the MDK is integrated
          and used within the application framework of choice.
+
+         A note on versions: service versions indicate API compatibility, not
+         releases of the underlying code. They should be in the form
+         '<major>.<minor>', e.g. '2.11'. Major versions indicates
+         incompatibility: '1.0' is incompatible with '2.11'. Minor versions
+         indicate backwards compatibility with new features: a client that wants
+         version '1.1' can talk to version '1.1' and '1.2' but not to version
+         '1.0'.
          """)
     interface MDK {
 

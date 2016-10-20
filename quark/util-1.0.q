@@ -74,29 +74,27 @@ namespace mdk_util {
         if (requested == null) {
             return true;
         }
-
         List<String> reqparts = requested.split(".");
         List<String> actparts = actual.split(".");
-        extend(reqparts, "0", 3);
-        extend(actparts, "0", 3);
+        extend(reqparts, "0", 2);
+        extend(actparts, "0", 2);
 
-        // major must be equal
-        if (reqparts[0] != actparts[0]) {
+        int reqmajor = reqparts[0].parseInt().getValue();
+        int actmajor = actparts[0].parseInt().getValue();
+        int reqminor = reqparts[1].parseInt().getValue();
+        int actminor = actparts[1].parseInt().getValue();
+
+        // major must be equal since it's complete incompatibility
+        if (reqmajor != actmajor) {
             return false;
         }
 
-        // if minor is greater than we want that's ok
-        if (actparts[1] > reqparts[1]) {
+        // minor implies backwards compatibility
+        if (actminor >= reqminor) {
             return true;
         }
 
-        // if minor is less than we want, that's not ok
-        if (actparts[1] < reqparts[1]) {
-            return false;
-        }
-
-        // when minor is equal, we check the bug fix
-        return actparts[2] >= reqparts[2];
+        return false;
     }
 
 }
