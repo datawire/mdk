@@ -17,6 +17,7 @@ from mdk_runtime import fakeRuntime
 from mdk_discovery import (
     ReplaceCluster, NodeActive, RecordingFailurePolicyFactory,
 )
+from mdk_protocol import Serializable
 
 from .test_discovery import create_node
 
@@ -382,3 +383,69 @@ class SessionCreationTests(TestCase):
         self.assertEqual(session2.getRemainingTime(), None)
         self.assertSessionHas(session2, session2._context.traceId, [1],
                               other=123)
+
+
+def expectSocket(runtime, url):
+    """Return the FakeWSActor we expect to have connected to a URL."""
+    ws = runtime.getWebSocketsService()
+    actor = ws.lastConnection()
+    assert actor.url.startswith(url)
+    return actor
+
+
+def expectSerializable(fake_wsactor, expected_type):
+    """Return the message of given type."""
+    msg = fake_wsactor.expectTextMessage()
+    assert msg is not None
+    evt = Serializable.decodeClassName(expected_type, msg)
+    type = evt._getClass()
+    assert type == expected_type
+    return evt
+
+
+class ConnectionStartupTests(TestCase):
+    """Tests for initial setup of MCP connections."""
+    URL = "ws://localhost:1234/"
+
+    def setUp(self):
+        self.runtime = fakeRuntime()
+        self.runtime.getEnvVarsService().set("DATAWIRE_TOKEN", "xxx");
+        self.runtime.getEnvVarsService().set("MDK_SERVER_URL", self.URL);
+        self.mdk = MDKImpl(self.runtime)
+        self.mdk.start()
+
+    def pump(self):
+        """Deliver scheduled events."""
+        self.runtime.getTimeService().pump()
+
+    def advance_time(self, seconds):
+        """Advance the clock."""
+        ts = self.runtime.getTimeService()
+        ts.advance(seconds)
+        ts.pump()
+        ts.pump()
+
+    def test_connectionNodeIdentity(self):
+        """
+        Each connection to MCP sends an Open message with the same node identity.
+        """
+        self.pump()
+        ws_actor = expectSocket(self.runtime, self.URL)
+        ws_actor.accept()
+        self.pump()
+        open = expectSerializable(ws_actor, "mdk_protocol.Open")
+        ws_actor.close()
+        self.advance_time(1)
+        ws_actor2 = expectSocket(self.runtime, self.URL)
+        ws_actor2.accept()
+        self.pump()
+        # Should be new connection:
+        self.assertNotEqual(ws_actor, ws_actor2)
+        open2 = expectSerializable(ws_actor2, "mdk_protocol.Open")
+        self.assertEqual(open.properties["datawire_nodeId"],
+                         open2.properties["datawire_nodeId"])
+
+    def test_randomNodeIdentity(self):
+        """
+        Node identity is randomly generated each time.
+        """

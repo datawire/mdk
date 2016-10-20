@@ -367,9 +367,11 @@ namespace mdk_protocol {
     class OpenCloseSubscriber extends WSClientSubscriber {
         MessageDispatcher _dispatcher;
         WSClient _wsclient;
+        String _node_id;
 
-        OpenCloseSubscriber(WSClient client) {
+        OpenCloseSubscriber(WSClient client, String node_id) {
             self._wsclient = client;
+            self._node_id = node_id;
             self._wsclient.subscribe(self);
         }
 
@@ -400,7 +402,9 @@ namespace mdk_protocol {
 
         void onWSConnected(Actor websocket) {
             // Send Open message to the server:
-            self._dispatcher.tell(self, new Open().encode(), websocket);
+            Open open = new Open();
+            open.properties["datawire_nodeId"] = self._node_id;
+            self._dispatcher.tell(self, open.encode(), websocket);
         }
 
         void onPump() {}
