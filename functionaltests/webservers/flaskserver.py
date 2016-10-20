@@ -35,5 +35,5 @@ def timeout():
 
 if __name__ == '__main__':
     mdk = mdk_setup(app)
-    mdk.setDefaultTimeout(10.0)
+    mdk.setDefaultDeadline(10.0)
     app.run(port=int(sys.argv[1]))

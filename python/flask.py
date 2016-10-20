@@ -41,7 +41,7 @@ def mdk_setup(app, timeout=None):
     """
     app.mdk = mdk.start()
     if timeout is not None:
-        app.mdk.setDefaultTimeout(timeout)
+        app.mdk.setDefaultDeadline(timeout)
     atexit.register(app.mdk.stop)
     request_started.connect(_on_request_started, app)
     got_request_exception.connect(_on_request_exception, app)

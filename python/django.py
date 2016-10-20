@@ -57,7 +57,7 @@ class MDKAppConfig(AppConfig):
         self.mdk = start()
         timeout = getattr(settings, "MDK_DEFAULT_TIMEOUT", None)
         if timeout is not None:
-            self.mdk.setDefaultTimeout(timeout)
+            self.mdk.setDefaultDeadline(timeout)
         atexit.register(self.mdk.stop)
         self.mdk_ready(self.mdk)
 

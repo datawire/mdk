@@ -8,7 +8,7 @@ module Rack
         @app = app
         @mdk = ::Quark::Mdk.start
         if params[:timeout] != nil
-          @mdk.setDefaultTimeout(params[:timeout])
+          @mdk.setDefaultDeadline(params[:timeout])
         end
         at_exit do
           @mdk.stop

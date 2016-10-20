@@ -235,8 +235,8 @@ class InteractionTestCase(TestCase):
                               expected_failed_nodes[node]))
 
 
-class SessionTimeoutTests(TestCase):
-    """Tests for the session timeout."""
+class SessionDeadlineTests(TestCase):
+    """Tests for the session deadline."""
 
     def setUp(self):
         """Initialize an empty environment."""
@@ -247,79 +247,79 @@ class SessionTimeoutTests(TestCase):
         self.mdk.start()
         self.session = self.mdk.session()
 
-    def test_setTimeout(self):
-        """A set timeout can be retrieved."""
-        self.session.setTimeout(13.5)
+    def test_setDeadline(self):
+        """A set deadline can be retrieved."""
+        self.session.setDeadline(13.5)
         self.assertEqual(13.5, self.session.getRemainingTime())
 
-    def test_notSetTimeout(self):
-        """Timeout is null if not set."""
+    def test_notSetDeadline(self):
+        """Deadline is null if not set."""
         self.assertEqual(None, self.session.getRemainingTime())
 
-    def test_timeoutChangesAsTimePasses(self):
-        """If time passes the timeout goes down."""
-        self.session.setTimeout(13.5)
+    def test_deadlineChangesAsTimePasses(self):
+        """If time passes the deadline goes down."""
+        self.session.setDeadline(13.5)
         self.runtime.getTimeService().advance(2.0)
         self.assertEqual(11.5, self.session.getRemainingTime())
 
-    def test_setTimeoutTwice(self):
-        """Timeouts can be decreased by setting, but not increased."""
-        self.session.setTimeout(10.0)
-        self.session.setTimeout(9.0)
+    def test_setDeadlineTwice(self):
+        """Deadlines can be decreased by setting, but not increased."""
+        self.session.setDeadline(10.0)
+        self.session.setDeadline(9.0)
         decreased = self.session.getRemainingTime()
-        self.session.setTimeout(11.0)
+        self.session.setDeadline(11.0)
         still_decreased = self.session.getRemainingTime()
         self.assertEqual((decreased, still_decreased), (9.0, 9.0))
 
     def test_serialization(self):
-        """A serialized session preserves the timeout."""
-        self.session.setTimeout(10.0)
+        """A serialized session preserves the deadline."""
+        self.session.setDeadline(10.0)
         self.session.set("xx", "yy")
         serialized = self.session.externalize()
         session2 = self.mdk.join(serialized)
         self.assertEqual(session2.getRemainingTime(), 10.0)
 
     def test_mdkDefault(self):
-        """The MDK can set a default timeout for new sessions."""
-        self.mdk.setDefaultTimeout(5.0)
+        """The MDK can set a default deadline for new sessions."""
+        self.mdk.setDefaultDeadline(5.0)
         session = self.mdk.session()
         self.assertEqual(session.getRemainingTime(), 5.0)
 
     def test_mdkDefaultForJoinedSessions(self):
         """
-        Timeouts for joined sessions are decreased to the MDK default timeout, but
+        Deadlines for joined sessions are decreased to the MDK default deadline, but
         never increased.
         """
         session1 = self.mdk.session()
-        session1.setTimeout(1.0)
+        session1.setDeadline(1.0)
         encoded1 = session1.externalize()
 
         session2 = self.mdk.session()
-        session2.setTimeout(3.0)
+        session2.setDeadline(3.0)
         encoded2 = session2.externalize()
 
-        self.mdk.setDefaultTimeout(2.0)
+        self.mdk.setDefaultDeadline(2.0)
         self.assertEqual((1.0, 2.0),
                          (self.mdk.join(encoded1).getRemainingTime(),
                           self.mdk.join(encoded2).getRemainingTime()))
 
-    def test_resolveNoTimeout(self):
+    def test_resolveNoDeadline(self):
         """
-        If a timeout higher than 10 seconds was set, resolving still times out after
+        If a deadline higher than 10 seconds was set, resolving still times out after
         10.0 seconds.
         """
-        self.session.setTimeout(20.0)
+        self.session.setDeadline(20.0)
         start = time()
         with self.assertRaises(Exception):
             self.session.resolve("unknown", "1.0")
         self.assertAlmostEqual(time() - start, 10.0, delta=1)
 
-    def test_resolveLowerTimeout(self):
+    def test_resolveLowerDeadline(self):
         """
-        If a timeout lower than 10 seconds was set, resolving happens after the
-        lower timeout.
+        If a deadline lower than 10 seconds was set, resolving happens after the
+        lower deadline.
         """
-        self.session.setTimeout(3.0)
+        self.session.setDeadline(3.0)
         start = time()
         with self.assertRaises(Exception):
             self.session.resolve("unknown", "1.0")

@@ -8,7 +8,7 @@ process.on('exit', function () {
 
 // Configure the default timeout for MDK sessions.
 exports.configure = function (timeout) {
-    exports.mdk.setDefaultTimeout(timeout);
+    exports.mdk.setDefaultDeadline(timeout);
 };
 
 // Start an interaction for each request, end it when the response finishes.
