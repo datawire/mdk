@@ -385,34 +385,17 @@ class SessionCreationTests(TestCase):
                               other=123)
 
 
-def expectSocket(runtime, url):
-    """Return the FakeWSActor we expect to have connected to a URL."""
-    ws = runtime.getWebSocketsService()
-    actor = ws.lastConnection()
-    assert actor.url.startswith(url)
-    return actor
-
-
-def expectSerializable(fake_wsactor, expected_type):
-    """Return the message of given type."""
-    msg = fake_wsactor.expectTextMessage()
-    assert msg is not None
-    evt = Serializable.decodeClassName(expected_type, msg)
-    type = evt._getClass()
-    assert type == expected_type
-    return evt
-
-
-class ConnectionStartupTests(TestCase):
-    """Tests for initial setup of MCP connections."""
+class MDKConnector(object):
+    """Manage an interaction with fake remote server."""
     URL = "ws://localhost:1234/"
 
-    def setUp(self):
+    def __init__(self):
         self.runtime = fakeRuntime()
         self.runtime.getEnvVarsService().set("DATAWIRE_TOKEN", "xxx");
         self.runtime.getEnvVarsService().set("MDK_SERVER_URL", self.URL);
         self.mdk = MDKImpl(self.runtime)
         self.mdk.start()
+        self.pump()
 
     def pump(self):
         """Deliver scheduled events."""
@@ -425,23 +408,44 @@ class ConnectionStartupTests(TestCase):
         ts.pump()
         ts.pump()
 
+    def expectSocket(self):
+        """Return the FakeWSActor we expect to have connected to a URL."""
+        ws = self.runtime.getWebSocketsService()
+        actor = ws.lastConnection()
+        assert actor.url.startswith(self.URL)
+        return actor
+
+    def expectSerializable(self, fake_wsactor, expected_type):
+        """Return the last sent message of given type."""
+        msg = fake_wsactor.expectTextMessage()
+        assert msg is not None
+        evt = Serializable.decodeClassName(expected_type, msg)
+        type = evt._getClass()
+        assert type == expected_type
+        return evt
+
+    def connect(self, fake_wsactor):
+        """Connect and then return the last sent Open message."""
+        fake_wsactor.accept()
+        self.pump()
+        return self.expectSerializable(fake_wsactor, "mdk_protocol.Open")
+
+
+class ConnectionStartupTests(TestCase):
+    """Tests for initial setup of MCP connections."""
     def test_connectionNodeIdentity(self):
         """
         Each connection to MCP sends an Open message with the same node identity.
         """
-        self.pump()
-        ws_actor = expectSocket(self.runtime, self.URL)
-        ws_actor.accept()
-        self.pump()
-        open = expectSerializable(ws_actor, "mdk_protocol.Open")
+        connector = MDKConnector()
+        ws_actor = connector.expectSocket()
+        open = connector.connect(ws_actor)
         ws_actor.close()
-        self.advance_time(1)
-        ws_actor2 = expectSocket(self.runtime, self.URL)
-        ws_actor2.accept()
-        self.pump()
+        connector.advance_time(1)
+        ws_actor2 = connector.expectSocket()
         # Should be new connection:
         self.assertNotEqual(ws_actor, ws_actor2)
-        open2 = expectSerializable(ws_actor2, "mdk_protocol.Open")
+        open2 = connector.connect(ws_actor2)
         self.assertEqual(open.properties["datawire_nodeId"],
                          open2.properties["datawire_nodeId"])
 
@@ -449,3 +453,11 @@ class ConnectionStartupTests(TestCase):
         """
         Node identity is randomly generated each time.
         """
+        connector = MDKConnector()
+        ws_actor = connector.expectSocket()
+        open = connector.connect(ws_actor)
+        connector2 = MDKConnector()
+        ws_actor2 = connector2.expectSocket()
+        open2 = connector.connect(ws_actor2)
+        self.assertNotEqual(open.properties["datawire_nodeId"],
+                            open2.properties["datawire_nodeId"])

@@ -394,7 +394,7 @@ namespace mdk {
             _disco = new Discovery(runtime);
             _wsclient = getWSClient(runtime);
             if (_wsclient != null) {
-                _openclose = new OpenCloseSubscriber(_wsclient, "");
+                _openclose = new OpenCloseSubscriber(_wsclient, Context.runtime().uuid());
             }
             EnvironmentVariables env = runtime.getEnvVarsService();
             DiscoverySourceFactory discoFactory = getDiscoveryFactory(env);
