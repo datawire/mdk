@@ -109,9 +109,29 @@ namespace mdk {
         Session session();
 
         @doc("""
-             Create a new Session and join it to a distributed trace.
+             Create a new Session and join it to an existing distributed sesion.
+
+             This should only ever be done once per an encoded context. That
+             means you should only use it for RPC or similar one-off calls. If
+             you received the encoded context via a broadcast medium (pub/sub,
+             message queues with multiple readers, etc.) you should use
+             childSession() instead.
              """)
         Session join(String encodedContext);
+
+        @doc("""
+             Create a new Session. The given encoded distributed session's
+             properties will be used to configure the new Session,
+             e.g. overrides will be preserved. However, because this is a new
+             Session the timeout will not be copied from the encoded session.
+
+             This is intended for use for encoded context received via a
+             broadcast medium (pub/sub, message queues with multiple readers,
+             etc.). If you know only you received the encoded context,
+             e.g. you're coding a server that receives the context from a HTTP
+             request, you should join() instead.
+             """)
+        Session derive(String encodedContext);
 
     }
 
@@ -437,6 +457,19 @@ namespace mdk {
             if (_defaultTimeout != null) {
                 session.setDeadline(_defaultTimeout);
             }
+            return session;
+        }
+
+        Session derive(String encodedContext) {
+            SessionImpl session = ?self.session();
+            SharedContext parent = SharedContext.decode(encodedContext);
+            session._context.properties = parent.properties;
+            if (session._context.properties.contains("timeout")) {
+                session._context.properties.remove("timeout");
+            }
+            session.info("mdk",
+                         "This session is derived from trace " + parent.traceId + " " +
+                         parent.clock.clocks.toString());
             return session;
         }
 
