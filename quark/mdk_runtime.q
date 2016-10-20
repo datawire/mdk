@@ -535,6 +535,7 @@ namespace mdk_runtime {
         float _now = 1000.0;
         Map<long,_FakeTimeRequest> _scheduled = {};
         MessageDispatcher dispatcher;
+        int _counter = 0;
 
         void onStart(MessageDispatcher dispatcher) {
             self.dispatcher = dispatcher;
@@ -542,7 +543,8 @@ namespace mdk_runtime {
 
         void onMessage(Actor origin, Object msg) {
             Schedule sched = ?msg;
-            _scheduled[_scheduled.keys().size()] = new _FakeTimeRequest(origin, sched.event, self._now + sched.seconds);
+            self._counter = self._counter + 1;
+            _scheduled[_counter] = new _FakeTimeRequest(origin, sched.event, self._now + sched.seconds);
         }
 
         float time() {
