@@ -663,4 +663,133 @@ namespace mdk_protocol {
         }
     }
 
+    @doc("The payload for an ackable event.")
+    interface AckablePayload {
+        @doc("When did this happen? Milliseconds since Unix epoch.")
+        long getTimestamp();
+    }
+
+    @doc("An event that can be acknowledged.")
+    class AckableEvent {
+        String json_type;
+
+        @doc("Sequence number of the log message, used for acknowledgements.")
+        long sequence;
+
+        @doc("Should the server send an acknowledgement?")
+        int sync = 0;
+
+        AckablePayload payload;
+
+        AckableEvent(String json_type, AckablePayload payload, long sequence) {
+            self.json_type = json_type;
+            self.payload = payload;
+            self.sequence = sequence;
+        }
+
+        long getTimestamp() {
+            return payload.getTimestamp();
+        }
+
+        String encode() {
+            Class clazz = self.payload.getClass();
+            JSONObject json = toJSON(self.payload, clazz);
+            json["type"] = self.json_type;
+            json["sequence"] = self.sequence;
+            json["sync"] = self.sync;
+            String encoded = json.toString();
+            return encoded;
+        }
+    }
+
+    @doc("""
+    Utility class for sending messages with a protocol that sends back acks.
+    """)
+    class SendWithAcks {
+        long _syncRequestPeriod = 5000L;  // how often (in ms) sync requests should be sent
+        int  _syncInFlightMax = 50;       // max size of the in-flight buffer before sending a sync request
+
+        List<AckableEvent> _buffered = [];  // events that are ready to be sent
+        List<AckableEvent> _inFlight = [];  // events that have been sent but not yet acknowledged
+        long _added = 0L;              // count of events that were added for sending; event sequence number
+        long _sent = 0L;                // count of events sent over the socket
+        long _failedSends = 0L;         // count of events that were sent but not acknowledged
+        long _recorded = 0L;            // count of events that were acknowledged by the server
+        long _lastSyncTime = 0L;        // when the last sync request was sent
+
+        Logger _myLog = new Logger("SendWithAcks");
+        void _debug(String message) {
+            String s = "[" + _buffered.size().toString() + " buf, " + _inFlight.size().toString() + " inf] ";
+            _myLog.debug(s + message);
+        }
+
+        @doc("Call when (re)connected to other side.")
+        void onConnected(Actor origin, MessageDispatcher dispatcher, Actor sock) {
+            // Send buffered messages and move them to the in-flight queue
+            // Set the sync flag as appropriate
+            while (_buffered.size() > 0) {
+                String debugSuffix = "";
+                AckableEvent evt = _buffered.remove(0);
+                _inFlight.add(evt);
+                if ((evt.getTimestamp() > _lastSyncTime + _syncRequestPeriod) ||
+                    (_inFlight.size() == _syncInFlightMax)) {
+                    evt.sync = 1;
+                    _lastSyncTime = evt.getTimestamp();
+                    debugSuffix = " with sync set";
+                }
+                dispatcher.tell(origin, evt.encode(), sock);
+                evt.sync = 0;
+                _sent = _sent + 1;
+                _debug("sent #" + evt.sequence.toString() + debugSuffix +
+                       " to " + sock.toString());
+            }
+        }
+
+        @doc("Call to send buffered messages.")
+        void onPump(Actor origin, MessageDispatcher dispatcher, Actor sock) {
+            // Send buffered messages and move them to the in-flight queue
+            // Set the sync flag as appropriate
+            while (_buffered.size() > 0) {
+                String debugSuffix = "";
+                AckableEvent evt = _buffered.remove(0);
+                _inFlight.add(evt);
+                if ((evt.getTimestamp() > _lastSyncTime + _syncRequestPeriod) ||
+                    (_inFlight.size() == _syncInFlightMax)) {
+                    evt.sync = 1;
+                    _lastSyncTime = evt.getTimestamp();
+                    debugSuffix = " with sync set";
+                }
+                dispatcher.tell(origin, evt.encode(), sock);
+                evt.sync = 0;
+                _sent = _sent + 1;
+                _debug("sent #" + evt.sequence.toString() + debugSuffix +
+                       " to " + sock.toString());
+            }
+        }
+
+        @doc("Called when receiving acknowledgement from other side.")
+        void onAck(long sequence) {
+            // Discard in-flight messages older than the acked sequence number; they have been logged.
+            while (_inFlight.size() > 0) {
+                if (_inFlight[0].sequence <= sequence) {
+                    AckableEvent evt = _inFlight.remove(0);
+                    _recorded = _recorded + 1;
+                    _debug("ack #" + sequence.toString() + ", discarding #" + evt.sequence.toString());
+                } else {
+                    // Subsequent events are too new
+                        break;
+                }
+            }
+        }
+
+        @doc("Send an event.")
+        void send(String json_type, AckablePayload event) {
+            // Add event to the outgoing buffer and make sure it has the newest
+            // sequence number.
+            AckableEvent wrapper = new AckableEvent(json_type, event, _added);
+            _added = _added + 1;
+            _buffered.add(wrapper);
+            _debug("logged #" + wrapper.sequence.toString());
+        }
+    }
 }

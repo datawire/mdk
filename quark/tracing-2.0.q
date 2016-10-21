@@ -203,7 +203,7 @@ namespace mdk_tracing {
 
     namespace protocol {
 
-        class LogEvent extends Serializable {
+        class LogEvent extends Serializable, AckablePayload {
             static String _json_type = "log";
 
             @doc("""Shared context""")
@@ -215,6 +215,10 @@ namespace mdk_tracing {
                  by the client.
                  """)
             long timestamp;
+
+            long getTimestamp() {
+                return self.timestamp;
+            }
 
             @doc("A string identifying the node from which this message originates.")
             String node;
@@ -231,14 +235,8 @@ namespace mdk_tracing {
             @doc("The content of the log message.")
             String text;
 
-            @doc("Sequence number of the log message, used for acknowledgements.")
-            long sequence;
-
-            @doc("Should the server send an acknowledgement?")
-            int sync;
-
             String toString() {
-                return "<LogEvent " + sequence.toString() + " @" + timestamp.toString() + " " + context.toString() +
+                return "<LogEvent " + timestamp.toString() + " " + context.toString() +
                     ", " + node + ", " + level + ", " + category + ", " + contentType + ", " + text + ">";
             }
 
@@ -272,29 +270,14 @@ namespace mdk_tracing {
             UnaryCallable _handler = null;
             MessageDispatcher _dispatcher;
 
-            long _syncRequestPeriod = 5000L;  // how often (in ms) sync requests should be sent
-            int  _syncInFlightMax = 50;       // max size of the in-flight buffer before sending a sync request
-
-            List<LogEvent> _buffered = [];  // log events that are ready to be sent
-            List<LogEvent> _inFlight = [];  // log events that have been sent but not yet acknowledged
-            long _logged = 0L;              // count of logged messages; log event sequence number
-            long _sent = 0L;                // count of events sent over the socket
-            long _failedSends = 0L;         // count of events that were sent but not acknowledged
-            long _recorded = 0L;            // count of events that were acknowledged by the server
-            long _lastSyncTime = 0L;        // when the last sync request was sent
-
             WSClient _wsclient; // The WSClient we will use
             Actor _sock = null; // The websocket we're connected to, if any
-
-            Logger _myLog = new Logger("TracingClient");
-            void _debug(String message) {
-                String s = "[" + _buffered.size().toString() + " buf, " + _inFlight.size().toString() + " inf] ";
-                _myLog.debug(s + message);
-            }
+            SendWithAcks _sendWithAcks;
 
             TracingClient(Tracer tracer, WSClient wsclient) {
                 _tracer = tracer;
                 _wsclient = wsclient;
+                _sendWithAcks = new SendWithAcks();
                 wsclient.subscribe(self);
             }
 
@@ -318,14 +301,7 @@ namespace mdk_tracing {
             void onWSConnected(Actor websock) {
                 _mutex.acquire();
                 self._sock = websock;
-                // Move in-flight messages back into the outgoing buffer to retry later
-                while (_inFlight.size() > 0) {
-                    LogEvent evt = _inFlight.remove(_inFlight.size() - 1);
-                    _buffered.insert(0, evt);
-                    _failedSends = _failedSends + 1;
-                    _debug("no ack for #" + evt.sequence.toString());
-                }
-                _debug("Starting up! with connection " + self._sock.toString());
+                self._sendWithAcks.onConnected(self, self._dispatcher, websock);
                 if (_handler != null) {
                     self._dispatcher.tell(self, new Subscribe().encode(), self._sock);
                 }
@@ -334,24 +310,7 @@ namespace mdk_tracing {
 
             void onPump() {
                 _mutex.acquire();
-                // Send buffered messages and move them to the in-flight queue
-                // Set the sync flag as appropriate
-                while (_buffered.size() > 0) {
-                    String debugSuffix = "";
-                    LogEvent evt = _buffered.remove(0);
-                    _inFlight.add(evt);
-                    if ((evt.timestamp > _lastSyncTime + _syncRequestPeriod) ||
-                        (_inFlight.size() == _syncInFlightMax)) {
-                        evt.sync = 1;
-                        _lastSyncTime = evt.timestamp;
-                        debugSuffix = " with sync set";
-                    }
-                    self._dispatcher.tell(self, evt.encode(), self._sock);
-                    evt.sync = 0;
-                    _sent = _sent + 1;
-                    _debug("sent #" + evt.sequence.toString() + debugSuffix +
-                           " to " + self._sock.toString());
-                }
+                self._sendWithAcks.onPump(self, self._dispatcher, self._sock);
                 _mutex.release();
             }
 
@@ -379,29 +338,14 @@ namespace mdk_tracing {
 
             void onLogAck(LogAck ack) {
                 _mutex.acquire();
-                // Discard in-flight messages older than the acked sequence number; they have been logged.
-                while (_inFlight.size() > 0) {
-                    if (_inFlight[0].sequence <= ack.sequence) {
-                        LogEvent evt = _inFlight.remove(0);
-                        _recorded = _recorded + 1;
-                        _debug("ack #" + ack.sequence.toString() + ", discarding #" + evt.sequence.toString());
-                    } else {
-                        // Subsequent events are too new
-                        break;
-                    }
-                }
+                self._sendWithAcks.onAck(ack.sequence);
                 _mutex.release();
             }
 
             @doc("Queue a log message for delivery to the server.")
             void log(LogEvent evt) {
                 _mutex.acquire();
-                // Add log event to the outgoing buffer and make sure it has the newest sequence number.
-                evt.sequence = _logged;
-                evt.sync = 0;
-                _logged = _logged + 1;
-                _buffered.add(evt);
-                _debug("logged #" + evt.sequence.toString());
+                self._sendWithAcks.send("log", evt);
                 _mutex.release();
             }
 

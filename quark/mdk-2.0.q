@@ -393,6 +393,8 @@ namespace mdk {
             }
             _disco = new Discovery(runtime);
             _wsclient = getWSClient(runtime);
+            // Make sure we register OpenCloseSubscriber first so that Open
+            // message gets sent first.
             if (_wsclient != null) {
                 _openclose = new OpenCloseSubscriber(_wsclient, Context.runtime().uuid());
             }
