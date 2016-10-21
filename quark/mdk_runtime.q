@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_runtime 2.0.20;
+package datawire_mdk_runtime 2.0.21;
 
 include actors_core.q;
 include actors_promise.q;

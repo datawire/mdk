@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk 2.0.20;
+package datawire_mdk 2.0.21;
 
 // DATAWIRE MDK
 
