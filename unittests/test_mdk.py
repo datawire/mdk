@@ -387,6 +387,7 @@ class SessionCreationTests(TestCase):
 
 class MDKConnector(object):
     """Manage an interaction with fake remote server."""
+
     URL = "ws://localhost:1234/"
 
     def __init__(self):
@@ -433,7 +434,7 @@ class MDKConnector(object):
 
 class ConnectionStartupTests(TestCase):
     """Tests for initial setup of MCP connections."""
-    def test_connectionNodeIdentity(self):
+    def test_connection_node_identity(self):
         """
         Each connection to MCP sends an Open message with the same node identity.
         """
@@ -449,7 +450,7 @@ class ConnectionStartupTests(TestCase):
         self.assertEqual(open.properties["datawire_nodeId"],
                          open2.properties["datawire_nodeId"])
 
-    def test_randomNodeIdentity(self):
+    def test_random_node_identity(self):
         """
         Node identity is randomly generated each time.
         """
@@ -461,3 +462,35 @@ class ConnectionStartupTests(TestCase):
         open2 = connector.connect(ws_actor2)
         self.assertNotEqual(open.properties["datawire_nodeId"],
                             open2.properties["datawire_nodeId"])
+
+
+class InteractionReportingTests(TestCase):
+    """The results of interactions are reported to the MCP."""
+
+    def setUp(self):
+        self.node1 = create_node("a1", "service1")
+        self.node2 = create_node("a2", "service2")
+        self.node3 = create_node("a3", "service3")
+
+    def add_nodes(self, mdk):
+        """Register existence of nodes with the MDK instance."""
+        mdk._disco.onMessage(None, NodeActive(self.node1))
+        mdk._disco.onMessage(None, NodeActive(self.node2))
+        mdk._disco.onMessage(None, NodeActive(self.node3))
+
+    def test_interaction(self):
+        """Interaction results are sent to the MCP."""
+        connector = MDKConnector()
+        ws_actor = connector.expectSocket()
+        connector.connect(ws_actor)
+        self.add_nodes(connector.mdk)
+
+        session = connector.mdk.session()
+        session.begin_interaction()
+        session.resolve("a1")
+        session.fail_interaction("fail")
+        session.resolve("a2")
+        session.end_interaction()
+
+    def test_independent_interactions(self):
+        """A new interaction doesn't report info from a previous interaction."""
