@@ -312,6 +312,23 @@ namespace mdk {
              If a timeout has not been set the result will be null.
              """)
         float getRemainingTime();
+
+        @doc("Return the value of a property from the distributed session.")
+        Object getProperty(String property);
+
+        @doc("""
+        Set a property on the distributed session.
+
+        The key should be prefixed with a namespace so that it doesn't conflict
+        with built-in properties, e.g. 'examplenamespace:myproperty' instead of
+        'myproperty'.
+
+        The value should be JSON serializable.
+        """)
+        void setProperty(String property, Object value);
+
+        @doc("Return whether the distributed session has a property.")
+        bool hasProperty(String property);
     }
 
     class MDKImpl extends MDK {
@@ -527,15 +544,15 @@ namespace mdk {
             }
         }
 
-        Object get(String property) {
+        Object getProperty(String property) {
             return _context.properties[property];
         }
 
-        void set(String property, Object value) {
+        void setProperty(String property, Object value) {
             _context.properties[property] = value;
         }
 
-        bool has(String property) {
+        bool hasProperty(String property) {
             return _context.properties.contains(property);
         }
 
@@ -551,11 +568,11 @@ namespace mdk {
             if (timeout > current) {
                 timeout = current;
             }
-            set("timeout",  _mdk._runtime.getTimeService().time() + timeout);
+            setProperty("timeout",  _mdk._runtime.getTimeService().time() + timeout);
         }
 
         float getRemainingTime() {
-            float deadline = ?get("timeout");
+            float deadline = ?getProperty("timeout");
             if (deadline == null) {
                 return null;
             }
@@ -564,11 +581,11 @@ namespace mdk {
 
         void route(String service, String version, String target, String targetVersion) {
             Map<String,List<Map<String,String>>> routes;
-            if (!has("routes")) {
+            if (!hasProperty("routes")) {
                 routes = {};
-                set("routes", routes);
+                setProperty("routes", routes);
             } else {
-                routes = ?get("routes");
+                routes = ?getProperty("routes");
             }
 
             List<Map<String,String>> targets;
@@ -583,7 +600,7 @@ namespace mdk {
         }
 
         void trace(String level) {
-            set("trace", level);
+            setProperty("trace", level);
         }
 
         static int _level(String level) {
@@ -596,8 +613,8 @@ namespace mdk {
 
         bool _enabled(String level) {
             int ilevel = _level("INFO");
-            if (has("trace")) {
-                ilevel = _level(?get("trace"));
+            if (hasProperty("trace")) {
+                ilevel = _level(?getProperty("trace"));
             }
 
             return _level(level) <= ilevel;
@@ -650,7 +667,7 @@ namespace mdk {
 
         Promise _resolve(String service, String version) {
             if (_experimental) {
-                Map<String,List<Map<String,String>>> routes = ?get("routes");
+                Map<String,List<Map<String,String>>> routes = ?getProperty("routes");
                 if (routes != null && routes.contains(service)) {
                     List<Map<String,String>> targets = routes[service];
                     int idx = 0;
