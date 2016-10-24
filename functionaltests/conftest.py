@@ -34,7 +34,10 @@ def run(filepath, language):
     command = (maybe_sudo +
                ["docker", "run", "--rm",
                 # Mount volume into container so Docker can access quark files:
-                "-v", ROOT_DIR + ":/code",] +
+                "-v", ROOT_DIR + ":/code",
+                # Allow container to access host network:
+                "--net=host",
+               ] +
                ["datawire/quark-run:" + QUARK_VERSION, "--" + language, '--verbose', docker_path])
     print(" ".join(command))
     check_call(command)

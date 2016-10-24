@@ -275,7 +275,7 @@ class SessionDeadlineTests(TestCase):
     def test_serialization(self):
         """A serialized session preserves the deadline."""
         self.session.setDeadline(10.0)
-        self.session.set("xx", "yy")
+        self.session.setProperty("xx", "yy")
         serialized = self.session.externalize()
         session2 = self.mdk.join(serialized)
         self.assertEqual(session2.getRemainingTime(), 10.0)
@@ -327,8 +327,8 @@ class SessionDeadlineTests(TestCase):
         self.assertAlmostEqual(time() - start, 3.0, delta=1)
 
 
-class SessionCreationTests(TestCase):
-    """Tests for session creation."""
+class SessionTests(TestCase):
+    """Tests for sessions."""
 
     def setUp(self):
         """Initialize an empty environment."""
@@ -354,16 +354,28 @@ class SessionCreationTests(TestCase):
         self.assertNotEqual(session._context.traceId,
                             session2._context.traceId)
 
+    def test_sessionProperties(self):
+        """Sessions have properties that can be set, checked and retrieved."""
+        session = self.mdk.session()
+        value = ["123", {"12": 123}]
+        session.setProperty("key", value)
+        session.setProperty("key2", "hello")
+        self.assertEqual((session.getProperty("key"), session.getProperty("key2"),
+                          session.hasProperty("key"), session.hasProperty("key2"),
+                          session.hasProperty("nope")),
+                         (value, "hello", True, True, False))
+
     def test_joinSession(self):
         """
-        A joined session has some trace ID and clock level as the encoded
+        A joined session has some trace ID, clock level and proprties as the encoded
         session.
         """
         session = self.mdk.session()
-        session.set("key", 456)
+        session.setProperty("key", 456)
+        session.setProperty("key2", [456, {"zoo": "foo"}])
         session2 = self.mdk.join(session.externalize())
         self.assertSessionHas(session2, session._context.traceId, [1, 0],
-                              key=456)
+                              key=456, key2=[456, {"zoo": "foo"}])
 
     def test_childSession(self):
         """
@@ -372,7 +384,7 @@ class SessionCreationTests(TestCase):
         than timeout.
         """
         session = self.mdk.session()
-        session.set("other", 123)
+        session.setProperty("other", 123)
         session._context.tick()
         session._context.tick()
         session._context.tick()

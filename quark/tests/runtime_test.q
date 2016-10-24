@@ -515,7 +515,7 @@ class TestRunner {
     TestActor testRealRuntimeWebsockets(MDKRuntime runtime) {
         // XXX should really use local server, not server on Internet
         WebSocketsTest result = new WebSocketsTest(new QuarkRuntimeWebSockets(),
-                                                   "wss://echo.websocket.org/", "wss://localhost:1/");
+                                                   "ws://127.0.0.1:9123/", "wss://localhost:1/");
         runtime.dispatcher.startActor(result.websockets);
         return result;
     }
