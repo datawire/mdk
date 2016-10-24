@@ -395,6 +395,17 @@ namespace mdk_runtime {
             }
         }
 
+        @doc("Skip over any logged messages for purposes of expectTextMessage().")
+        void swallowLogMessages() {
+            if (!resolved) {
+                Context.runtime().fail("not connected yet");
+            }
+            while (expectIdx < self.sent.size() &&
+                   self.sent[expectIdx].find("mdk_tracing.protocol.LogEvent") != -1) {
+                expectIdx = expectIdx + 1;
+            }
+        }
+
         @doc("""
         Check that a message has been sent via this actor.
         """)

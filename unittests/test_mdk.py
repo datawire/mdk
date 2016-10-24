@@ -446,6 +446,20 @@ class MDKConnector(object):
         self.pump()
         return self.expectSerializable(fake_wsactor, "mdk_protocol.Open")
 
+    def expectInteraction(self, test, fake_wsactor, session,
+                          failed_nodes, succeeded_nodes):
+        """Assert an InteractionEvent was sent, and return it."""
+        interaction = self.expectSerializable(
+            fake_wsactor, "mdk_metrics.InteractionEvent")
+        test.assertEqual(interaction.node, self.mdk.procUUID)
+        test.assertEqual(interaction.session, session._context.traceId)
+        expected = {node.properties["datawire_nodeId"]: 1
+                    for node in succeeded_nodes}
+        for node in failed_nodes:
+            expected[node.properties["datawire_nodeId"]] = 0
+        test.assertEqual(interaction.results, expected)
+        return interaction
+
 
 class ConnectionStartupTests(TestCase):
     """Tests for initial setup of MCP connections."""
@@ -515,17 +529,12 @@ class InteractionReportingTests(TestCase):
         time_service.advance(5)
         time_service.pump()
 
-        # Skip log message
-        connector.expectSerializable(ws_actor, "mdk_tracing.protocol.LogEvent")
+        # Skip log messages:
+        ws_actor.swallowLogMessages()
 
-        interaction = connector.expectSerializable(
-            ws_actor, "mdk_metrics.InteractionEvent")
+        interaction = connector.expectInteraction(self, ws_actor, session,
+                                                  [self.node1], [self.node2])
         self.assertEqual(interaction.timestamp, int(1000*start_time))
-        self.assertEqual(interaction.node, connector.mdk.procUUID)
-        self.assertEqual(interaction.session, session._context.traceId)
-        self.assertEqual(interaction.results,
-                         {self.node1.properties["datawire_nodeId"]: 0,
-                          self.node2.properties["datawire_nodeId"]: 1})
 
     def test_independent_interactions(self):
         """A new interaction doesn't report info from a previous interaction."""
