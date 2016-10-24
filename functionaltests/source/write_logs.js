@@ -43,7 +43,7 @@ var main = function() {
         session.error(category, sent_messages[2]);
         session.info(category, sent_messages[3]);
         session.warn(category, sent_messages[4]);
-    }, 1000);
+    }, 3000);
 };
 
 main();
