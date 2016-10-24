@@ -22,8 +22,6 @@ from mdk_protocol import Serializable
 
 from .test_discovery import create_node
 
-import logging
-logging.basicConfig(level=logging.DEBUG)
 
 class MDKInitializationTestCase(TestCase):
     """
@@ -80,13 +78,9 @@ class InteractionTestCase(TestCase):
 
     def init(self):
         """Initialize an empty environment."""
-        # Initialize runtime and MDK:
-        self.runtime = fakeRuntime()
-        self.runtime.getEnvVarsService().set("DATAWIRE_TOKEN", "somevalue")
-        self.runtime.dependencies.registerService("failurepolicy_factory",
-                                                  RecordingFailurePolicyFactory())
-        self.mdk = MDKImpl(self.runtime)
-        self.mdk.start()
+        self.connector = MDKConnector(RecordingFailurePolicyFactory())
+        self.runtime = self.connector.runtime
+        self.mdk = self.connector.mdk
         self.disco = self.mdk._disco
         # Create a session:
         self.session = self.mdk.session()
@@ -201,6 +195,8 @@ class InteractionTestCase(TestCase):
         failures = iter(failures)
         assume(not isinstance(requested_interactions, unicode))
         self.init()
+        ws_actor = self.connector.expectSocket()
+        self.connector.connect(ws_actor)
 
         failures = iter(failures)
         created_services = {}
@@ -208,7 +204,9 @@ class InteractionTestCase(TestCase):
         expected_failed_nodes = Counter()
 
         def run_interaction(children):
-            fails = next(failures)
+            should_fail = next(failures)
+            failed = []
+            succeeded = []
             self.session.start_interaction()
             for child in children:
                 if isinstance(child, unicode):
@@ -221,15 +219,21 @@ class InteractionTestCase(TestCase):
                     self.disco.onMessage(None, NodeActive(node))
                     # Make sure the child Node is resolved in the interaction
                     self.session.resolve(node.service, "1.0")
-                    if fails:
+                    if should_fail:
                         expected_failed_nodes[node] += 1
+                        failed.append(node)
                     else:
                         expected_success_nodes[node] += 1
+                        succeeded.append(node)
                 else:
                     run_interaction(child)
-            if fails:
+            if should_fail:
                 self.session.fail_interaction("OHNO")
             self.session.finish_interaction()
+            self.connector.advance_time(5.0) # Make sure interaction is sent
+            ws_actor.swallowLogMessages()
+            self.connector.expectInteraction(
+                self, ws_actor, self.session, failed, succeeded)
 
         run_interaction(requested_interactions)
         for node in set(expected_failed_nodes) | set(expected_success_nodes):
@@ -405,10 +409,13 @@ class MDKConnector(object):
 
     URL = "ws://localhost:1234/"
 
-    def __init__(self):
+    def __init__(self, failurepolicy_factory=None):
         self.runtime = fakeRuntime()
         self.runtime.getEnvVarsService().set("DATAWIRE_TOKEN", "xxx");
         self.runtime.getEnvVarsService().set("MDK_SERVER_URL", self.URL);
+        if failurepolicy_factory is not None:
+            self.runtime.dependencies.registerService(
+                "failurepolicy_factory", failurepolicy_factory)
         self.mdk = MDKImpl(self.runtime)
         self.mdk.start()
         self.pump()

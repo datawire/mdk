@@ -536,10 +536,10 @@ namespace mdk {
         static TLS<bool> _inLogging = new TLS<bool>(new _TLSInit());
 
         MDKImpl _mdk;
-        // Each List<Node> is another stack level added by
-        // start_interaction. First one is implicit fallback in case none are started.
-        List<List<Node>> _resolved = [[]];
-        InteractionEvent _interactionReport;
+        // Each List<Node> is another stack level added by start_interaction.
+        List<List<Node>> _resolved = [];
+        // Each InteractionEvent is another stack level added by start interaction.
+        List<InteractionEvent> _interactionReports = [];
         SharedContext _context;
         bool _experimental = false;
 
@@ -554,6 +554,10 @@ namespace mdk {
                 SharedContext ctx = SharedContext.decode(encodedContext);
                 _context = ctx.start_span();
             }
+            // Start a dummy interaction so that we don't blow up if someone
+            // does something that requires an interaction to be
+            // started. Well-written code shouldn't rely on this.
+            self.start_interaction();
         }
 
         Object getProperty(String property) {
@@ -727,11 +731,12 @@ namespace mdk {
         }
 
         void start_interaction() {
-            _interactionReport = new InteractionEvent();
-            _interactionReport.node = _mdk.procUUID;
-            _interactionReport.timestamp =
+            InteractionEvent interactionReport = new InteractionEvent();
+            interactionReport.node = _mdk.procUUID;
+            interactionReport.timestamp =
                 (1000.0 * _mdk._runtime.getTimeService().time()).round();
-            _interactionReport.session = _context.traceId;
+            interactionReport.session = _context.traceId;
+            _interactionReports.add(interactionReport);
             _resolved.add([]);
         }
 
@@ -758,7 +763,7 @@ namespace mdk {
                 idx = idx + 1;
                 involved.add(node.toString());
                 node.failure();
-                _interactionReport.addNode(node, false);
+                _interactionReports[_interactionReports.size() - 1].addNode(node, false);
             }
 
             String text = "involved: " + ", ".join(involved) + "\n\n" + message;
@@ -769,19 +774,22 @@ namespace mdk {
             // Pops a level off the stack
             List<Node> nodes = _current_interaction();
             _resolved.remove(_resolved.size() - 1);
-
+            InteractionEvent report = _interactionReports
+                .remove(_interactionReports.size() - 1);
             int idx = 0;
             while (idx < nodes.size()) {
                 Node node = nodes[idx];
                 node.success();
-                _interactionReport.addNode(node, true);
+                report.addNode(node, true);
                 idx = idx + 1;
             }
-            _mdk._metrics.sendInteraction(_interactionReport);
+            _mdk._metrics.sendInteraction(report);
         }
 
         void interact(UnaryCallable cmd) {
             start_interaction();
+            // XXX use callSafely to add error-handling and fail_interaction
+            // support
             cmd.__call__(self);
             finish_interaction();
         }
