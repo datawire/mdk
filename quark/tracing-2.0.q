@@ -345,7 +345,7 @@ namespace mdk_tracing {
             @doc("Queue a log message for delivery to the server.")
             void log(LogEvent evt) {
                 _mutex.acquire();
-                self._sendWithAcks.send("log", evt);
+                self._sendWithAcks.send(evt._json_type, evt);
                 _mutex.release();
             }
 
