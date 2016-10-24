@@ -396,7 +396,7 @@ namespace mdk {
             // Make sure we register OpenCloseSubscriber first so that Open
             // message gets sent first.
             if (_wsclient != null) {
-                _openclose = new OpenCloseSubscriber(_wsclient, Context.runtime().uuid());
+                _openclose = new OpenCloseSubscriber(_wsclient, procUUID);
             }
             EnvironmentVariables env = runtime.getEnvVarsService();
             DiscoverySourceFactory discoFactory = getDiscoveryFactory(env);

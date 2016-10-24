@@ -449,6 +449,8 @@ class ConnectionStartupTests(TestCase):
         open2 = connector.connect(ws_actor2)
         self.assertEqual(open.properties["datawire_nodeId"],
                          open2.properties["datawire_nodeId"])
+        self.assertEqual(open.properties["datawire_nodeId"],
+                         connector.mdk.procUUID)
 
     def test_random_node_identity(self):
         """
