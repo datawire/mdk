@@ -64,7 +64,6 @@ namespace mdk_metrics {
 
         @doc("Queue info about interaction to be sent to the MCP.")
         void sendInteraction(InteractionEvent evt) {
-            print("SEND " + evt.toString());
             self._sendWithAcks.send(evt._json_type, evt);
         }
 
@@ -79,13 +78,11 @@ namespace mdk_metrics {
         }
 
         void onWSConnected(Actor websock) {
-            print("CONNECTED");
             self._sock = websock;
             self._sendWithAcks.onConnected(self, self._dispatcher, websock);
         }
 
         void onPump() {
-            print("PUMP");
             self._sendWithAcks.onPump(self, self._dispatcher, self._sock);
         }
 
