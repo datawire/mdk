@@ -8,6 +8,7 @@ from past.builtins import unicode
 from unittest import TestCase
 from tempfile import mkdtemp
 from collections import Counter
+from json import loads
 
 import hypothesis.strategies as st
 from hypothesis import given, assume
@@ -21,6 +22,8 @@ from mdk_protocol import Serializable
 
 from .test_discovery import create_node
 
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 class MDKInitializationTestCase(TestCase):
     """
@@ -432,9 +435,9 @@ class MDKConnector(object):
         """Return the last sent message of given type."""
         msg = fake_wsactor.expectTextMessage()
         assert msg is not None
+        json = loads(msg)
         evt = Serializable.decodeClassName(expected_type, msg)
-        type = evt._getClass()
-        assert type == expected_type
+        assert json["type"] == evt._json_type
         return evt
 
     def connect(self, fake_wsactor):
@@ -495,16 +498,34 @@ class InteractionReportingTests(TestCase):
     def test_interaction(self):
         """Interaction results are sent to the MCP."""
         connector = MDKConnector()
+        time_service = connector.runtime.getTimeService()
         ws_actor = connector.expectSocket()
         connector.connect(ws_actor)
         self.add_nodes(connector.mdk)
 
         session = connector.mdk.session()
-        session.begin_interaction()
-        session.resolve("a1")
+        session.start_interaction()
+        start_time = time_service.time()
+        time_service.advance(123)
+        session.resolve("service1", "1.0")
         session.fail_interaction("fail")
-        session.resolve("a2")
-        session.end_interaction()
+        session.resolve("service2", "1.0")
+        session.finish_interaction()
+        time_service.pump()
+        time_service.advance(5)
+        time_service.pump()
+
+        # Skip log message
+        connector.expectSerializable(ws_actor, "mdk_tracing.protocol.LogEvent")
+
+        interaction = connector.expectSerializable(
+            ws_actor, "mdk_metrics.InteractionEvent")
+        self.assertEqual(interaction.timestamp, int(1000*start_time))
+        self.assertEqual(interaction.node, connector.mdk.procUUID)
+        self.assertEqual(interaction.session, session._context.traceId)
+        self.assertEqual(interaction.results,
+                         {self.node1.properties["datawire_nodeId"]: 0,
+                          self.node2.properties["datawire_nodeId"]: 1})
 
     def test_independent_interactions(self):
         """A new interaction doesn't report info from a previous interaction."""

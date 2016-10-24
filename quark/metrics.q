@@ -1,12 +1,17 @@
+quark 1.0;
+
 /* Metric reporting sub-protocol. */
 
 package datawire_mdk_tracing 2.0.22;
 
 include protocol-1.0.q;
+include discovery-3.0.q;
 
+import mdk_discovery;
 import mdk_protocol;
 
 namespace mdk_metrics {
+    @doc("Wire protocol message for reporting interaction results to MCP.")
     class InteractionEvent extends Serializable, AckablePayload {
         static String _json_type = "interaction_event";
 
@@ -20,13 +25,26 @@ namespace mdk_metrics {
         @doc("Unique identifier for this interaction.")
         String uuid = Context.runtime().uuid();
 
+        @doc("Identifier for current session.")
+        String session;
+
         @doc("The UUID of the node that initiated the interaction.")
         String node;
 
-        @doc("Map destination node UUID to success/failure of interaction.")
-        Map<String,bool> results = {};
+        @doc("Map destination node UUID to success=1/failure=0 of interaction.")
+        Map<String,int> results = {};
+
+        @doc("Add the result of communicating with a specific node.")
+        void addNode(Node destination, bool success) {
+            int value = 0;
+            if (success) {
+                value = 1;
+            }
+            self.results[?destination.properties["datawire_nodeId"]] = value;
+        }
     }
 
+    @doc("Wire protocol message for MCP to acknowledge InteractionEvent receipt.")
     class InteractionAck extends Serializable {
         static String _json_type = "interaction_ack";
 
@@ -34,6 +52,7 @@ namespace mdk_metrics {
         long sequence;
     }
 
+    @doc("Mini-protocol for sending metrics to MCP.")
     class MetricsClient extends WSClientSubscriber {
         MessageDispatcher _dispatcher;
         Actor _sock = null; // The websocket we're connected to, if any
@@ -45,6 +64,7 @@ namespace mdk_metrics {
 
         @doc("Queue info about interaction to be sent to the MCP.")
         void sendInteraction(InteractionEvent evt) {
+            print("SEND " + evt.toString());
             self._sendWithAcks.send(evt._json_type, evt);
         }
 
@@ -59,11 +79,13 @@ namespace mdk_metrics {
         }
 
         void onWSConnected(Actor websock) {
+            print("CONNECTED");
             self._sock = websock;
             self._sendWithAcks.onConnected(self, self._dispatcher, websock);
         }
 
         void onPump() {
+            print("PUMP");
             self._sendWithAcks.onPump(self, self._dispatcher, self._sock);
         }
 

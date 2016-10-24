@@ -39,7 +39,7 @@ def create_node(address, service="myservice"):
     node.service = service
     node.version = "1.0"
     node.address = address
-    node.properties = {"datawire_nodeId": uuid4()}
+    node.properties = {"datawire_nodeId": str(uuid4())}
     return node
 
 

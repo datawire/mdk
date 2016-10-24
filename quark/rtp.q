@@ -28,6 +28,9 @@ namespace mdk_rtp {
         parser.register("logack", Class.get("mdk_tracing.protocol.LogAck"));
         parser.register("mdk_tracing.protocol.LogAckEvent", Class.get("mdk_tracing.protocol.LogAck"));
         parser.register("subscribe", Class.get("mdk_tracing.protocol.Subscribe"));
+        // Metrics protocol
+        parser.register("interaction_event", Class.get("mdk_metrics.InteractionEvent"));
+        parser.register("interaction_ack", Class.get("mdk_metrics.InteractionAck"));
         return parser;
     }
 }
