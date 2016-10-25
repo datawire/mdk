@@ -37,7 +37,7 @@ def main():
             print("No full results yet. Specifically got: " + repr(event))
 
     mdk._tracer.subscribe(got_message)
-
+    time.sleep(3)
     for level in ["critical", "error", "warn", "info", "debug"]:
         f = getattr(session, level)
         f(category, "hello {} {}".format(category, level))

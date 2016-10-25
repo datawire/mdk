@@ -7,6 +7,7 @@ Additional tests can be found in quark/tests/mdk_test.q.
 from __future__ import absolute_import
 from builtins import range
 from builtins import object
+from uuid import uuid4
 
 from unittest import TestCase
 from json import dumps
@@ -38,7 +39,7 @@ def create_node(address, service="myservice"):
     node.service = service
     node.version = "1.0"
     node.address = address
-    node.properties = {}
+    node.properties = {"datawire_nodeId": str(uuid4())}
     return node
 
 

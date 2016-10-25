@@ -37,11 +37,13 @@ var main = function() {
 	}
     });
 
-    session.critical(category, sent_messages[0]);
-    session.debug(category, sent_messages[1]);
-    session.error(category, sent_messages[2]);
-    session.info(category, sent_messages[3]);
-    session.warn(category, sent_messages[4]);
+    setTimeout(function() {
+        session.critical(category, sent_messages[0]);
+        session.debug(category, sent_messages[1]);
+        session.error(category, sent_messages[2]);
+        session.info(category, sent_messages[3]);
+        session.warn(category, sent_messages[4]);
+    }, 3000);
 };
 
 main();

@@ -10,6 +10,7 @@ include introspection-1.0.q;
 include discovery-3.0.q;
 include tracing-2.0.q;
 include rtp.q;
+include metrics.q;
 
 import mdk_discovery;
 import mdk_tracing;
@@ -18,7 +19,10 @@ import mdk_util;
 import mdk_runtime;
 import quark.concurrent;
 import mdk_rtp;
+import mdk_metrics;
+// Needs to be last import, until we rip out Quark's built-in Promise:
 import mdk_runtime.promise;
+
 
 @doc("Microservices Development Kit -- obtain a reference using MDK.init()")
 namespace mdk {
@@ -342,6 +346,9 @@ namespace mdk {
         Discovery _disco;
         DiscoverySource _discoSource;
         Tracer _tracer = null;
+        MetricsClient _metrics = null;
+        // In the future this should be based on the Docker container id, AWS
+        // instance id, etc. when possible:
         String procUUID = Context.runtime().uuid();
         bool _running = false;
         float _defaultTimeout = null;
@@ -410,8 +417,10 @@ namespace mdk {
             }
             _disco = new Discovery(runtime);
             _wsclient = getWSClient(runtime);
+            // Make sure we register OpenCloseSubscriber first so that Open
+            // message gets sent first.
             if (_wsclient != null) {
-                _openclose = new OpenCloseSubscriber(_wsclient);
+                _openclose = new OpenCloseSubscriber(_wsclient, procUUID);
             }
             EnvironmentVariables env = runtime.getEnvVarsService();
             DiscoverySourceFactory discoFactory = getDiscoveryFactory(env);
@@ -422,6 +431,7 @@ namespace mdk {
             if (_wsclient != null) {
                 _tracer = Tracer(runtime, _wsclient);
                 _tracer.initContext();
+                _metrics = new MetricsClient(_wsclient);
             }
         }
 
@@ -439,6 +449,7 @@ namespace mdk {
                 _runtime.dispatcher.startActor(_wsclient);
                 _runtime.dispatcher.startActor(_openclose);
                 _runtime.dispatcher.startActor(_tracer);
+                _runtime.dispatcher.startActor(_metrics);
             }
             _runtime.dispatcher.startActor(_disco);
             _runtime.dispatcher.startActor(_discoSource);
@@ -525,9 +536,10 @@ namespace mdk {
         static TLS<bool> _inLogging = new TLS<bool>(new _TLSInit());
 
         MDKImpl _mdk;
-        // Each List<Node> is another stack level added by
-        // start_interaction. First one is implicit fallback in case none are started.
-        List<List<Node>> _resolved = [[]];
+        // Each List<Node> is another stack level added by start_interaction.
+        List<List<Node>> _resolved = [];
+        // Each InteractionEvent is another stack level added by start interaction.
+        List<InteractionEvent> _interactionReports = [];
         SharedContext _context;
         bool _experimental = false;
 
@@ -542,6 +554,10 @@ namespace mdk {
                 SharedContext ctx = SharedContext.decode(encodedContext);
                 _context = ctx.start_span();
             }
+            // Start a dummy interaction so that we don't blow up if someone
+            // does something that requires an interaction to be
+            // started. Well-written code shouldn't rely on this.
+            self.start_interaction();
         }
 
         Object getProperty(String property) {
@@ -715,6 +731,12 @@ namespace mdk {
         }
 
         void start_interaction() {
+            InteractionEvent interactionReport = new InteractionEvent();
+            interactionReport.node = _mdk.procUUID;
+            interactionReport.timestamp =
+                (1000.0 * _mdk._runtime.getTimeService().time()).round();
+            interactionReport.session = _context.traceId;
+            _interactionReports.add(interactionReport);
             _resolved.add([]);
         }
 
@@ -741,6 +763,7 @@ namespace mdk {
                 idx = idx + 1;
                 involved.add(node.toString());
                 node.failure();
+                _interactionReports[_interactionReports.size() - 1].addNode(node, false);
             }
 
             String text = "involved: " + ", ".join(involved) + "\n\n" + message;
@@ -751,17 +774,22 @@ namespace mdk {
             // Pops a level off the stack
             List<Node> nodes = _current_interaction();
             _resolved.remove(_resolved.size() - 1);
-
+            InteractionEvent report = _interactionReports
+                .remove(_interactionReports.size() - 1);
             int idx = 0;
             while (idx < nodes.size()) {
                 Node node = nodes[idx];
                 node.success();
+                report.addNode(node, true);
                 idx = idx + 1;
             }
+            _mdk._metrics.sendInteraction(report);
         }
 
         void interact(UnaryCallable cmd) {
             start_interaction();
+            // XXX use callSafely to add error-handling and fail_interaction
+            // support
             cmd.__call__(self);
             finish_interaction();
         }

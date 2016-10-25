@@ -36,6 +36,7 @@ def main()
         end
       end
     })
+  sleep 3
 
   session.critical(category, sent_messages[0])
   session.debug(category, sent_messages[1])

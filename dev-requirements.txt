@@ -13,4 +13,5 @@ blinker==1.4
 django==1.9.9
 twisted==16.4
 crochet==1.5.0
+pytest-catchlog==1.2.2
 autobahn==0.16.0

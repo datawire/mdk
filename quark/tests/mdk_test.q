@@ -16,6 +16,7 @@ import mdk_discovery;
 import mdk_rtp;
 
 void main(List<String> args) {
+    logging.makeConfig().setLevel("DEBUG").configure();
     test.run(args);
 }
 
@@ -82,13 +83,14 @@ class TracingTest {
     }
 
     Tracer newTracer(String url) {
-        return new Tracer(runtime, new WSClient(runtime, getRTPParser(), url, "the_token"));
+        WSClient client = new WSClient(runtime, getRTPParser(), url, "the_token");
+        OpenCloseSubscriber openclose = new OpenCloseSubscriber(client, "abc");
+        runtime.dispatcher.startActor(openclose);
+        return new Tracer(runtime, client);
     }
 
     FakeWSActor startTracer(Tracer tracer) {
-        OpenCloseSubscriber openclose = new OpenCloseSubscriber(tracer._client._wsclient);
         runtime.dispatcher.startActor(tracer._client._wsclient);
-        runtime.dispatcher.startActor(openclose);
         runtime.dispatcher.startActor(tracer);
         tracer.initContext();
         tracer.log("procUUID", "DEBUG", "blah", "testing...");
@@ -192,7 +194,7 @@ class DiscoveryTest {
     Discovery createDisco() {
         Discovery disco = new Discovery(runtime);
         WSClient wsclient = new WSClient(runtime, getRTPParser(), "http://url/", "");
-        OpenCloseSubscriber openclose = new OpenCloseSubscriber(wsclient);
+        OpenCloseSubscriber openclose = new OpenCloseSubscriber(wsclient, "xxasa");
         runtime.dispatcher.startActor(wsclient);
         runtime.dispatcher.startActor(openclose);
         self.client = ?new mdk_discovery.protocol.DiscoClientFactory(wsclient).create(disco, self.runtime);

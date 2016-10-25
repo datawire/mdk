@@ -8,6 +8,7 @@ from past.builtins import unicode
 from unittest import TestCase
 from tempfile import mkdtemp
 from collections import Counter
+from json import loads
 
 import hypothesis.strategies as st
 from hypothesis import given, assume
@@ -17,6 +18,7 @@ from mdk_runtime import fakeRuntime
 from mdk_discovery import (
     ReplaceCluster, NodeActive, RecordingFailurePolicyFactory,
 )
+from mdk_protocol import Serializable
 
 from .test_discovery import create_node
 
@@ -76,13 +78,9 @@ class InteractionTestCase(TestCase):
 
     def init(self):
         """Initialize an empty environment."""
-        # Initialize runtime and MDK:
-        self.runtime = fakeRuntime()
-        self.runtime.getEnvVarsService().set("DATAWIRE_TOKEN", "somevalue")
-        self.runtime.dependencies.registerService("failurepolicy_factory",
-                                                  RecordingFailurePolicyFactory())
-        self.mdk = MDKImpl(self.runtime)
-        self.mdk.start()
+        self.connector = MDKConnector(RecordingFailurePolicyFactory())
+        self.runtime = self.connector.runtime
+        self.mdk = self.connector.mdk
         self.disco = self.mdk._disco
         # Create a session:
         self.session = self.mdk.session()
@@ -197,6 +195,8 @@ class InteractionTestCase(TestCase):
         failures = iter(failures)
         assume(not isinstance(requested_interactions, unicode))
         self.init()
+        ws_actor = self.connector.expectSocket()
+        self.connector.connect(ws_actor)
 
         failures = iter(failures)
         created_services = {}
@@ -204,7 +204,9 @@ class InteractionTestCase(TestCase):
         expected_failed_nodes = Counter()
 
         def run_interaction(children):
-            fails = next(failures)
+            should_fail = next(failures)
+            failed = []
+            succeeded = []
             self.session.start_interaction()
             for child in children:
                 if isinstance(child, unicode):
@@ -217,15 +219,21 @@ class InteractionTestCase(TestCase):
                     self.disco.onMessage(None, NodeActive(node))
                     # Make sure the child Node is resolved in the interaction
                     self.session.resolve(node.service, "1.0")
-                    if fails:
+                    if should_fail:
                         expected_failed_nodes[node] += 1
+                        failed.append(node)
                     else:
                         expected_success_nodes[node] += 1
+                        succeeded.append(node)
                 else:
                     run_interaction(child)
-            if fails:
+            if should_fail:
                 self.session.fail_interaction("OHNO")
             self.session.finish_interaction()
+            self.connector.advance_time(5.0) # Make sure interaction is sent
+            ws_actor.swallowLogMessages()
+            self.connector.expectInteraction(
+                self, ws_actor, self.session, failed, succeeded)
 
         run_interaction(requested_interactions)
         for node in set(expected_failed_nodes) | set(expected_success_nodes):
@@ -394,3 +402,146 @@ class SessionTests(TestCase):
         self.assertEqual(session2.getRemainingTime(), None)
         self.assertSessionHas(session2, session2._context.traceId, [1],
                               other=123)
+
+
+class MDKConnector(object):
+    """Manage an interaction with fake remote server."""
+
+    URL = "ws://localhost:1234/"
+
+    def __init__(self, failurepolicy_factory=None):
+        self.runtime = fakeRuntime()
+        self.runtime.getEnvVarsService().set("DATAWIRE_TOKEN", "xxx");
+        self.runtime.getEnvVarsService().set("MDK_SERVER_URL", self.URL);
+        if failurepolicy_factory is not None:
+            self.runtime.dependencies.registerService(
+                "failurepolicy_factory", failurepolicy_factory)
+        self.mdk = MDKImpl(self.runtime)
+        self.mdk.start()
+        self.pump()
+
+    def pump(self):
+        """Deliver scheduled events."""
+        self.runtime.getTimeService().pump()
+
+    def advance_time(self, seconds):
+        """Advance the clock."""
+        ts = self.runtime.getTimeService()
+        ts.advance(seconds)
+        ts.pump()
+        ts.pump()
+
+    def expectSocket(self):
+        """Return the FakeWSActor we expect to have connected to a URL."""
+        ws = self.runtime.getWebSocketsService()
+        actor = ws.lastConnection()
+        assert actor.url.startswith(self.URL)
+        return actor
+
+    def expectSerializable(self, fake_wsactor, expected_type):
+        """Return the last sent message of given type."""
+        msg = fake_wsactor.expectTextMessage()
+        assert msg is not None
+        json = loads(msg)
+        evt = Serializable.decodeClassName(expected_type, msg)
+        assert json["type"] == evt._json_type
+        return evt
+
+    def connect(self, fake_wsactor):
+        """Connect and then return the last sent Open message."""
+        fake_wsactor.accept()
+        self.pump()
+        return self.expectSerializable(fake_wsactor, "mdk_protocol.Open")
+
+    def expectInteraction(self, test, fake_wsactor, session,
+                          failed_nodes, succeeded_nodes):
+        """Assert an InteractionEvent was sent, and return it."""
+        interaction = self.expectSerializable(
+            fake_wsactor, "mdk_metrics.InteractionEvent")
+        test.assertEqual(interaction.node, self.mdk.procUUID)
+        test.assertEqual(interaction.session, session._context.traceId)
+        expected = {node.properties["datawire_nodeId"]: 1
+                    for node in succeeded_nodes}
+        for node in failed_nodes:
+            expected[node.properties["datawire_nodeId"]] = 0
+        test.assertEqual(interaction.results, expected)
+        return interaction
+
+
+class ConnectionStartupTests(TestCase):
+    """Tests for initial setup of MCP connections."""
+    def test_connection_node_identity(self):
+        """
+        Each connection to MCP sends an Open message with the same node identity.
+        """
+        connector = MDKConnector()
+        ws_actor = connector.expectSocket()
+        open = connector.connect(ws_actor)
+        ws_actor.close()
+        connector.advance_time(1)
+        ws_actor2 = connector.expectSocket()
+        # Should be new connection:
+        self.assertNotEqual(ws_actor, ws_actor2)
+        open2 = connector.connect(ws_actor2)
+        self.assertEqual(open.properties["datawire_nodeId"],
+                         open2.properties["datawire_nodeId"])
+        self.assertEqual(open.properties["datawire_nodeId"],
+                         connector.mdk.procUUID)
+
+    def test_random_node_identity(self):
+        """
+        Node identity is randomly generated each time.
+        """
+        connector = MDKConnector()
+        ws_actor = connector.expectSocket()
+        open = connector.connect(ws_actor)
+        connector2 = MDKConnector()
+        ws_actor2 = connector2.expectSocket()
+        open2 = connector.connect(ws_actor2)
+        self.assertNotEqual(open.properties["datawire_nodeId"],
+                            open2.properties["datawire_nodeId"])
+
+
+class InteractionReportingTests(TestCase):
+    """The results of interactions are reported to the MCP."""
+
+    def setUp(self):
+        self.node1 = create_node("a1", "service1")
+        self.node2 = create_node("a2", "service2")
+        self.node3 = create_node("a3", "service3")
+
+    def add_nodes(self, mdk):
+        """Register existence of nodes with the MDK instance."""
+        mdk._disco.onMessage(None, NodeActive(self.node1))
+        mdk._disco.onMessage(None, NodeActive(self.node2))
+        mdk._disco.onMessage(None, NodeActive(self.node3))
+
+    def test_interaction(self):
+        """Interaction results are sent to the MCP."""
+        connector = MDKConnector()
+        time_service = connector.runtime.getTimeService()
+        ws_actor = connector.expectSocket()
+        connector.connect(ws_actor)
+        self.add_nodes(connector.mdk)
+
+        session = connector.mdk.session()
+        session.start_interaction()
+        start_time = time_service.time()
+        time_service.advance(123)
+        session.resolve("service1", "1.0")
+        session.fail_interaction("fail")
+        session.resolve("service2", "1.0")
+        session.finish_interaction()
+        time_service.pump()
+        time_service.advance(5)
+        time_service.pump()
+
+        # Skip log messages:
+        ws_actor.swallowLogMessages()
+
+        interaction = connector.expectInteraction(self, ws_actor, session,
+                                                  [self.node1], [self.node2])
+        self.assertEqual(interaction.timestamp, int(1000*start_time))
+
+    def test_independent_interactions(self):
+        """A new interaction doesn't report info from a previous interaction."""

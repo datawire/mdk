@@ -45,6 +45,11 @@ public class WriteLogs {
             return true;
         });
 
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            ;
+        }
         session.critical(category, sent_messages.get(0));
         session.debug(category, sent_messages.get(1));
         session.error(category, sent_messages.get(2));
