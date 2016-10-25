@@ -5,10 +5,13 @@ Unit tests for Python-specific code.
 import logging
 from unittest import TestCase
 
+from flask import Flask, g
+
 from mdk_tracing import FakeTracer
 from mdk_runtime import fakeRuntime
 from mdk import MDKImpl
 from mdk.logging import MDKHandler
+from mdk.flask import MDKLoggingHandler, mdk_setup
 
 
 def create_mdk():
@@ -92,3 +95,50 @@ class LoggingTests(TestCase):
         self.assertEqual([d["context"] for d in tracer.messages],
                          [s._context.traceId for s in
                           [session1, handler._default_session, session3]])
+
+
+def make_flask_app(logger):
+    """Create a Flask app that logs to the given Logger."""
+    app = Flask("myapp")
+
+    @app.route("/")
+    def log():
+        logger.info("hello: " + g.mdk_session._context.traceId)
+        return ""
+
+    return app
+
+
+class FlaskLoggingTests(TestCase):
+    """Test for Flask's logging integration."""
+
+    def tes_withinARequest(self):
+        """
+        When logging inside a Flask route, the MDK Session for the request is used
+        if MDKLoggingHandler was set up.
+        """
+        logger = logging.Logger("logz")
+        mdk, tracer = create_mdk()
+        app = make_flask_app(logger)
+        mdk_setup(app, mdk=mdk)
+
+        handler = MDKLoggingHandler(mdk)
+        logger.addHandler(handler)
+        client = app.test_client()
+        client.get("/")
+        message = tracer.messages[-1]
+        self.assertEqual("hello: " + message["context"], message["text"])
+
+    def test_outsideARequest(self):
+        """
+        When logging outside a Flask route, MDKLoggingHandler still ensures logs are
+        passed to MDK.
+        """
+        logger = logging.Logger("logz")
+        mdk, tracer = create_mdk()
+
+        handler = MDKLoggingHandler(mdk)
+        logger.addHandler(handler)
+        logger.info("helloz!")
+        message = tracer.messages[-1]
+        self.assertEqual("helloz!", message["text"])
