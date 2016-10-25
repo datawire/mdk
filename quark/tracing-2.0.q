@@ -41,18 +41,10 @@ something like
 
 namespace mdk_tracing {
 
-    class SharedContextInitializer extends TLSInitializer<SharedContext> {
-        SharedContext getValue() {
-            return null;
-            // return new SharedContext();
-        }
-    }
-
     class Tracer extends Actor {
         Logger logger = new Logger("MDK Tracer");
         long lastPoll = 0L;
 
-        TLS<SharedContext> _context = new TLS<SharedContext>(new SharedContextInitializer());
         protocol.TracingClient _client;
         MDKRuntime runtime;
 
@@ -85,40 +77,9 @@ namespace mdk_tracing {
 
         void onMessage(Actor origin, Object mesage) {}
 
-        void initContext() {
-            // Implicitly creates a span for you.
-            _context.setValue(new SharedContext());
-        }
-
-        void joinContext(SharedContext context) {
-            _context.setValue(context.start_span());
-            // Always open a new span when joining a context.
-        }
-
-        void joinEncodedContext(String encodedContext) {
-            SharedContext newContext = SharedContext.decode(encodedContext);
-            self.joinContext(newContext);
-        }
-
-        SharedContext getContext() {
-            return _context.getValue();
-        }
-
-        void setContext(SharedContext ctx) {
-            _context.setValue(ctx);
-        }
-
-        void start_span() {
-            _context.setValue(self.getContext().start_span());
-        }
-
-        void finish_span() {
-            _context.setValue(self.getContext().finish_span());
-        }
-
         @doc("Send a log message to the server.")
-        void log(String procUUID, String level, String category, String text) {
-            SharedContext ctx = self.getContext();
+            void log(SharedContext ctx, String procUUID, String level,
+                     String category, String text) {
             ctx.tick();
             logger.trace("CTX " + ctx.toString());
 

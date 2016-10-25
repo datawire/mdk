@@ -430,7 +430,6 @@ namespace mdk {
             }
             if (_wsclient != null) {
                 _tracer = Tracer(runtime, _wsclient);
-                _tracer.initContext();
                 _metrics = new MetricsClient(_wsclient);
             }
         }
@@ -645,8 +644,7 @@ namespace mdk {
                     return;
                 }
                 _inLogging.setValue(true);
-                _mdk._tracer.setContext(_context);
-                _mdk._tracer.log(_mdk.procUUID, level, category, text);
+                _mdk._tracer.log(_context, _mdk.procUUID, level, category, text);
                 _inLogging.setValue(false);
             }
         }
