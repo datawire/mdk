@@ -4,6 +4,8 @@ Flask integration for the MDK.
 This requires Flask and the blinker library.
 """
 
+from __future__ import absolute_import
+
 import atexit
 import traceback
 
