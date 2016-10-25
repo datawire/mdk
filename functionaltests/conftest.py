@@ -45,13 +45,13 @@ def websocket_echo_server():
     Popen(command)
     # Wait for the container to have launched
     while True:
+        time.sleep(1.0)
         dps_command = maybe_sudo() + "docker ps -f name=websocket-echo".split()
         print(" ".join(dps_command))
         dps_output = check_output(dps_command)
         print(dps_output)
         if b"websocket-echo" in dps_output:
             break
-        time.sleep(0.25)
 
 
 def run(filepath, language):
