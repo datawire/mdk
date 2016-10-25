@@ -79,8 +79,14 @@ install-mdk: packages $(wildcard javascript/**/*)
 	npm install javascript/datawire_mdk_request/
 	cd output/java/mdk-2.0 && mvn install
 
+.PHONY: setup-docker
+setup-docker: docker
+	# Set up docker image for a local websocket echo server
+	cd docker/websocket-echo && docker build -t datawire/websocket-echo -f Dockerfile .
+	docker tag datawire/websocket-echo datawire/websocket-echo:`sed s/v//g < QUARK_VERSION.txt`
+
 .PHONY: test
-test: install-mdk test-python test-python3
+test: install-mdk setup-docker test-python test-python3
 
 .PHONY: guard-token
 guard-token:
