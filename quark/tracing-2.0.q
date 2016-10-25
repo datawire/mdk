@@ -41,7 +41,30 @@ something like
 
 namespace mdk_tracing {
 
-    class Tracer extends Actor {
+    @doc("MDK can use this to handle logging on the Session.")
+    interface TracingDestination extends Actor {
+        @doc("Send a log message to the server.")
+        void log(SharedContext ctx, String procUUID, String level,
+                 String category, String text);
+    }
+
+    @doc("In-memory testing of logs.")
+    class FakeTracer extends TracingDestination {
+        List<Map<String,String>> messages = [];
+
+        void log(SharedContext ctx, String procUUID, String level,
+                 String category, String text) {
+            messages.add({"level": level, "category": category,
+                          "text": text, "context": ctx.traceId});
+        }
+
+        void onStart(MessageDispatcher dispatcher) {}
+        void onStop() {}
+        void onMessage(Actor origin, Object message) {}
+    }
+
+    @doc("Send log messages to the MCP server.")
+    class Tracer extends Actor, TracingDestination {
         Logger logger = new Logger("MDK Tracer");
         long lastPoll = 0L;
 
@@ -78,8 +101,8 @@ namespace mdk_tracing {
         void onMessage(Actor origin, Object mesage) {}
 
         @doc("Send a log message to the server.")
-            void log(SharedContext ctx, String procUUID, String level,
-                     String category, String text) {
+        void log(SharedContext ctx, String procUUID, String level,
+                 String category, String text) {
             ctx.tick();
             logger.trace("CTX " + ctx.toString());
 

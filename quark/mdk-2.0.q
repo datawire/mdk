@@ -415,6 +415,9 @@ namespace mdk {
                 runtime.dependencies.registerService("failurepolicy_factory",
                                                      getFailurePolicy(runtime));
             }
+            if (runtime.dependencies.hasService("tracer")) {
+                _tracer = ?_runtime.dependencies.getService("tracer");
+            }
             _disco = new Discovery(runtime);
             _wsclient = getWSClient(runtime);
             // Make sure we register OpenCloseSubscriber first so that Open
@@ -429,7 +432,9 @@ namespace mdk {
                 runtime.dependencies.registerService("discovery_registrar", _discoSource);
             }
             if (_wsclient != null) {
-                _tracer = Tracer(runtime, _wsclient);
+                if (_tracer == null) {
+                    _tracer = Tracer(runtime, _wsclient);
+                }
                 _metrics = new MetricsClient(_wsclient);
             }
         }
