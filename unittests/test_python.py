@@ -35,7 +35,7 @@ class LoggingTests(TestCase):
         mdk, tracer = create_mdk()
         session = mdk.session()
         session.trace("DEBUG")
-        logger.addHandler(MDKHandler(lambda: session))
+        logger.addHandler(MDKHandler(mdk, lambda: session))
 
         logger.debug("debugz")
         logger.info("infoz")
@@ -54,7 +54,7 @@ class LoggingTests(TestCase):
         logger = logging.Logger("mylog")
         mdk, tracer = create_mdk()
         session = mdk.session()
-        logger.addHandler(MDKHandler(lambda: session))
+        logger.addHandler(MDKHandler(mdk, lambda: session))
 
         logger.info("hello %s", "world")
         self.assertEqual(tracer.messages[0]["text"], "hello world")
@@ -67,9 +67,28 @@ class LoggingTests(TestCase):
         mdk, tracer = create_mdk()
         # Make logging into MDK log back into Python logging:
         tracer.log = lambda *args, **kwargs: logging.info("hello!")
-        handler = MDKHandler(lambda: mdk.session())
+        handler = MDKHandler(mdk, lambda: mdk.session())
 
         root_logger = logging.getLogger()
         root_logger.addHandler(handler)
         self.addCleanup(lambda: root_logger.removeHandler(handler))
         logging.error("zoop")
+
+    def test_sessions(self):
+        """
+        The given session's context is used; if no session is available a default
+        session is used.
+        """
+        mdk, tracer = create_mdk()
+        session1, session3 = mdk.session(), mdk.session()
+        def get_session(results=[session1, None, session3]):
+            return results.pop(0)
+
+        logger = logging.Logger("mylog")
+        handler = MDKHandler(mdk, get_session)
+        logger.addHandler(handler)
+        for i in range(3):
+            logger.info("hello")
+        self.assertEqual([d["context"] for d in tracer.messages],
+                         [s._context.traceId for s in
+                          [session1, handler._default_session, session3]])
