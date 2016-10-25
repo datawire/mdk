@@ -786,7 +786,9 @@ namespace mdk {
                 report.addNode(node, true);
                 idx = idx + 1;
             }
-            _mdk._metrics.sendInteraction(report);
+            if (_mdk._metrics != null) {
+                _mdk._metrics.sendInteraction(report);
+            }
         }
 
         void interact(UnaryCallable cmd) {
