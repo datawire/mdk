@@ -333,6 +333,9 @@ namespace mdk {
 
         @doc("Return whether the distributed session has a property.")
         bool hasProperty(String property);
+
+        @doc("Return the session's Environment.")
+        String getEnvironment();
     }
 
     class MDKImpl extends MDK {
@@ -498,7 +501,7 @@ namespace mdk {
         }
 
         Session session() {
-            SessionImpl session = new SessionImpl(self, null);
+            SessionImpl session = new SessionImpl(self, null, self._environment);
             if (_defaultTimeout != null) {
                 session.setDeadline(_defaultTimeout);
             }
@@ -519,7 +522,8 @@ namespace mdk {
         }
 
         Session join(String encodedContext) {
-            SessionImpl session = new SessionImpl(self, encodedContext);
+            SessionImpl session = new SessionImpl(self, encodedContext,
+                                                  self._environment);
             if (_defaultTimeout != null) {
                 session.setDeadline(_defaultTimeout);
             }
@@ -552,13 +556,14 @@ namespace mdk {
         SharedContext _context;
         bool _experimental = false;
 
-        SessionImpl(MDKImpl mdk, String encodedContext) {
+        SessionImpl(MDKImpl mdk, String encodedContext, String localEnvironment) {
             _experimental = (mdk._runtime.getEnvVarsService()
                              .var("MDK_EXPERIMENTAL").orElseGet("") != "");
             _mdk = mdk;
             encodedContext = ?sanitize(encodedContext);
             if (encodedContext == null || encodedContext == "") {
                 _context = new SharedContext();
+                _context.environment = localEnvironment;
             } else {
                 SharedContext ctx = SharedContext.decode(encodedContext);
                 _context = ctx.start_span();
@@ -567,6 +572,10 @@ namespace mdk {
             // does something that requires an interaction to be
             // started. Well-written code shouldn't rely on this.
             self.start_interaction();
+        }
+
+        String getEnvironment() {
+            return self._context.environment;
         }
 
         Object getProperty(String property) {

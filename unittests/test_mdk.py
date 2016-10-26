@@ -339,10 +339,9 @@ class SessionTests(TestCase):
 
     def setUp(self):
         """Initialize an empty environment."""
-        self.runtime = fakeRuntime()
-        self.runtime.getEnvVarsService().set("DATAWIRE_TOKEN", "something")
-        self.mdk = MDKImpl(self.runtime)
-        self.mdk.start()
+        self.connector = MDKConnector(env={"MDK_ENVIRONMENT": "myenv"})
+        self.runtime = self.connector.runtime
+        self.mdk = self.connector.mdk
 
     def assertSessionHas(self, session, trace_id, clock_level, **properties):
         """
@@ -361,6 +360,11 @@ class SessionTests(TestCase):
         self.assertNotEqual(session._context.traceId,
                             session2._context.traceId)
 
+    def test_newSesssionEnvironment(self):
+        """New sessions get their environment from the MDK."""
+        session = self.mdk.session()
+        self.assertEqual(session.getEnvironment(), "myenv")
+
     def test_sessionProperties(self):
         """Sessions have properties that can be set, checked and retrieved."""
         session = self.mdk.session()
@@ -374,8 +378,8 @@ class SessionTests(TestCase):
 
     def test_joinSession(self):
         """
-        A joined session has some trace ID, clock level and proprties as the encoded
-        session.
+        A joined session has some trace ID, clock level  properties
+        as the encoded session.
         """
         session = self.mdk.session()
         session.setProperty("key", 456)
@@ -383,6 +387,15 @@ class SessionTests(TestCase):
         session2 = self.mdk.join(session.externalize())
         self.assertSessionHas(session2, session._context.traceId, [1, 0],
                               key=456, key2=[456, {"zoo": "foo"}])
+
+    def test_joinSessionEnvironment(self):
+        """
+        A joined session gets its environment from the encoded session, not the MDK.
+        """
+        connector = MDKConnector(env={"MDK_ENVIRONMENT": "env2"})
+        encoded_session = connector.mdk.session().externalize()
+        session2 = self.mdk.join(encoded_session)
+        self.assertEqual(session2.getEnvironment(), "env2")
 
     def test_childSession(self):
         """

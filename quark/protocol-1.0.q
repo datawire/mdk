@@ -184,6 +184,13 @@ namespace mdk_protocol {
         """)
         Map<String, Object> properties = {};
 
+        @doc("""
+        The environment for this context, e.g. 'sandbox' or 'production'.
+
+        If unspecified we use 'sandbox' by default.
+        """)
+        String environment = "sandbox";
+
         int _lastEntry = 0;
 
         SharedContext() {
