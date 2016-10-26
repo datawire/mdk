@@ -297,13 +297,6 @@ class DiscoveryEnvironmentTests(TestCase):
             self.assertEqual(resolve(disco, "myservice", "1.0", "env2").address,
                              "somewhere2")
 
-    def test_environmentInheritance(self):
-        """
-        If an Environment has a parent it is checked if there are no Nodes in the
-        child Environment.
-        """
-        raise NotImplementedError("IMPLEMENT ME")
-
 
 class CircuitBreakerTests(TestCase):
     """
