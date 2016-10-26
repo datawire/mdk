@@ -370,7 +370,9 @@ namespace mdk {
                 result = new DiscoClientFactory(_wsclient);
             } else {
                 if (config.startsWith("synapse:path=")) {
-                    result = mdk_discovery.synapse.Synapse(config.substring(13, config.size()));
+                    result = mdk_discovery.synapse
+                        .Synapse(config.substring(13, config.size()),
+                                 self._environment);
                 } else {
                     if (config.startsWith("static:nodes=")) {
                         String json = config.substring(13, config.size());

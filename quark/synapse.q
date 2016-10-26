@@ -26,13 +26,16 @@ namespace synapse {
     """)
     class Synapse extends DiscoverySourceFactory {
         String _directory_path;
+        String _environment;
 
-        Synapse(String directory_path) {
+        Synapse(String directory_path, String environment) {
             self._directory_path = directory_path;
+            self._environment = environment;
         }
 
         DiscoverySource create(Actor subscriber, MDKRuntime runtime) {
-            return new _SynapseSource(subscriber, self._directory_path, runtime);
+            return new _SynapseSource(subscriber, self._directory_path, runtime,
+                                      self._environment);
         }
 
         bool isRegistrar() {
@@ -48,14 +51,12 @@ namespace synapse {
         MessageDispatcher dispatcher;
         String environment;
 
-        _SynapseSource(Actor subscriber, String directory_path, MDKRuntime runtime) {
+        _SynapseSource(Actor subscriber, String directory_path, MDKRuntime runtime,
+                       String environment) {
             self.subscriber = subscriber;
             self.directory_path = directory_path;
             self.files = runtime.getFileService();
-            // XXX
-            //self.environment = runtime.getEnvVarsService()
-            //    .var("MDK_ENVIRONMENT").orElseGet("sandbox");
-            self.environment = "whatever";
+            self.environment = environment;
         }
 
         void onStart(MessageDispatcher dispatcher) {

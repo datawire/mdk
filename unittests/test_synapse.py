@@ -19,13 +19,13 @@ class SynapseTests(TestCase):
 
     def setUp(self):
         self.runtime = fake_runtime()
-        self.runtime.getEnvVarsService().set("MDK_ENVIRONMENT", "staging")
         self.disco = Discovery(self.runtime)
         self.runtime.dispatcher.startActor(self.disco)
 
         self.directory = mkdtemp()
         self.addCleanup(lambda: rmtree(self.directory))
-        self.synapse = Synapse(self.directory).create(self.disco, self.runtime)
+        self.synapse = Synapse(self.directory, "staging").create(
+            self.disco, self.runtime)
         self.runtime.dispatcher.startActor(self.synapse)
 
     def pump(self):
