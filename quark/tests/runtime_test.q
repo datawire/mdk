@@ -513,9 +513,9 @@ class TestRunner {
     }
 
     TestActor testRealRuntimeWebsockets(MDKRuntime runtime) {
-        // XXX should really use local server, not server on Internet
+        // Connect to the server running in the docker container websocket-echo
         WebSocketsTest result = new WebSocketsTest(new QuarkRuntimeWebSockets(),
-                                                   "ws://127.0.0.1:9123/", "wss://localhost:1/");
+                                                   "ws://websocket-echo:9123/", "wss://localhost:1/");
         runtime.dispatcher.startActor(result.websockets);
         return result;
     }

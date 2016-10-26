@@ -1,0 +1,15 @@
+{
+    "name": "websocket-echo",
+    "version": "1.0.0",
+    "description": "Websocket echo server on port 9123",
+    "main": "index.js",
+    "scripts": {
+        "start": "node index.js",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "author": "",
+    "license": "Apache-2.0",
+    "dependencies": {
+        "ws": "^1.1.1"
+    }
+}
