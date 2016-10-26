@@ -84,7 +84,7 @@ class TracingTest {
 
     Tracer newTracer(String url) {
         WSClient client = new WSClient(runtime, getRTPParser(), url, "the_token");
-        OpenCloseSubscriber openclose = new OpenCloseSubscriber(client, "abc");
+        OpenCloseSubscriber openclose = new OpenCloseSubscriber(client, "abc", "sandbox");
         runtime.dispatcher.startActor(openclose);
         return new Tracer(runtime, client);
     }
@@ -194,7 +194,7 @@ class DiscoveryTest {
     Discovery createDisco() {
         Discovery disco = new Discovery(runtime);
         WSClient wsclient = new WSClient(runtime, getRTPParser(), "http://url/", "");
-        OpenCloseSubscriber openclose = new OpenCloseSubscriber(wsclient, "xxasa");
+        OpenCloseSubscriber openclose = new OpenCloseSubscriber(wsclient, "xxasa", "sandbox");
         runtime.dispatcher.startActor(wsclient);
         runtime.dispatcher.startActor(openclose);
         self.client = ?new mdk_discovery.protocol.DiscoClientFactory(wsclient).create(disco, self.runtime);
@@ -299,7 +299,7 @@ class DiscoveryTest {
     void testResolvePreStart() {
         Discovery disco = self.createDisco();
 
-        Promise promise = disco._resolve("svc", "1.0");
+        Promise promise = disco.resolve("svc", "1.0", "sandbox");
         checkEqual(false, promise.value().hasValue());
 
         FakeWSActor sev = startDisco(disco);
@@ -314,7 +314,7 @@ class DiscoveryTest {
         Discovery disco = self.createDisco();
         FakeWSActor sev = startDisco(disco);
 
-        Promise promise = disco._resolve("svc", "1.0");
+        Promise promise = disco.resolve("svc", "1.0", "sandbox");
         checkEqual(false, promise.value().hasValue());
 
         Node node = doActive(sev, "svc", "addr", "1.2.3");
@@ -328,7 +328,7 @@ class DiscoveryTest {
 
         Node node = doActive(sev, "svc", "addr", "1.2.3");
 
-        Promise promise = disco._resolve("svc", "1.0");
+        Promise promise = disco.resolve("svc", "1.0", "sandbox");
         checkEqualNodes(node, ?promise.value().getValue());
     }
 
@@ -337,8 +337,8 @@ class DiscoveryTest {
     void testResolveBeforeAndBeforeNotification() {
         Discovery disco = self.createDisco();
         FakeWSActor sev = startDisco(disco);
-        Promise promise = disco._resolve("svc", "1.0");
-        Promise promise2 = disco._resolve("svc", "1.0");
+        Promise promise = disco.resolve("svc", "1.0", "sandbox");
+        Promise promise2 = disco.resolve("svc", "1.0", "sandbox");
         checkEqual(false, promise.value().hasValue());
         checkEqual(false, promise2.value().hasValue());
 
@@ -351,11 +351,11 @@ class DiscoveryTest {
     void testResolveBeforeAndAfterNotification() {
         Discovery disco = self.createDisco();
         FakeWSActor sev = startDisco(disco);
-        Promise promise = disco._resolve("svc", "1.0");
+        Promise promise = disco.resolve("svc", "1.0", "sandbox");
 
         Node node = doActive(sev, "svc", "addr", "1.2.3");
 
-        Promise promise2 = disco._resolve("svc", "1.0");
+        Promise promise2 = disco.resolve("svc", "1.0", "sandbox");
         checkEqualNodes(node, ?promise.value().getValue());
         checkEqualNodes(node, ?promise2.value().getValue());
     }
@@ -367,7 +367,7 @@ class DiscoveryTest {
         Node node = doActive(sev, "svc", "addr", "1.2.3");
         doActive(sev, "svc2", "addr", "1.2.3");
 
-        Promise promise = disco._resolve("svc", "1.0");
+        Promise promise = disco.resolve("svc", "1.0", "sandbox");
         checkEqualNodes(node, ?promise.value().getValue());
     }
 
@@ -378,9 +378,9 @@ class DiscoveryTest {
         Node n1 = doActive(sev, "svc", "addr1.0", "1.0.0");
         Node n2 = doActive(sev, "svc", "addr1.2.3", "1.2.3");
 
-        Promise promise = disco._resolve("svc", "1.0");
+        Promise promise = disco.resolve("svc", "1.0", "sandbox");
         checkEqualNodes(n1, ?promise.value().getValue());
-        promise = disco._resolve("svc", "1.1");
+        promise = disco.resolve("svc", "1.1", "sandbox");
         checkEqualNodes(n2, ?promise.value().getValue());
     }
 
@@ -388,8 +388,8 @@ class DiscoveryTest {
         Discovery disco = self.createDisco();
         FakeWSActor sev = startDisco(disco);
 
-        Promise p1 = disco._resolve("svc", "1.0");
-        Promise p2 = disco._resolve("svc", "1.1");
+        Promise p1 = disco.resolve("svc", "1.0", "sandbox");
+        Promise p2 = disco.resolve("svc", "1.1", "sandbox");
 
         Node n1 = doActive(sev, "svc", "addr1.0", "1.0.0");
         Node n2 = doActive(sev, "svc", "addr1.2.3", "1.2.3");
@@ -405,9 +405,9 @@ class DiscoveryTest {
         Node n1 = doActive(sev, "svc", "addr1", "1.0.0");
         Node n2 = doActive(sev, "svc", "addr2", "1.0.0");
 
-        Promise p = disco._resolve("svc", "1.0");
+        Promise p = disco.resolve("svc", "1.0", "sandbox");
         checkEqualNodes(n1, ?p.value().getValue());
-        p = disco._resolve("svc", "1.0");
+        p = disco.resolve("svc", "1.0", "sandbox");
         checkEqualNodes(n2, ?p.value().getValue());
 
         Node failed = ?p.value().getValue();
@@ -418,9 +418,9 @@ class DiscoveryTest {
             idx = idx + 1;
         }
 
-        p = disco._resolve("svc", "1.0");
+        p = disco.resolve("svc", "1.0", "sandbox");
         checkEqualNodes(n1, ?p.value().getValue());
-        p = disco._resolve("svc", "1.0");
+        p = disco.resolve("svc", "1.0", "sandbox");
         checkEqualNodes(n1, ?p.value().getValue());
     }
 
@@ -428,7 +428,7 @@ class DiscoveryTest {
         Discovery disco = self.createDisco();
         FakeWSActor sev = startDisco(disco);
 
-        Promise promise = disco._resolve("svc", "1.0");
+        Promise promise = disco.resolve("svc", "1.0", "sandbox");
         checkEqual(false, promise.value().hasValue());
 
         Active active = new Active();
@@ -446,7 +446,7 @@ class DiscoveryTest {
 
         idx = 0;
         while (idx < count*10) {
-            Node node = ?disco._resolve("svc", "1.0").value().getValue();
+            Node node = ?disco.resolve("svc", "1.0", "sandbox").value().getValue();
             checkEqual("addr" + (idx % count).toString(), node.address);
             idx = idx + 1;
         }
