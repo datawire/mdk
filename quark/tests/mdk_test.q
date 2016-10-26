@@ -269,23 +269,6 @@ class DiscoveryTest {
         checkEqualNodes(node, active.node);
     }
 
-    void testRegisterTheNiceWay() {
-        Discovery disco = self.createDisco();
-        FakeWSActor sev = startDisco(disco);
-
-        Node node = new Node();
-        node.service = "svc";
-        node.address = "addr";
-        node.version = "1.2.3";
-        disco.register_service(node.service, node.address, node.version);
-
-        Open open = expectOpen(sev);
-        if (open == null) { return; }
-        Active active = expectActive(sev);
-        if (active == null) { return; }
-        checkEqualNodes(node, active.node);
-    }
-
     Node doActive(FakeWSActor sev, String svc, String addr, String version) {
         Active active = new Active();
         active.node = new Node();
