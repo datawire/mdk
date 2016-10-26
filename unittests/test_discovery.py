@@ -385,7 +385,7 @@ class FakeDiscovery(object):
     def compare(self, real_discovery):
         """Compare us to a real Discovery instance, assert same state."""
         real_services = {}
-        for name, cluster in list(real_discovery.services.items()):
+        for name, cluster in list(real_discovery.services["sandbox"].items()):
             real_services[name] = set(node.address for node in cluster.nodes)
         assert self.services == real_services
 

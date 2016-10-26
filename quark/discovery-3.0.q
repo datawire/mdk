@@ -69,6 +69,7 @@ namespace mdk_discovery {
         ReplaceCluster(String cluster, String environment, List<Node> nodes) {
             self.nodes = nodes;
             self.cluster = cluster;
+            self.environment = environment;
         }
     }
 
@@ -500,7 +501,8 @@ namespace mdk_discovery {
 
         // Clusters the disco says are available, as well as clusters for
         // which we are awaiting resolution.
-        Map<String, Cluster> services = new Map<String, Cluster>();
+        // Maps environment -> (servicename -> Cluster).
+        Map<String, Map<String, Cluster>> services = {};
 
         bool started = false;
         Lock mutex = new Lock();
@@ -572,20 +574,34 @@ namespace mdk_discovery {
             return self.register(node);
         }
 
+        @doc("Get the service->Cluster mapping for an Environment.")
+        Map<String,Cluster> _getServices(String environment) {
+            if (!services.contains(environment)) {
+                services[environment] = {};
+            }
+            return services[environment];
+        }
+
+        @doc("Get the Cluster for a given service and environment.")
+        Cluster _getCluster(String service, String environment) {
+            Map<String,Cluster> clusters = _getServices(environment);
+            if (!clusters.contains(service)) {
+                clusters[service] = new Cluster(self._fpfactory);
+            }
+            return clusters[service];
+        }
+
         @doc("""
         Return the current known Nodes for a service in a particular
         Environment, if any.
         """)
         List<Node> knownNodes(String service, String environment) {
-            if (!services.contains(service)) {
-                return [];
-            }
-            return services[service].nodes;
+            return _getCluster(service, environment).nodes;
         }
 
         @doc("Get the FailurePolicy for a Node.")
         FailurePolicy failurePolicy(Node node) {
-            return services[node.service].failurePolicy(node);
+            return _getCluster(node.service, node.environment).failurePolicy(node);
         }
 
         @doc("Resolve a service name into an available service node. You must")
@@ -595,14 +611,10 @@ namespace mdk_discovery {
             PromiseResolver factory = new PromiseResolver(runtime.dispatcher);
 
             self._lock();
-
-            if (!services.contains(service)) {
-                services[service] = new Cluster(self._fpfactory);
-            }
-
-            Node result = services[service].chooseVersion(version);
+            Cluster cluster = _getCluster(service, environment);
+            Node result = cluster.chooseVersion(version);
             if (result == null) {
-                services[service]._addRequest(version, factory);
+                cluster._addRequest(version, factory);
                 self._release();
             } else {
                 self._release();
@@ -626,19 +638,16 @@ namespace mdk_discovery {
             }
             if (klass == "mdk_discovery.ReplaceCluster") {
                 ReplaceCluster replace = ?message;
-                self._replace(replace.cluster, replace.nodes);
+                self._replace(replace.cluster, replace.environment, replace.nodes);
                 return;
             }
         }
 
-        void _replace(String service, List<Node> nodes) {
+        void _replace(String service, String environment, List<Node> nodes) {
             self._lock();
             logger.info("replacing all nodes for " + service + " with "
                         + nodes.toString());
-            if (!services.contains(service)) {
-                services[service] = new Cluster(self._fpfactory);
-            }
-            Cluster cluster = services[service];
+            Cluster cluster = _getCluster(service, environment);
             List<Node> currentNodes = new ListUtil<Node>().slice(cluster.nodes,
                                                                  0,
                                                                  cluster.nodes.size());
@@ -659,16 +668,9 @@ namespace mdk_discovery {
         // @doc("Add a given node.")
         void _active(Node node) {
             self._lock();
-
-            String service = node.service;
-
             logger.info("adding " + node.toString());
 
-            if (!services.contains(service)) {
-                services[service] = new Cluster(self._fpfactory);
-            }
-
-            Cluster cluster = services[service];
+            Cluster cluster = _getCluster(node.service, node.environment);
             cluster.add(node);
 
             self._release();
@@ -678,22 +680,14 @@ namespace mdk_discovery {
         // @doc("Expire a given node.")
         void _expire(Node node) {
             self._lock();
+            logger.info("removing " + node.toString() + " from cluster");
 
-            String service = node.service;
-
-            if (services.contains(service)) {
-                Cluster cluster = services[service];
-
-                logger.info("removing " + node.toString() + " from cluster");
-
-                cluster.remove(node);
-                // We don't check for or remove clusters with no nodes
-                // because they might have unresolved promises in
-                // _waiting.
-            }
+            _getCluster(node.service, node.environment).remove(node);
+            // We don't check remove clusters with no nodes because they might
+            // have unresolved promises in _waiting.
 
             self._release();
         }
     }
-    
+
 }
