@@ -2,15 +2,15 @@ SHELL=/bin/bash
 
 .PHONY: default
 default:
-	echo "You can run:"
-	echo "* 'make setup' to setup the environment"
-	echo "* '[sudo] make setup-docker' to prepare docker images for tests"
-	echo "* 'make test' to run tests (requires setup and DATAWIRE_TOKEN)"
-	echo "* 'make packages' to build packages (.whl, .gem, etc.)"
-	echo "* 'make release-patch' to do a patch release (2.0.x)"
-	echo "* 'make release-minor' to do a minor release (2.x.0)"
-	echo "* 'make upload-packages' to upload packages to native repos (e.g. .whl to PyPI, .gem to RubyGems.org, etc.)"
-	echo "* 'make clean' to undo setup and packages"
+	@echo "You can run:"
+	@echo "* 'make setup' to setup the environment"
+	@echo "* '[sudo] make setup-docker' to prepare docker images for tests"
+	@echo "* 'make test' to run tests (requires setup, setup-docker, and DATAWIRE_TOKEN)"
+	@echo "* 'make packages' to build packages (.whl, .gem, etc.)"
+	@echo "* 'make release-patch' to do a patch release (2.0.x)"
+	@echo "* 'make release-minor' to do a minor release (2.x.0)"
+	@echo "* 'make upload-packages' to upload packages to native repos (e.g. .whl to PyPI, .gem to RubyGems.org, etc.)"
+	@echo "* 'make clean' to undo setup and packages"
 
 .PHONY: clean
 clean:
