@@ -61,9 +61,12 @@ namespace mdk_discovery {
     @doc("Message from DiscoverySource: replace all nodes in a particular Cluster.")
     class ReplaceCluster {
         List<Node> nodes;
+        @doc("The name of the service.")
         String cluster;
+        @doc("The Environment for all nodes in this message.")
+        String environment = "sandbox";
 
-        ReplaceCluster(String cluster, List<Node> nodes) {
+        ReplaceCluster(String cluster, String environment, List<Node> nodes) {
             self.nodes = nodes;
             self.cluster = cluster;
         }
@@ -122,8 +125,8 @@ namespace mdk_discovery {
             return new StaticRoutes(nodes);
         }
 
-        StaticRoutes(List<Node> knowNodes) {
-            self._knownNodes = knowNodes;
+        StaticRoutes(List<Node> knownNodes) {
+            self._knownNodes = knownNodes;
         }
 
         bool isRegistrar() {
@@ -436,6 +439,8 @@ namespace mdk_discovery {
         String address;
         @doc("Additional metadata associated with this service instance.")
         Map<String,Object> properties = {};
+        @doc("The Environment the Node is in.")
+        String environment = "sandbox";
 
         FailurePolicy _policy = null;
 
@@ -567,8 +572,11 @@ namespace mdk_discovery {
             return self.register(node);
         }
 
-        @doc("Return the current known Nodes for a service, if any.")
-        List<Node> knownNodes(String service) {
+        @doc("""
+        Return the current known Nodes for a service in a particular
+        Environment, if any.
+        """)
+        List<Node> knownNodes(String service, String environment) {
             if (!services.contains(service)) {
                 return [];
             }
@@ -583,7 +591,7 @@ namespace mdk_discovery {
         @doc("Resolve a service name into an available service node. You must")
         @doc("usually start the uplink before this will do much; see start().")
         @doc("The returned Promise will end up with a Node as its value.")
-        Promise _resolve(String service, String version) {
+        Promise resolve(String service, String version, String environment) {
             PromiseResolver factory = new PromiseResolver(runtime.dispatcher);
 
             self._lock();
@@ -602,20 +610,6 @@ namespace mdk_discovery {
             }
 
             return factory.promise;
-        }
-
-        @doc("Resolve a service; return a (Bluebird) Promise on Javascript. Does not work elsewhere.")
-        Object resolve(String service, String version) {
-            return toNativePromise(_resolve(service, version));
-        }
-
-        // XXX blocking API, never call from Javascript or Quark code.
-        @doc("Wait for service name to resolve into an available service node, or fail")
-        @doc("appropriately (typically by raising an exception if the language")
-        @doc("supports it). This should only be used in blocking runtimes (e.g. ")
-        @doc("you do not want to use this in Javascript).")
-        Node resolve_until(String service, String version, float timeout) {
-            return ?WaitForPromise.wait(self._resolve(service, version), timeout, "service " + service);
         }
 
         void onMessage(Actor origin, Object message) {

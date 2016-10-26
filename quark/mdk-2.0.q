@@ -716,7 +716,8 @@ namespace mdk {
                 }
             }
 
-            return _mdk._disco._resolve(service, version).
+            // XXX USE SESSION ENVIRONMENT
+            return _mdk._disco.resolve(service, version, "sandbox").
                 andThen(bind(self, "_resolvedCallback", []));
         }
 

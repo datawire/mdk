@@ -33,14 +33,20 @@ def create_disco():
     return disco
 
 
-def create_node(address, service="myservice"):
+def create_node(address, service="myservice", environment="sandbox"):
     """Create a new Node."""
     node = Node()
     node.service = service
     node.version = "1.0"
     node.address = address
     node.properties = {"datawire_nodeId": str(uuid4())}
+    node.environment = environment
     return node
+
+
+def resolve(disco, service, version, environment="sandbox"):
+    """Resolve a service to a Node."""
+    return disco.resolve(service, version, environment).value().getValue()
 
 
 class DiscoveryTests(TestCase):
@@ -51,16 +57,12 @@ class DiscoveryTests(TestCase):
         self.assertEqual((a.version, a.address, a.service, a.properties),
                          (b.version, b.address, b.service, b.properties))
 
-    def resolve(self, disco, service, version):
-        """Resolve a service to a Node."""
-        return disco._resolve(service, version).value().getValue()
-
     def test_active(self):
         """NodeActive adds a Node to Discovery."""
         disco = create_disco()
         node = create_node("somewhere")
         disco.onMessage(None, NodeActive(node))
-        self.assertEqual(disco.knownNodes("myservice"), [node])
+        self.assertEqual(disco.knownNodes("myservice", "sandbox"), [node])
 
     def test_resolve(self):
         """resolve() returns a Node matching an active one."""
@@ -68,7 +70,7 @@ class DiscoveryTests(TestCase):
         node = create_node("somewhere")
         node.properties = {"x": 1}
         disco.onMessage(None, NodeActive(node))
-        resolved = self.resolve(disco, "myservice", "1.0")
+        resolved = resolve(disco, "myservice", "1.0")
         self.assertEqual(
             (resolved.version, resolved.address, resolved.service, resolved.properties),
             ("1.0", "somewhere", "myservice", {"x": 1}))
@@ -82,8 +84,8 @@ class DiscoveryTests(TestCase):
         node2.version = "1.7"
         node2.properties = {"a": 123}
         disco.onMessage(None, NodeActive(node2))
-        self.assertEqual(disco.knownNodes("myservice"), [node2])
-        resolved = self.resolve(disco, "myservice", "1.7")
+        self.assertEqual(disco.knownNodes("myservice", "sandbox"), [node2])
+        resolved = resolve(disco, "myservice", "1.7")
         self.assertEqual((resolved.version, resolved.properties),
                          ("1.7", {"a": 123}))
 
@@ -93,7 +95,7 @@ class DiscoveryTests(TestCase):
         """
         disco = create_disco()
         result = []
-        promise = disco._resolve("myservice", "1.0")
+        promise = disco.resolve("myservice", "1.0", "sandbox")
         promise.andThen(result.append)
         self.assertFalse(result)
 
@@ -107,14 +109,14 @@ class DiscoveryTests(TestCase):
         node = create_node("somewhere")
         disco.onMessage(None, NodeActive(node))
         disco.onMessage(None, NodeExpired(node))
-        self.assertEqual(disco.knownNodes("myservice"), [])
+        self.assertEqual(disco.knownNodes("myservice", "sandbox"), [])
 
     def test_expiredUnknown(self):
         """NodeExpired does nothing for unknown Node."""
         disco = create_disco()
         node = create_node("somewhere")
         disco.onMessage(None, NodeExpired(node))
-        self.assertEqual(disco.knownNodes("myservice"), [])
+        self.assertEqual(disco.knownNodes("myservice", "sandbox"), [])
 
     def test_replace(self):
         """
@@ -128,8 +130,8 @@ class DiscoveryTests(TestCase):
         node4 = create_node("somewhere4")
         disco.onMessage(None, NodeActive(node1))
         disco.onMessage(None, NodeActive(node2))
-        disco.onMessage(None, ReplaceCluster("myservice", [node3, node4]))
-        self.assertEqual(disco.knownNodes("myservice"), [node3, node4])
+        disco.onMessage(None, ReplaceCluster("myservice", "sandbox",  [node3, node4]))
+        self.assertEqual(disco.knownNodes("myservice", "sandbox"), [node3, node4])
 
     def test_replaceEmpty(self):
         """
@@ -138,8 +140,8 @@ class DiscoveryTests(TestCase):
         disco = create_disco()
         node1 = create_node("somewhere")
         node2 = create_node("somewhere2")
-        disco.onMessage(None, ReplaceCluster("myservice", [node1, node2]))
-        self.assertEqual(disco.knownNodes("myservice"), [node1, node2])
+        disco.onMessage(None, ReplaceCluster("myservice", "sandbox",  [node1, node2]))
+        self.assertEqual(disco.knownNodes("myservice", "sandbox"), [node1, node2])
 
     def test_replaceTriggersWaitingPromises(self):
         """
@@ -147,12 +149,12 @@ class DiscoveryTests(TestCase):
         """
         disco = create_disco()
         result = []
-        promise = disco._resolve("myservice", "1.0")
+        promise = disco.resolve("myservice", "1.0", "sandbox")
         promise.andThen(result.append)
         self.assertFalse(result)
 
         node = create_node("somewhere")
-        disco.onMessage(None, ReplaceCluster("myservice", [node]))
+        disco.onMessage(None, ReplaceCluster("myservice", "sandbox",  [node]))
         self.assertNodesEqual(result[0], node)
 
     def test_activeDoesNotMutate(self):
@@ -162,7 +164,7 @@ class DiscoveryTests(TestCase):
         disco = create_disco()
         node = create_node("somewhere")
         disco.onMessage(None, NodeActive(node))
-        resolved_node = self.resolve(disco, "myservice", "1.0")
+        resolved_node = resolve(disco, "myservice", "1.0")
 
         node2 = create_node("somewhere")
         node2.version = "1.3"
@@ -177,11 +179,11 @@ class DiscoveryTests(TestCase):
         disco = create_disco()
         node = create_node("somewhere")
         disco.onMessage(None, NodeActive(node))
-        resolved_node = self.resolve(disco, "myservice", "1.0")
+        resolved_node = resolve(disco, "myservice", "1.0")
 
         node2 = create_node("somewhere")
         node2.version = "1.3"
-        disco.onMessage(None, ReplaceCluster("myservice", [node2]))
+        disco.onMessage(None, ReplaceCluster("myservice", "sandbox",  [node2]))
         self.assertEqual(resolved_node.version, "1.0")
 
     def test_nodeCircuitBreaker(self):
@@ -189,7 +191,7 @@ class DiscoveryTests(TestCase):
         disco = create_disco()
         node = create_node("somewhere")
         disco.onMessage(None, NodeActive(node))
-        resolved_node = self.resolve(disco, "myservice", "1.0")
+        resolved_node = resolve(disco, "myservice", "1.0")
 
         avail1 = resolved_node.available()
         # Default threshold in CircuitBreaker is three failures:
@@ -209,17 +211,17 @@ class DiscoveryTests(TestCase):
         disco = create_disco()
         node = create_node("somewhere")
         disco.onMessage(None, NodeActive(node))
-        resolved_node = self.resolve(disco, "myservice", "1.0")
+        resolved_node = resolve(disco, "myservice", "1.0")
         # Uh-oh it's a pretty broken node:
         for i in range(10):
             resolved_node.failure()
 
         node = create_node("somewhere")
         disco.onMessage(None, NodeActive(node))
-        resolved_node2 = self.resolve(disco, "myservice", "1.0")
+        resolved_node2 = resolve(disco, "myservice", "1.0")
         self.assertEqual(resolved_node2, None)
         resolved_node.success()
-        self.assertNodesEqual(self.resolve(disco, "myservice", "1.0"), node)
+        self.assertNodesEqual(resolve(disco, "myservice", "1.0"), node)
 
     def test_replaceDoesNotDisableCircuitBreaker(self):
         """
@@ -229,17 +231,78 @@ class DiscoveryTests(TestCase):
         disco = create_disco()
         node = create_node("somewhere")
         disco.onMessage(None, NodeActive(node))
-        resolved_node = self.resolve(disco, "myservice", "1.0")
+        resolved_node = resolve(disco, "myservice", "1.0")
         # Uh-oh it's a pretty broken node:
         for i in range(10):
             resolved_node.failure()
 
         node = create_node("somewhere")
-        disco.onMessage(None, ReplaceCluster("myservice", [node]))
-        resolved_node2 = self.resolve(disco, "myservice", "1.0")
+        disco.onMessage(None, ReplaceCluster("myservice", "sandbox", [node]))
+        resolved_node2 = resolve(disco, "myservice", "1.0")
         self.assertEqual(resolved_node2, None)
         resolved_node.success()
-        self.assertNodesEqual(self.resolve(disco, "myservice", "1.0"), node)
+        self.assertNodesEqual(resolve(disco, "myservice", "1.0"), node)
+
+
+class DiscoveryEnvironmentTests(TestCase):
+    """Tests for interaction between Discovery and environments."""
+
+    def test_activeIsEnvironmentSpecific(self):
+        """ActiveNode only updates the Environment set on the Node."""
+        node = create_node("somewhere", "myservice", "env1")
+        disco = create_disco()
+        disco.onMessage(None, NodeActive(node))
+        self.assertEqual((disco.knownNodes("myservice", "env1"),
+                          disco.knownNodes("myservice", "env2")),
+                         ([node], []))
+
+    def test_expireIsEnvironmentSpecific(self):
+        """ExpireNode only updates the Environment set on the Node."""
+        node = create_node("somewhere", "myservice", "env1")
+        node2 = create_node("somewhere2", "myservice", "env2")
+        disco = create_disco()
+        disco.onMessage(None, NodeActive(node))
+        disco.onMessage(None, NodeActive(node2))
+        disco.onMessage(None, NodeExpired(node))
+        self.assertEqual((disco.knownNodes("myservice", "env1"),
+                          disco.knownNodes("myservice", "env2")),
+                         ([], [node2]))
+
+    def test_replaceIsEnvironmentSpecific(self):
+        """ReplaceCluster only updates the Environment set on the Node."""
+        node = create_node("somewhere", "myservice", "env1")
+        node2 = create_node("somewhere2", "myservice", "env2")
+        node3 = create_node("somewhere3", "myservice", "env2")
+        disco = create_disco()
+        disco.onMessage(None, NodeActive(node))
+        disco.onMessage(None, NodeActive(node2))
+        disco.onMessage(None, ReplaceCluster(node3.service, node3.environment,
+                                             [node3]))
+        self.assertEqual((disco.knownNodes("myservice", "env1"),
+                          disco.knownNodes("myservice", "env2")),
+                         ([node], [node3]))
+
+    def test_resolve(self):
+        """Resolve is limited to the specified environment."""
+        node = create_node("somewhere", "myservice", "env1")
+        node2 = create_node("somewhere2", "myservice", "env2")
+        disco = create_disco()
+        disco.onMessage(None, NodeActive(node))
+        disco.onMessage(None, NodeActive(node2))
+        # Do repeatedly in case round robin is somehow tricking us:
+        for i in range(10):
+            self.assertEqual(resolve(disco, "myservice", "1.0", "env1").address,
+                             "somewhere")
+        for i in range(10):
+            self.assertEqual(resolve(disco, "myservice", "1.0", "env2").address,
+                             "somewhere2")
+
+    def test_environmentInheritance(self):
+        """
+        If an Environment has a parent it is checked if there are no Nodes in the
+        child Environment.
+        """
+        raise NotImplementedError("IMPLEMENT ME")
 
 
 class CircuitBreakerTests(TestCase):
@@ -378,7 +441,7 @@ class StatefulDiscoveryTesting(GenericStateMachine):
         elif command == "replace":
             service, addresses = args
             nodes = [create_node(address, service) for address in addresses]
-            message = ReplaceCluster(service, nodes)
+            message = ReplaceCluster(service, "sandbox", nodes)
             self.fake.replace(service, addresses)
         else:
             raise AssertionError("Unknown command.")
@@ -404,8 +467,8 @@ class StaticDiscoverySourceTests(TestCase):
         static = StaticRoutes(nodes).create(self.disco, self.runtime)
         self.runtime.dispatcher.startActor(static)
 
-        self.assertEqual(self.disco.knownNodes("service1"), [nodes[0]])
-        self.assertEqual(self.disco.knownNodes("service2"), [nodes[1]])
+        self.assertEqual(self.disco.knownNodes("service1", "sandbox"), [nodes[0]])
+        self.assertEqual(self.disco.knownNodes("service2", "sandbox"), [nodes[1]])
 
     def test_parseJSON(self):
         """
@@ -413,13 +476,15 @@ class StaticDiscoverySourceTests(TestCase):
         as active.
         """
         static = StaticRoutes.parseJSON(dumps(
-            [{"service": "service1", "address": "a", "version": "1.0"},
-             {"service": "service2", "address": "b", "version": "2.0"}]
+            [{"service": "service1", "address": "a", "version": "1.0",
+              "environment": "myenv"},
+             {"service": "service2", "address": "b", "version": "2.0",
+              "environment": "myenv2"}]
         )).create(self.disco, self.runtime)
 
         self.runtime.dispatcher.startActor(static)
 
-        [node1] = self.disco.knownNodes("service1")
+        [node1] = self.disco.knownNodes("service1", "myenv")
         self.assertEqual((node1.address, node1.version), ("a", "1.0"))
-        [node2] = self.disco.knownNodes("service2")
+        [node2] = self.disco.knownNodes("service2", "myenv2")
         self.assertEqual((node2.address, node2.version), ("b", "2.0"))

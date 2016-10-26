@@ -46,11 +46,16 @@ namespace synapse {
         String directory_path;
         FileActor files;
         MessageDispatcher dispatcher;
+        String environment;
 
         _SynapseSource(Actor subscriber, String directory_path, MDKRuntime runtime) {
             self.subscriber = subscriber;
             self.directory_path = directory_path;
             self.files = runtime.getFileService();
+            // XXX
+            //self.environment = runtime.getEnvVarsService()
+            //    .var("MDK_ENVIRONMENT").orElseGet("sandbox");
+            self.environment = "whatever";
         }
 
         void onStart(MessageDispatcher dispatcher) {
@@ -70,7 +75,8 @@ namespace synapse {
 
         @doc("Send an appropriate update to the subscriber for this DiscoverySource.")
         void _update(String service, List<Node> nodes) {
-            self.dispatcher.tell(self, new ReplaceCluster(service, nodes),
+            self.dispatcher.tell(self, new ReplaceCluster(service, self.environment,
+                                                          nodes),
                                  self.subscriber);
         }
 

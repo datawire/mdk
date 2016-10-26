@@ -19,6 +19,7 @@ class SynapseTests(TestCase):
 
     def setUp(self):
         self.runtime = fake_runtime()
+        self.runtime.getEnvVarsService().set("MDK_ENVIRONMENT", "staging")
         self.disco = Discovery(self.runtime)
         self.runtime.dispatcher.startActor(self.disco)
 
@@ -73,7 +74,7 @@ class SynapseTests(TestCase):
         self.write("service2.json", [])
         self.pump()
         self.assertNodesEqual(
-            self.disco.knownNodes("service1"),
+            self.disco.knownNodes("service1", "staging"),
             [self.node("service1", "host1", 123),
              self.node("service1", "host2", 124)])
 
@@ -86,7 +87,7 @@ class SynapseTests(TestCase):
                                      {"host": "host4", "port": 126}])
         self.pump()
         self.assertNodesEqual(
-            self.disco.knownNodes("service1"),
+            self.disco.knownNodes("service1", "staging"),
             [self.node("service1", "host3", 125),
              self.node("service1", "host4", 126)])
 
@@ -97,18 +98,18 @@ class SynapseTests(TestCase):
         self.pump()
         self.remove("service1.json")
         self.pump()
-        self.assertNodesEqual(self.disco.knownNodes("service1"), [])
+        self.assertNodesEqual(self.disco.knownNodes("service1", "staging"), [])
 
     def test_badFormat(self):
         """An unreadable file leaves Discovery unchanged."""
         with open(os.path.join(self.directory, "service2.json"), "w") as f:
             f.write("this is not json")
         self.pump()
-        self.assertNodesEqual(self.disco.knownNodes("service2"), [])
+        self.assertNodesEqual(self.disco.knownNodes("service2", "staging"), [])
 
     def test_unexpectedFilename(self):
         """Files that don't end with '.json' are ignored."""
         self.write("service1.abcd", [{"host": "host1", "port": 123},
                                      {"host": "host2", "port": 124}])
         self.pump()
-        self.assertNodesEqual(self.disco.knownNodes("service1"), [])
+        self.assertNodesEqual(self.disco.knownNodes("service1", "staging"), [])
