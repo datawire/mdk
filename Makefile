@@ -27,6 +27,8 @@ clean:
 	-docker kill websocket-echo
 	docker rmi datawire/websocket-echo:latest
 	docker rmi datawire/websocket-echo:`node -e "console.log(require('./docker/websocket-echo/package.json').version)"`
+	docker rmi datawire/mdk-quark-run:latest
+	docker rmi datawire/mdk-quark-run:`sed s/v//g < QUARK_VERSION.txt`
 
 virtualenv:
 	virtualenv -p python2 virtualenv
@@ -89,6 +91,10 @@ setup-docker: docker
 	docker build -t datawire/websocket-echo docker/websocket-echo
 	docker tag datawire/websocket-echo \
 		datawire/websocket-echo:`node -e "console.log(require('./docker/websocket-echo/package.json').version)"`
+	# Set up special docker image for `quark run`ning tests
+	# Need `quark install --online` and additional build environment stuff for MDK Runtime
+	docker build -t datawire/mdk-quark-run docker/mdk-quark-run
+	docker tag datawire/mdk-quark-run datawire/mdk-quark-run:`sed s/v//g < QUARK_VERSION.txt`
 
 .PHONY: test
 test: install-mdk test-python test-python3

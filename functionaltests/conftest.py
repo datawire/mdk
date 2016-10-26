@@ -66,7 +66,7 @@ def run(filepath, language):
                 # Link to local websocket echo server running in another container
                 "--link", "websocket-echo",
                ] +
-               ["datawire/quark-run:" + QUARK_VERSION, "--" + language, '--verbose', docker_path])
+               ["datawire/mdk-quark-run:" + QUARK_VERSION, "--" + language, '--verbose', docker_path])
     print(" ".join(command))
     check_call(command)
 
