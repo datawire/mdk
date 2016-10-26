@@ -13,7 +13,8 @@ mdkSession.setDeadline(1.0);
 
 var requestMDK = mdk_request.forMDKSession(mdkSession);
 requestMDK(process.argv[2], function (error, response, body) {
-    if (error !== null && error.code === 'ETIMEDOUT') {
+    if (error !== null && (error.code === 'ETIMEDOUT' ||
+                           error.code === 'ESOCKETTIMEDOUT')) {
         process.exit(123);
     } else {
         process.exit(0);

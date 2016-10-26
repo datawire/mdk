@@ -92,8 +92,8 @@ class TracingTest {
     FakeWSActor startTracer(Tracer tracer) {
         runtime.dispatcher.startActor(tracer._client._wsclient);
         runtime.dispatcher.startActor(tracer);
-        tracer.initContext();
-        tracer.log("procUUID", "DEBUG", "blah", "testing...");
+        SharedContext ctx = new SharedContext();
+        tracer.log(ctx, "procUUID", "DEBUG", "blah", "testing...");
         self.pump();
         FakeWSActor sev = expectSocket(self.runtime, tracer._client._wsclient.url + "?token=" + tracer._client._wsclient.token);
         if (sev == null) {

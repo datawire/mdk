@@ -4,14 +4,18 @@ Flask integration for the MDK.
 This requires Flask and the blinker library.
 """
 
+from __future__ import absolute_import
+
 import atexit
 import traceback
 
-import mdk
+from mdk import start
+from .logging import MDKHandler
 
 from flask import (
     g, request, request_started, got_request_exception, request_tearing_down,
 )
+
 
 def _on_request_started(sender, **extra):
     """Create a new MDK session at request start."""
@@ -31,22 +35,44 @@ def _on_request_tearing_down(sender, **extra):
     del g.mdk_session
 
 
-def mdk_setup(app, timeout=None):
-    """Setup MDK integration with Flask.
+def mdk_setup(app, timeout=None, mdk=None):
+    """
+    Setup MDK integration with Flask.
 
     :param app: A Flask application instance.
     :param timeout: Default timeout in seconds to set for the MDK session.
+    :param mdk: An optional ``mdk.MDK`` instance to use instead of creating a
+        new one. It will not be started or stopped.
 
     :return: The ``mdk.MDK`` instance.
     """
-    app.mdk = mdk.start()
+    if mdk is None:
+        app.mdk = start()
+        atexit.register(app.mdk.stop)
+    else:
+        app.mdk = mdk
     if timeout is not None:
         app.mdk.setDefaultDeadline(timeout)
-    atexit.register(app.mdk.stop)
     request_started.connect(_on_request_started, app)
     got_request_exception.connect(_on_request_exception, app)
     request_tearing_down.connect(_on_request_tearing_down, app)
     return app.mdk
 
 
-__all__ = ["mdk_setup"]
+class MDKLoggingHandler(MDKHandler):
+    """
+    ``logging.Handler`` that routes logs to MDK and extracts MDK session from
+    the Flask request.
+    """
+    def __init__(self, mdk):
+        """
+        :param mdk: A ``mdk.MDK`` instance.
+        """
+        def get_session():
+            if not g:
+                return None
+            return getattr(g, "mdk_session", None)
+        MDKHandler.__init__(self, mdk, get_session)
+
+
+__all__ = ["mdk_setup", "MDKLoggingHandler"]
