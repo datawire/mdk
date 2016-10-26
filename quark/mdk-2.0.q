@@ -352,6 +352,9 @@ namespace mdk {
         String procUUID = Context.runtime().uuid();
         bool _running = false;
         float _defaultTimeout = null;
+        // The Environment this MDK is configured for, e.g. "sandbox" or
+        // "production".
+        String _environment;
 
         @doc("Choose DiscoverySource based on environment variables.")
         DiscoverySourceFactory getDiscoveryFactory(EnvironmentVariables env) {
@@ -411,6 +414,8 @@ namespace mdk {
         MDKImpl(MDKRuntime runtime) {
             _reflection_hack = new Map<String,Object>();
             _runtime = runtime;
+            _environment = runtime.getEnvVarsService()
+                .var("MDK_ENVIRONMENT").orElseGet("sandbox");
             if (!runtime.dependencies.hasService("failurepolicy_factory")) {
                 runtime.dependencies.registerService("failurepolicy_factory",
                                                      getFailurePolicy(runtime));
@@ -423,7 +428,7 @@ namespace mdk {
             // Make sure we register OpenCloseSubscriber first so that Open
             // message gets sent first.
             if (_wsclient != null) {
-                _openclose = new OpenCloseSubscriber(_wsclient, procUUID);
+                _openclose = new OpenCloseSubscriber(_wsclient, procUUID, _environment);
             }
             EnvironmentVariables env = runtime.getEnvVarsService();
             DiscoverySourceFactory discoFactory = getDiscoveryFactory(env);

@@ -409,10 +409,13 @@ class MDKConnector(object):
 
     URL = "ws://localhost:1234/"
 
-    def __init__(self, failurepolicy_factory=None):
+    def __init__(self, failurepolicy_factory=None, env={}):
         self.runtime = fakeRuntime()
-        self.runtime.getEnvVarsService().set("DATAWIRE_TOKEN", "xxx");
-        self.runtime.getEnvVarsService().set("MDK_SERVER_URL", self.URL);
+        env_vars = self.runtime.getEnvVarsService()
+        for key, value in env.items():
+            env_vars.set(key, value)
+        env_vars.set("DATAWIRE_TOKEN", "xxx");
+        env_vars.set("MDK_SERVER_URL", self.URL);
         if failurepolicy_factory is not None:
             self.runtime.dependencies.registerService(
                 "failurepolicy_factory", failurepolicy_factory)
@@ -483,10 +486,8 @@ class ConnectionStartupTests(TestCase):
         # Should be new connection:
         self.assertNotEqual(ws_actor, ws_actor2)
         open2 = connector.connect(ws_actor2)
-        self.assertEqual(open.properties["datawire_nodeId"],
-                         open2.properties["datawire_nodeId"])
-        self.assertEqual(open.properties["datawire_nodeId"],
-                         connector.mdk.procUUID)
+        self.assertEqual(open.nodeId,open2.nodeId)
+        self.assertEqual(open.nodeId, connector.mdk.procUUID)
 
     def test_random_node_identity(self):
         """
@@ -498,8 +499,25 @@ class ConnectionStartupTests(TestCase):
         connector2 = MDKConnector()
         ws_actor2 = connector2.expectSocket()
         open2 = connector.connect(ws_actor2)
-        self.assertNotEqual(open.properties["datawire_nodeId"],
-                            open2.properties["datawire_nodeId"])
+        self.assertNotEqual(open.nodeId, open2.nodeId)
+
+    def test_environment(self):
+        """
+        The Open message includes the Environment loaded from an env variable.
+        """
+        connector = MDKConnector(env={"MDK_ENVIRONMENT": "myenv"})
+        ws_actor = connector.expectSocket()
+        open = connector.connect(ws_actor)
+        self.assertEqual(open.environment, "myenv")
+
+    def test_default_environment(self):
+        """
+        The Environment is 'sandbox' if none env variable is set.
+        """
+        connector = MDKConnector()
+        ws_actor = connector.expectSocket()
+        open = connector.connect(ws_actor)
+        self.assertEqual(open.environment, "sandbox")
 
 
 class InteractionReportingTests(TestCase):
@@ -542,6 +560,3 @@ class InteractionReportingTests(TestCase):
         interaction = connector.expectInteraction(self, ws_actor, session,
                                                   [self.node1], [self.node2])
         self.assertEqual(interaction.timestamp, int(1000*start_time))
-
-    def test_independent_interactions(self):
-        """A new interaction doesn't report info from a previous interaction."""
