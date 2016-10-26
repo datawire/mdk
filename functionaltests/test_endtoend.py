@@ -75,7 +75,7 @@ class Python2Tests(TestCase):
                    context_id, expected_messages])
         print("context_id", context_id)
         # Ensure the subscription is in place before we send messages:
-        time.sleep(5)
+        time.sleep(8)
         context_id = run_python(self.python_binary, "start_trace.py", [context_id], output=True)
         run_python(self.python_binary, "continue_trace.py", [context_id])
         assert p.wait() == 0

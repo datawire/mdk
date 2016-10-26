@@ -12,7 +12,7 @@ def main():
     context = sys.argv[1]
     session = mdk.join(context)
     session.info("process2", "world")
-    time.sleep(3)  # make sure it's written
+    time.sleep(5)  # make sure it's written
     mdk.stop()
 
 if __name__ == '__main__':
