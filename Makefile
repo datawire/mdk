@@ -4,6 +4,7 @@ SHELL=/bin/bash
 default:
 	echo "You can run:"
 	echo "* 'make setup' to setup the environment"
+	echo "* '[sudo] make setup-docker' to prepare docker images for tests"
 	echo "* 'make test' to run tests (requires setup and DATAWIRE_TOKEN)"
 	echo "* 'make packages' to build packages (.whl, .gem, etc.)"
 	echo "* 'make release-patch' to do a patch release (2.0.x)"
@@ -23,6 +24,9 @@ clean:
 	rm -fr ~/.m2/repository/io/datawire/mdk
 	rm -rf node_modules
 	find . -name "__pycache__" -print0 | xargs -0 rm -fr
+	-docker kill websocket-echo
+	docker rmi datawire/websocket-echo:latest
+	docker rmi datawire/websocket-echo:`node -e "console.log(require('./docker/websocket-echo/package.json').version)"`
 
 virtualenv:
 	virtualenv -p python2 virtualenv
@@ -87,7 +91,7 @@ setup-docker: docker
 		datawire/websocket-echo:`node -e "console.log(require('./docker/websocket-echo/package.json').version)"`
 
 .PHONY: test
-test: install-mdk setup-docker test-python test-python3
+test: install-mdk test-python test-python3
 
 .PHONY: guard-token
 guard-token:
