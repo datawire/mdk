@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk 2.0.22;
+package datawire_mdk 2.0.23;
 
 // DATAWIRE MDK
 
@@ -415,6 +415,9 @@ namespace mdk {
                 runtime.dependencies.registerService("failurepolicy_factory",
                                                      getFailurePolicy(runtime));
             }
+            if (runtime.dependencies.hasService("tracer")) {
+                _tracer = ?_runtime.dependencies.getService("tracer");
+            }
             _disco = new Discovery(runtime);
             _wsclient = getWSClient(runtime);
             // Make sure we register OpenCloseSubscriber first so that Open
@@ -429,8 +432,9 @@ namespace mdk {
                 runtime.dependencies.registerService("discovery_registrar", _discoSource);
             }
             if (_wsclient != null) {
-                _tracer = Tracer(runtime, _wsclient);
-                _tracer.initContext();
+                if (_tracer == null) {
+                    _tracer = Tracer(runtime, _wsclient);
+                }
                 _metrics = new MetricsClient(_wsclient);
             }
         }
@@ -645,8 +649,7 @@ namespace mdk {
                     return;
                 }
                 _inLogging.setValue(true);
-                _mdk._tracer.setContext(_context);
-                _mdk._tracer.log(_mdk.procUUID, level, category, text);
+                _mdk._tracer.log(_context, _mdk.procUUID, level, category, text);
                 _inLogging.setValue(false);
             }
         }
@@ -783,7 +786,9 @@ namespace mdk {
                 report.addNode(node, true);
                 idx = idx + 1;
             }
-            _mdk._metrics.sendInteraction(report);
+            if (_mdk._metrics != null) {
+                _mdk._metrics.sendInteraction(report);
+            }
         }
 
         void interact(UnaryCallable cmd) {
