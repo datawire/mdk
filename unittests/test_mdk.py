@@ -23,9 +23,6 @@ from mdk_protocol import Serializable
 from .test_discovery import create_node
 
 
-### XXXXXXX Session.resolve and friends use the Session's environment!
-
-
 class MDKInitializationTestCase(TestCase):
     """
     Tests for top-level MDK API startup.
