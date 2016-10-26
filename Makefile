@@ -82,8 +82,9 @@ install-mdk: packages $(wildcard javascript/**/*)
 .PHONY: setup-docker
 setup-docker: docker
 	# Set up docker image for a local websocket echo server
-	cd docker/websocket-echo && docker build -t datawire/websocket-echo -f Dockerfile .
-	docker tag datawire/websocket-echo datawire/websocket-echo:`sed s/v//g < QUARK_VERSION.txt`
+	docker build -t datawire/websocket-echo docker/websocket-echo
+	docker tag datawire/websocket-echo \
+		datawire/websocket-echo:`node -e "console.log(require('./docker/websocket-echo/package.json').version)"`
 
 .PHONY: test
 test: install-mdk setup-docker test-python test-python3
