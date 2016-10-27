@@ -35,7 +35,7 @@ def assertRegisteryDiscoverable(test, discover, additional_env={}):
     test.addCleanup(lambda: p.kill())
     resolved_address = discover(service).decode("utf-8")
     test.assertIn(address, resolved_address)
-    return p, service
+    return p, service, address
 
 
 def assertNotResolvable(test, service, additional_env={}):
@@ -53,7 +53,7 @@ class Python2Tests(TestCase):
     def test_discovery(self):
         """Minimal discovery end-to-end test."""
         # 1. Services registered by one process can be looked up by another.
-        p, service = assertRegisteryDiscoverable(
+        p, service, _ = assertRegisteryDiscoverable(
             self,
             lambda service: run_python(self.python_binary, "resolve.py",
                                        [service], output=True))
@@ -101,7 +101,7 @@ class Python3Tests(Python2Tests):
         environment.
         """
         # 1. Register in default environment
-        _, service = assertRegisteryDiscoverable(
+        _, service, _ = assertRegisteryDiscoverable(
             self,
             lambda service: run_python(self.python_binary, "resolve.py",
                                        [service], output=True,
@@ -110,21 +110,67 @@ class Python3Tests(Python2Tests):
         # 2. Assert it can't be found in a different environment:
         assertNotResolvable(service, {"MDK_ENVIRONMENT": "anotherenv"})
 
+    def assertResolvable(self, service, environment, expected_address,
+                         context=None):
+        """
+        Assert a service can be resolved in the given environment.
+        """
+        params = [service]
+        if context is not None:
+            params.append(context)
+        address = run_python(self.python_binary, "resolve.py",
+                             params, output=True,
+                             additional_env={"MDK_ENVIRONMENT": environment})
+        self.assertEqual(address, expected_address)
+
+    def registerInAnEnvironment(self, environment):
+        """
+        Register a service in the specified environment.
+        """
+        env = {"MDK_ENVIRONMENT": environment}
+        _, service, address = assertRegisteryDiscoverable(
+            self,
+            lambda service: run_python(self.python_binary, "resolve.py",
+                                       [service], output=True,
+                                       additional_env=env),
+            additional_env=env)
+        return service, address
+
     def test_environmentIsolation(self):
         """
         A service registered in environment A can't be resolved from another
         environment.
         """
         # 1. Register in one environment
-        env = {"MDK_ENVIRONMENT": "env1"}
-        _, service = assertRegisteryDiscoverable(
-            self,
-            lambda service: run_python(self.python_binary, "resolve.py",
-                                       [service], output=True,
-                                       additional_env=env),
-            additional_env=env)
+        service, _ = self.registerInAnEnvironment("firstenv")
         # 2. Assert it can't be found in a different environment:
         assertNotResolvable(service, {"MDK_ENVIRONMENT": "anotherenv"})
+
+    def test_environmentInheritance(self):
+        """
+        Imagine an environment 'parent:child'.
+
+        Service A that is in environment 'parent:child' can communicate with a
+        service B that is in enviornment 'parent'.
+
+        Furthermore, the session preserves the original environment, so if A
+        calls B and B wants to call C within the same session, if C is in
+        'parent:child' it will be found by B.
+        """
+        # 1. Create a session in environment parent:child
+        context_id = run_python(self.python_binary, "create_trace.py", output=True,
+                                additional_env={"MDK_ENVIRONMENT": "parent:child"})
+        # 2. Register B in parent, and C in parent:child
+        serviceB, addressB = self.registerInAnEnvironment("parent")
+        serviceC, addressC = self.registerInAnEnvironment("parent:child")
+        # 3. Services in parent:child can resolve B, even though it's in
+        # parent, both with and without a parent:child session:
+        self.assertResolvable(serviceB, addressB, "parent:child")
+        self.assertResolvable(serviceB, addressB, "parent:child", context_id)
+        # 4. Services in parent can resolve C if it's joined a parent:child
+        # session, but not with its normal sessions:
+        self.assertResolvable(serviceC, addressC, "parent:child", context_id)
+        assertNotResolvable(self, serviceC, {"MDK_ENVIRONMENT": "parent"})
 
 
 class JavascriptTests(TestCase):
