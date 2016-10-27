@@ -291,6 +291,8 @@ namespace mdk_discovery {
         Map<String,FailurePolicy> _failurepolicies = {}; // Maps address->FailurePolicy
         int _counter = 0;
         FailurePolicyFactory _fpfactory;
+        // Versions that have been registered at some point in the past:
+        List<String> _registeredVersions = [];
 
         Cluster(FailurePolicyFactory fpfactory) {
             self._fpfactory = fpfactory;
@@ -338,10 +340,40 @@ namespace mdk_discovery {
             return null;
         }
 
+        @doc("""
+        Return whether node with semantically matching version was registered at
+        some point.
+        """)
+        bool matchingVersionRegistered(String version) {
+            int idx = 0;
+            while (idx < _registeredVersions.size()) {
+                if (versionMatch(version, _registeredVersions[idx])) {
+                    return true;
+                }
+                idx = idx + 1;
+            }
+            return false;
+        }
+
         @doc("Add a Node to the cluster (or, if it's already present in the cluster,")
         @doc("update its properties).  At present, this involves a linear search, so")
         @doc("very large Clusters are unlikely to perform well.")
         void add(Node node) {
+            // Register the node's version if we haven't seen it before:
+            int kdx = 0;
+            bool foundVersion = false;
+            while (kdx < _registeredVersions.size()) {
+                if (_registeredVersions[kdx] == node.version) {
+                    foundVersion = true;
+                    break;
+                }
+                kdx = kdx + 1;
+            }
+            if (!foundVersion) {
+                _registeredVersions.add(node.version);
+            }
+
+            // Create FailurePolicy for new addresses:
             if (!_failurepolicies.contains(node.address)) {
                 _failurepolicies[node.address] = self._fpfactory.create();
             }
@@ -602,6 +634,16 @@ namespace mdk_discovery {
 
             self._lock();
             Cluster cluster = _getCluster(service, environment);
+            if (!cluster.matchingVersionRegistered(version)) {
+                // We've never seen a Node registered with a matching version. So
+                // check if there is parent environment, and if so use it.
+                if (environment.find(":") != -1) {
+                    String parent = environment.split(":")[0];
+                    self._release();
+                    return resolve(service, version, parent);
+                }
+            }
+
             Node result = cluster.chooseVersion(version);
             if (result == null) {
                 cluster._addRequest(version, factory);

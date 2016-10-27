@@ -297,6 +297,75 @@ class DiscoveryEnvironmentTests(TestCase):
             self.assertEqual(resolve(disco, "myservice", "1.0", "env2").address,
                              "somewhere2")
 
+    def test_environmentInheritance(self):
+        """
+        If an Environment has a parent it is checked if there have never been Nodes
+        with that service name registered in the child Environment.
+        """
+        # In the parent only
+        node = create_node("somewhere", "myservice", "parent")
+        # In the child
+        node2 = create_node("somewhere2", "myservice2", "parent:child")
+        disco = create_disco()
+        disco.onMessage(None, NodeActive(node))
+        disco.onMessage(None, NodeActive(node2))
+        # Do repeatedly in case round robin is somehow tricking us:
+        for i in range(10):
+            self.assertEqual(resolve(disco, "myservice", "1.0", "parent:child").address,
+                             "somewhere")
+        for i in range(10):
+            self.assertEqual(resolve(disco, "myservice2", "1.0", "parent:child").address,
+                             "somewhere2")
+
+    def test_environmentInheritanceVersions(self):
+        """
+        If an Environment has a parent it is checked if there are no Nodes that have
+        ever been registered with that service and version in the child
+        Environment.
+        """
+        # This one won't work if we need 1.0:
+        node = create_node("somewhere2.0", "myservice", "parent:child")
+        node.version = "2.0"
+        # So we expect to fall back to this:
+        node2 = create_node("somewhere1.0", "myservice", "parent")
+        disco = create_disco()
+        disco.onMessage(None, NodeActive(node))
+        disco.onMessage(None, NodeActive(node2))
+        # Do repeatedly in case round robin is somehow tricking us:
+        for i in range(10):
+            self.assertEqual(resolve(disco, "myservice", "1.0", "parent:child").address,
+                             "somewhere1.0")
+
+    def test_environmentReverseInheritance(self):
+        """
+        A parent environment doesn't get access to Nodes in the child environment.
+        """
+        # In the child only
+        node = create_node("somewhere", "myservice", "parent:child")
+        disco = create_disco()
+        disco.onMessage(None, NodeActive(node))
+        # Parent can't find it
+        self.assertEqual(resolve(disco, "myservice", "1.0", "parent"), None)
+
+    def test_noInheritanceAfterRegister(self):
+        """
+        Once a service/version pair have been registered in the child environment,
+        the parent environment isn't used even if there are currently no nodes
+        available in the child.
+        """
+        node = create_node("somewhere", "myservice", "parent:child")
+        disco = create_disco()
+        disco.onMessage(None, NodeActive(node))
+        # Uh oh, service went away in the child!
+        disco.onMessage(None, NodeExpired(node))
+        # But it still exists in parent
+        node2 = create_node("somewhere2", "myservice", "parent")
+        disco.onMessage(None, NodeActive(node2))
+        # However, since it existed in the child before, we won't get version
+        # from the parent.
+        self.assertEqual(resolve(disco, "myservice", "1.0", "parent:child"),
+                         None)
+
 
 class CircuitBreakerTests(TestCase):
     """
