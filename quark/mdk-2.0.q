@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk 2.0.23;
+package datawire_mdk 2.0.26;
 
 // DATAWIRE MDK
 
@@ -333,6 +333,9 @@ namespace mdk {
 
         @doc("Return whether the distributed session has a property.")
         bool hasProperty(String property);
+
+        @doc("Return the session's Environment.")
+        String getEnvironment();
     }
 
     class MDKImpl extends MDK {
@@ -352,6 +355,9 @@ namespace mdk {
         String procUUID = Context.runtime().uuid();
         bool _running = false;
         float _defaultTimeout = null;
+        // The Environment this MDK is configured for, e.g. "sandbox" or
+        // "production".
+        String _environment;
 
         @doc("Choose DiscoverySource based on environment variables.")
         DiscoverySourceFactory getDiscoveryFactory(EnvironmentVariables env) {
@@ -364,7 +370,9 @@ namespace mdk {
                 result = new DiscoClientFactory(_wsclient);
             } else {
                 if (config.startsWith("synapse:path=")) {
-                    result = mdk_discovery.synapse.Synapse(config.substring(13, config.size()));
+                    result = mdk_discovery.synapse
+                        .Synapse(config.substring(13, config.size()),
+                                 self._environment);
                 } else {
                     if (config.startsWith("static:nodes=")) {
                         String json = config.substring(13, config.size());
@@ -411,6 +419,8 @@ namespace mdk {
         MDKImpl(MDKRuntime runtime) {
             _reflection_hack = new Map<String,Object>();
             _runtime = runtime;
+            _environment = runtime.getEnvVarsService()
+                .var("MDK_ENVIRONMENT").orElseGet("sandbox");
             if (!runtime.dependencies.hasService("failurepolicy_factory")) {
                 runtime.dependencies.registerService("failurepolicy_factory",
                                                      getFailurePolicy(runtime));
@@ -423,7 +433,7 @@ namespace mdk {
             // Make sure we register OpenCloseSubscriber first so that Open
             // message gets sent first.
             if (_wsclient != null) {
-                _openclose = new OpenCloseSubscriber(_wsclient, procUUID);
+                _openclose = new OpenCloseSubscriber(_wsclient, procUUID, _environment);
             }
             EnvironmentVariables env = runtime.getEnvVarsService();
             DiscoverySourceFactory discoFactory = getDiscoveryFactory(env);
@@ -478,6 +488,7 @@ namespace mdk {
             node.service = service;
             node.version = version;
             node.address = address;
+            node.environment = self._environment;
 
             node.properties = { "datawire_nodeId": procUUID };
 
@@ -493,7 +504,7 @@ namespace mdk {
         }
 
         Session session() {
-            SessionImpl session = new SessionImpl(self, null);
+            SessionImpl session = new SessionImpl(self, null, self._environment);
             if (_defaultTimeout != null) {
                 session.setDeadline(_defaultTimeout);
             }
@@ -514,7 +525,8 @@ namespace mdk {
         }
 
         Session join(String encodedContext) {
-            SessionImpl session = new SessionImpl(self, encodedContext);
+            SessionImpl session = new SessionImpl(self, encodedContext,
+                                                  self._environment);
             if (_defaultTimeout != null) {
                 session.setDeadline(_defaultTimeout);
             }
@@ -547,13 +559,14 @@ namespace mdk {
         SharedContext _context;
         bool _experimental = false;
 
-        SessionImpl(MDKImpl mdk, String encodedContext) {
+        SessionImpl(MDKImpl mdk, String encodedContext, String localEnvironment) {
             _experimental = (mdk._runtime.getEnvVarsService()
                              .var("MDK_EXPERIMENTAL").orElseGet("") != "");
             _mdk = mdk;
             encodedContext = ?sanitize(encodedContext);
             if (encodedContext == null || encodedContext == "") {
                 _context = new SharedContext();
+                _context.environment = localEnvironment;
             } else {
                 SharedContext ctx = SharedContext.decode(encodedContext);
                 _context = ctx.start_span();
@@ -562,6 +575,10 @@ namespace mdk {
             // does something that requires an interaction to be
             // started. Well-written code shouldn't rely on this.
             self.start_interaction();
+        }
+
+        String getEnvironment() {
+            return self._context.environment;
         }
 
         Object getProperty(String property) {
@@ -702,7 +719,7 @@ namespace mdk {
                 }
             }
 
-            return _mdk._disco._resolve(service, version).
+            return _mdk._disco.resolve(service, version, self.getEnvironment()).
                 andThen(bind(self, "_resolvedCallback", []));
         }
 
@@ -769,8 +786,13 @@ namespace mdk {
                 _interactionReports[_interactionReports.size() - 1].addNode(node, false);
             }
 
-            String text = "involved: " + ", ".join(involved) + "\n\n" + message;
-            self.error("interaction failure", text);
+            String text = "no dependent services involved";
+
+            if (involved.size() > 0) {
+                text = "involved: " + ", ".join(involved);
+            }
+
+            self.error("interaction failure", text + "\n\n" + message);
         }
 
         void finish_interaction() {

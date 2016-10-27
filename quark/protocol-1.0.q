@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_protocol 2.0.23;
+package datawire_mdk_protocol 2.0.26;
 
 import quark.concurrent;
 import quark.reflect;
@@ -184,6 +184,13 @@ namespace mdk_protocol {
         """)
         Map<String, Object> properties = {};
 
+        @doc("""
+        The environment for this context, e.g. 'sandbox' or 'production'.
+
+        If unspecified we use 'sandbox' by default.
+        """)
+        String environment = "sandbox";
+
         int _lastEntry = 0;
 
         SharedContext() {
@@ -279,6 +286,8 @@ namespace mdk_protocol {
 
         String version = "2.0.0";
         Map<String,String> properties = {};
+        String nodeId;
+        String environment = "sandbox";  // Default environment is sandbox
     }
 
     // XXX: this should probably go somewhere in the library
@@ -368,10 +377,12 @@ namespace mdk_protocol {
         MessageDispatcher _dispatcher;
         WSClient _wsclient;
         String _node_id;
+        String _environment;
 
-        OpenCloseSubscriber(WSClient client, String node_id) {
+        OpenCloseSubscriber(WSClient client, String node_id, String environment) {
             self._wsclient = client;
             self._node_id = node_id;
+            self._environment = environment;
             self._wsclient.subscribe(self);
         }
 
@@ -403,7 +414,8 @@ namespace mdk_protocol {
         void onWSConnected(Actor websocket) {
             // Send Open message to the server:
             Open open = new Open();
-            open.properties["datawire_nodeId"] = self._node_id;
+            open.nodeId = self._node_id;
+            open.environment = _environment;
             self._dispatcher.tell(self, open.encode(), websocket);
         }
 
