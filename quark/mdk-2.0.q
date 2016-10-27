@@ -786,8 +786,13 @@ namespace mdk {
                 _interactionReports[_interactionReports.size() - 1].addNode(node, false);
             }
 
-            String text = "involved: " + ", ".join(involved) + "\n\n" + message;
-            self.error("interaction failure", text);
+            String text = "no dependent services involved";
+
+            if (involved.size() > 0) {
+                text = "involved: " + ", ".join(involved);
+            }
+
+            self.error("interaction failure", text + "\n\n" + message);
         }
 
         void finish_interaction() {
