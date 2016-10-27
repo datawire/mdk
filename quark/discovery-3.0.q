@@ -564,7 +564,7 @@ namespace mdk_discovery {
             return self;
         }
 
-        @doc("Get the service->Cluster mapping for an Environment.")
+        @doc("Get the service to Cluster mapping for an Environment.")
         Map<String,Cluster> _getServices(String environment) {
             if (!services.contains(environment)) {
                 services[environment] = {};
