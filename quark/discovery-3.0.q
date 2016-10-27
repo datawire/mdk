@@ -61,11 +61,15 @@ namespace mdk_discovery {
     @doc("Message from DiscoverySource: replace all nodes in a particular Cluster.")
     class ReplaceCluster {
         List<Node> nodes;
+        @doc("The name of the service.")
         String cluster;
+        @doc("The Environment for all nodes in this message.")
+        String environment = "sandbox";
 
-        ReplaceCluster(String cluster, List<Node> nodes) {
+        ReplaceCluster(String cluster, String environment, List<Node> nodes) {
             self.nodes = nodes;
             self.cluster = cluster;
+            self.environment = environment;
         }
     }
 
@@ -122,8 +126,8 @@ namespace mdk_discovery {
             return new StaticRoutes(nodes);
         }
 
-        StaticRoutes(List<Node> knowNodes) {
-            self._knownNodes = knowNodes;
+        StaticRoutes(List<Node> knownNodes) {
+            self._knownNodes = knownNodes;
         }
 
         bool isRegistrar() {
@@ -436,6 +440,8 @@ namespace mdk_discovery {
         String address;
         @doc("Additional metadata associated with this service instance.")
         Map<String,Object> properties = {};
+        @doc("The Environment the Node is in.")
+        String environment = "sandbox";
 
         FailurePolicy _policy = null;
 
@@ -495,7 +501,8 @@ namespace mdk_discovery {
 
         // Clusters the disco says are available, as well as clusters for
         // which we are awaiting resolution.
-        Map<String, Cluster> services = new Map<String, Cluster>();
+        // Maps environment -> (servicename -> Cluster).
+        Map<String, Map<String, Cluster>> services = {};
 
         bool started = false;
         Lock mutex = new Lock();
@@ -557,44 +564,47 @@ namespace mdk_discovery {
             return self;
         }
 
-        @doc("Register info about a service node with the discovery service. You must")
-        @doc("usually start the uplink before this will do much; see start().")
-        Discovery register_service(String service, String address, String version) {
-            Node node = new Node();
-            node.service = service;
-            node.address = address;
-            node.version = version;
-            return self.register(node);
+        @doc("Get the service->Cluster mapping for an Environment.")
+        Map<String,Cluster> _getServices(String environment) {
+            if (!services.contains(environment)) {
+                services[environment] = {};
+            }
+            return services[environment];
         }
 
-        @doc("Return the current known Nodes for a service, if any.")
-        List<Node> knownNodes(String service) {
-            if (!services.contains(service)) {
-                return [];
+        @doc("Get the Cluster for a given service and environment.")
+        Cluster _getCluster(String service, String environment) {
+            Map<String,Cluster> clusters = _getServices(environment);
+            if (!clusters.contains(service)) {
+                clusters[service] = new Cluster(self._fpfactory);
             }
-            return services[service].nodes;
+            return clusters[service];
+        }
+
+        @doc("""
+        Return the current known Nodes for a service in a particular
+        Environment, if any.
+        """)
+        List<Node> knownNodes(String service, String environment) {
+            return _getCluster(service, environment).nodes;
         }
 
         @doc("Get the FailurePolicy for a Node.")
         FailurePolicy failurePolicy(Node node) {
-            return services[node.service].failurePolicy(node);
+            return _getCluster(node.service, node.environment).failurePolicy(node);
         }
 
         @doc("Resolve a service name into an available service node. You must")
         @doc("usually start the uplink before this will do much; see start().")
         @doc("The returned Promise will end up with a Node as its value.")
-        Promise _resolve(String service, String version) {
+        Promise resolve(String service, String version, String environment) {
             PromiseResolver factory = new PromiseResolver(runtime.dispatcher);
 
             self._lock();
-
-            if (!services.contains(service)) {
-                services[service] = new Cluster(self._fpfactory);
-            }
-
-            Node result = services[service].chooseVersion(version);
+            Cluster cluster = _getCluster(service, environment);
+            Node result = cluster.chooseVersion(version);
             if (result == null) {
-                services[service]._addRequest(version, factory);
+                cluster._addRequest(version, factory);
                 self._release();
             } else {
                 self._release();
@@ -602,20 +612,6 @@ namespace mdk_discovery {
             }
 
             return factory.promise;
-        }
-
-        @doc("Resolve a service; return a (Bluebird) Promise on Javascript. Does not work elsewhere.")
-        Object resolve(String service, String version) {
-            return toNativePromise(_resolve(service, version));
-        }
-
-        // XXX blocking API, never call from Javascript or Quark code.
-        @doc("Wait for service name to resolve into an available service node, or fail")
-        @doc("appropriately (typically by raising an exception if the language")
-        @doc("supports it). This should only be used in blocking runtimes (e.g. ")
-        @doc("you do not want to use this in Javascript).")
-        Node resolve_until(String service, String version, float timeout) {
-            return ?WaitForPromise.wait(self._resolve(service, version), timeout, "service " + service);
         }
 
         void onMessage(Actor origin, Object message) {
@@ -632,19 +628,16 @@ namespace mdk_discovery {
             }
             if (klass == "mdk_discovery.ReplaceCluster") {
                 ReplaceCluster replace = ?message;
-                self._replace(replace.cluster, replace.nodes);
+                self._replace(replace.cluster, replace.environment, replace.nodes);
                 return;
             }
         }
 
-        void _replace(String service, List<Node> nodes) {
+        void _replace(String service, String environment, List<Node> nodes) {
             self._lock();
             logger.info("replacing all nodes for " + service + " with "
                         + nodes.toString());
-            if (!services.contains(service)) {
-                services[service] = new Cluster(self._fpfactory);
-            }
-            Cluster cluster = services[service];
+            Cluster cluster = _getCluster(service, environment);
             List<Node> currentNodes = new ListUtil<Node>().slice(cluster.nodes,
                                                                  0,
                                                                  cluster.nodes.size());
@@ -665,16 +658,9 @@ namespace mdk_discovery {
         // @doc("Add a given node.")
         void _active(Node node) {
             self._lock();
-
-            String service = node.service;
-
             logger.info("adding " + node.toString());
 
-            if (!services.contains(service)) {
-                services[service] = new Cluster(self._fpfactory);
-            }
-
-            Cluster cluster = services[service];
+            Cluster cluster = _getCluster(node.service, node.environment);
             cluster.add(node);
 
             self._release();
@@ -684,22 +670,14 @@ namespace mdk_discovery {
         // @doc("Expire a given node.")
         void _expire(Node node) {
             self._lock();
+            logger.info("removing " + node.toString() + " from cluster");
 
-            String service = node.service;
-
-            if (services.contains(service)) {
-                Cluster cluster = services[service];
-
-                logger.info("removing " + node.toString() + " from cluster");
-
-                cluster.remove(node);
-                // We don't check for or remove clusters with no nodes
-                // because they might have unresolved promises in
-                // _waiting.
-            }
+            _getCluster(node.service, node.environment).remove(node);
+            // We don't check remove clusters with no nodes because they might
+            // have unresolved promises in _waiting.
 
             self._release();
         }
     }
-    
+
 }
