@@ -772,10 +772,10 @@ namespace mdk {
             String text = "no dependent services involved";
 
             if (involved.size() > 0) {
-                text = "involved: " + ", ".join(involved) + "\n\n" + message;
+                text = "involved: " + ", ".join(involved);
             }
 
-            self.error("interaction failure", text);
+            self.error("interaction failure", text + "\n\n" + message);
         }
 
         void finish_interaction() {
