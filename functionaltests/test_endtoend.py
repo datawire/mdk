@@ -15,23 +15,34 @@ def random_string():
     return "random_" + str(random())[2:]
 
 
-def assertRegisteryDiscoverable(test, discover):
+def assertRegisteryDiscoverable(test, discover, additional_env={}):
     """
     Services registered by one process can be looked up by another.
 
     :param test: A TestCase instance.
     :param discover: a callable that takes the service name and returns the
     resolved address.
+    :param additional_env: Additional environment variables to set.
 
     Returns the registeration Popen object and the service.
     """
     service = random_string()
     address = random_string()
-    p = Popen([sys.executable, os.path.join(CODE_PATH, "register.py"), service, address])
+    env = os.environ.copy()
+    env.update(additional_env)
+    p = Popen([sys.executable, os.path.join(CODE_PATH, "register.py"),
+               service, address], env=env)
     test.addCleanup(lambda: p.kill())
     resolved_address = discover(service).decode("utf-8")
     test.assertIn(address, resolved_address)
     return p, service
+
+
+def assertNotResolvable(test, service, additional_env={}):
+    """Assert the service isn't resolvable."""
+    resolved_address = run_python(sys.executable, "resolve.py",
+                                  [service], output=True)
+    test.assertEqual(b"not found", resolved_address)
 
 
 class Python2Tests(TestCase):
@@ -50,9 +61,7 @@ class Python2Tests(TestCase):
         # 2. If the service is unregistered via MDK stop() then it is no longer resolvable.
         p.terminate()
         time.sleep(3)
-        resolved_address = run_python(self.python_binary, "resolve.py",
-                                      [service], output=True)
-        self.assertEqual(b"not found", resolved_address)
+        assertNotResolvable(self, service)
 
     def test_logging(self):
         """Minimal logging end-to-end test.
@@ -85,6 +94,37 @@ class Python3Tests(Python2Tests):
     """Tests for Python 3 usage of MDK API."""
 
     python_binary = os.path.join(ROOT_PATH, "virtualenv3/bin/python")
+
+    def test_defaultEnvironmentIsolation(self):
+        """
+        A service registered in default environment can't be resolved from another
+        environment.
+        """
+        # 1. Register in default environment
+        _, service = assertRegisteryDiscoverable(
+            self,
+            lambda service: run_python(self.python_binary, "resolve.py",
+                                       [service], output=True,
+                                       additional_env={
+                                           "MDK_ENVIRONMENT": "sandbox"}))
+        # 2. Assert it can't be found in a different environment:
+        assertNotResolvable(service, {"MDK_ENVIRONMENT": "anotherenv"})
+
+    def test_environmentIsolation(self):
+        """
+        A service registered in environment A can't be resolved from another
+        environment.
+        """
+        # 1. Register in one environment
+        env = {"MDK_ENVIRONMENT": "env1"}
+        _, service = assertRegisteryDiscoverable(
+            self,
+            lambda service: run_python(self.python_binary, "resolve.py",
+                                       [service], output=True,
+                                       additional_env=env),
+            additional_env=env)
+        # 2. Assert it can't be found in a different environment:
+        assertNotResolvable(service, {"MDK_ENVIRONMENT": "anotherenv"})
 
 
 class JavascriptTests(TestCase):
