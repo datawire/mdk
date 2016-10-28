@@ -30,6 +30,14 @@ interface TestActor extends Actor {
     void start(TestRunner runner);
 }
 
+void failTest(String message) {
+    // In some circumstances, the failure message passed to
+    // Runtime.fail does not show up. Try to avoid this issue by
+    // printing the message first.
+    print("Test failure: " + message);
+    Context.runtime().fail(message);
+}
+
 class RealSleep extends UnaryCallable {
     Object call(Object seconds) {
 	// Don't actually have to do anything, time passes on its own.
@@ -91,7 +99,7 @@ class TimeScheduleTest extends TestActor {
 	float elapsed = reportedTime - self.startTime;
 	print("Expected: " + expected.toString() + " delay, actually elapsed: " + elapsed.toString());
 	if (elapsed - expected > 0.1 || elapsed - expected < -0.1) {
-	    Context.runtime().fail("Scheduled for too long!");
+	    failTest("Scheduled for too long!");
 	}
     }
 
@@ -121,7 +129,7 @@ class TimeScheduleTest extends TestActor {
         if (happened.event == "0second") {
             print("0 second event delivered.");
             if (self.scheduling) {
-                Context.runtime().fail("Scheduled event reentrantly!");
+                failTest("Scheduled event reentrantly!");
             }
             // Sleep 1 second to hit 1second scheduled event:
             self.dispatcher.tell(self, new Sleep(1.0), self);
@@ -170,7 +178,7 @@ class WebSocketsTest extends TestActor {
     }
 
     void failure(Object result, String reason) {
-	panic("WebSocket test failed: " + reason + " with " + result.toString());
+	failTest("WebSocket test failed: " + reason + " with " + result.toString());
     }
 
     void changeState(String state) {
@@ -207,7 +215,7 @@ class WebSocketsTest extends TestActor {
 
     void _gotMessage(String message) {
 	if (message != "can you hear me?") {
-	    panic("Unexpected echo message: " + message);
+	    failTest("Unexpected echo message: " + message);
 	}
 	self.testClose();
     }
@@ -247,7 +255,7 @@ class WebSocketsTest extends TestActor {
 
     void onMessage(Actor origin, Object message) {
 	if (connection == null) {
-	    panic("Got message while still unconnected.");
+	    failTest("Got message while still unconnected.");
 	}
 	if (message.getClass().id == "mdk_runtime.WSMessage" && self.state == "testMessages") {
 	    WSMessage m = ?message;
@@ -258,7 +266,7 @@ class WebSocketsTest extends TestActor {
 	    self._gotClose();
 	    return;
 	}
-	panic("Unexpected message, state: " + self.state + " message: " + message.toString());
+	failTest("Unexpected message, state: " + self.state + " message: " + message.toString());
     }
 }
 
@@ -303,7 +311,7 @@ class FileActorTests extends TestActor {
 
     void assertCreateNotification(FileContents contents) {
         if (contents.path != self.file || contents.contents != "initial value") {
-            panic("Unexpected results: " + contents.path + " " + contents.contents);
+            failTest("Unexpected results: " + contents.path + " " + contents.contents);
         }
         self.testChangeNotification();
     }
@@ -320,10 +328,10 @@ class FileActorTests extends TestActor {
                 return;
             }
             if (contents.contents != "changed value") {
-                panic("Unexpected value: " + contents.contents);
+                failTest("Unexpected value: " + contents.contents);
             }
         } else {
-            panic("Unexpected file: " + contents.path);
+            failTest("Unexpected file: " + contents.path);
         }
         self.testDeleteNotification();
     }
@@ -335,7 +343,7 @@ class FileActorTests extends TestActor {
 
     void assertDeleteNotification(FileDeleted deleted) {
         if (deleted.path != self.file) {
-            panic("Unexpected value: " + deleted.path);
+            failTest("Unexpected value: " + deleted.path);
         }
         self.state = "done";
         self.dispatcher.stopActor(self.actor);
@@ -346,14 +354,14 @@ class FileActorTests extends TestActor {
         String typeId = message.getClass().id;
         if (self.state == "testCreateNotification") {
             if (typeId != "mdk_runtime.files.FileContents") {
-                panic("Unexpected message: " + typeId);
+                failTest("Unexpected message: " + typeId);
             }
             self.assertCreateNotification(?message);
             return;
         }
         if (self.state == "testChangeNotification") {
             if (typeId != "mdk_runtime.files.FileContents") {
-                panic("Unexpected message: " + typeId);
+                failTest("Unexpected message: " + typeId);
             }
             self.assertChangeNotification(?message);
             return;
@@ -363,12 +371,12 @@ class FileActorTests extends TestActor {
                 return; // hopefully just spurious false positive
             }
             if (typeId != "mdk_runtime.files.FileDeleted") {
-                panic("Unexpected message: " + typeId);
+                failTest("Unexpected message: " + typeId);
             }
             self.assertDeleteNotification(?message);
             return;
         }
-        panic("Unexpected message: " + message.toString());
+        failTest("Unexpected message: " + message.toString());
     }
 }
 
@@ -401,7 +409,7 @@ class KeepaliveActor extends Actor {
 	    return;
 	}
 	if (self.runtime.getTimeService().time() - self.timeStarted > 60.0) {
-	    Context.runtime().fail("Tests took too long.");
+	    failTest("Test took too long.");
 	    return;
 	}
 	self.runtime.dispatcher.tell(self, new Schedule("wakeup", 1.0),
@@ -481,6 +489,7 @@ class TestRunner {
     int nextTest = 0;
     MDKRuntime runtime;
     KeepaliveActor keepalive;
+    bool allTestsDone = false;
 
     TestRunner() {
 	self.tests = {"real runtime: time, scheduling":
@@ -497,6 +506,7 @@ class TestRunner {
             self.tests["files"] = bind(self, "testFiles", []);
         }
 	self.testNames = tests.keys();
+        self.testNames.sort();
     }
 
     TestActor testRealRuntimeScheduling(MDKRuntime runtime) {
@@ -514,7 +524,7 @@ class TestRunner {
 
     TestActor testRealRuntimeWebsockets(MDKRuntime runtime) {
         // Connect to the server running in the docker container websocket-echo
-        WebSocketsTest result = new WebSocketsTest(new QuarkRuntimeWebSockets(),
+        WebSocketsTest result = new WebSocketsTest(runtime.getWebSocketsService(),
                                                    "ws://websocket-echo:9123/", "wss://localhost:1/");
         runtime.dispatcher.startActor(result.websockets);
         return result;
@@ -541,6 +551,7 @@ class TestRunner {
 
         // If there are no more tests we're done:
 	if (self.nextTest == testNames.size()) {
+            self.allTestsDone = true;
 	    print("All done.");
 	    return;
 	}
@@ -563,6 +574,15 @@ class TestRunner {
     }
 }
 
+macro bool isJavascript() $py{False} $js{true} $java{false} $rb{false};
+
 void main(List<String> args) {
-    new TestRunner().runNextTest();
+    TestRunner runner = new TestRunner();
+    runner.runNextTest();
+
+    // Keep main thread alive until tests are done. Hack needed until
+    // runtime stuff is wrapped up and merged and all that.
+    while (!isJavascript() && !runner.allTestsDone) {
+        Context.runtime().sleep(0.5);
+    }
 }

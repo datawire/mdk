@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_discovery 2.0.23;
+package datawire_mdk_discovery 2.0.26;
 
 include discovery-protocol-3.0.q;
 include synapse.q;
@@ -596,7 +596,7 @@ namespace mdk_discovery {
             return self;
         }
 
-        @doc("Get the service->Cluster mapping for an Environment.")
+        @doc("Get the service to Cluster mapping for an Environment.")
         Map<String,Cluster> _getServices(String environment) {
             if (!services.contains(environment)) {
                 services[environment] = {};

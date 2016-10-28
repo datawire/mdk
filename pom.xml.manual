@@ -6,7 +6,7 @@
   <artifactId>datawire_mdk</artifactId>
   <!-- Don't remove or change the comment on the next line, it's used by
        .bumpversion.cfg to find where to replace the version on release. -->
-  <version>2.0.23</version><!-- PACKAGE VERSION HERE -->
+  <version>2.0.26</version><!-- PACKAGE VERSION HERE -->
   <name>datawire_mdk</name>
   <description>Java mdk</description>
   <url>http://datawire.github.io/mdk/</url>

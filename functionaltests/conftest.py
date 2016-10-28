@@ -44,7 +44,7 @@ def websocket_echo_server():
     print(" ".join(command))
     Popen(command)
     # Wait for the container to have launched
-    while True:
+    for idx in range(60):
         time.sleep(1.0)
         dps_command = maybe_sudo() + "docker ps -f name=websocket-echo".split()
         print(" ".join(dps_command))
@@ -52,6 +52,8 @@ def websocket_echo_server():
         print(dps_output)
         if b"websocket-echo" in dps_output:
             break
+    else:
+        raise RuntimeError("Failed to start ws-echo in docker. Did you run 'make setup-docker'?")
 
 
 def run(filepath, language):
@@ -66,7 +68,7 @@ def run(filepath, language):
                 # Link to local websocket echo server running in another container
                 "--link", "websocket-echo",
                ] +
-               ["datawire/quark-run:" + QUARK_VERSION, "--" + language, '--verbose', docker_path])
+               ["datawire/mdk-quark-run:" + QUARK_VERSION, "--" + language, '--verbose', docker_path])
     print(" ".join(command))
     check_call(command)
 
