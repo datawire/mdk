@@ -146,7 +146,7 @@ class Python3Tests(Python2Tests):
         # 2. Assert it can't be found in a different environment:
         assertNotResolvable(service, {"MDK_ENVIRONMENT": "anotherenv"})
 
-    def test_environmentInheritance(self):
+    def test_environmentFallback(self):
         """
         Imagine an environment 'parent:child'.
 
@@ -171,6 +171,19 @@ class Python3Tests(Python2Tests):
         # session, but not with its normal sessions:
         self.assertResolvable(serviceC, addressC, "parent:child", context_id)
         assertNotResolvable(self, serviceC, {"MDK_ENVIRONMENT": "parent"})
+
+    def test_environmentWithFallbackIdentity(self):
+        """
+        The environment variable 'parent:child' creates the same environment as
+        'child', so services configured either way can see each other.
+        """
+        # 1. Register B in parent:child, and C in child
+        serviceB, addressB = self.registerInAnEnvironment("child")
+        serviceC, addressC = self.registerInAnEnvironment("parent:child")
+        # 2. parent:child can see anything in child, and vice versa
+        # parent, both with and without a parent:child session:
+        self.assertResolvable(serviceB, addressB, "parent:child")
+        self.assertResolvable(serviceC, addressC, "child")
 
 
 class JavascriptTests(TestCase):
