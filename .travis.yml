@@ -16,13 +16,22 @@ cache:
   directories:
     - $HOME/.m2
     - $HOME/.pip/cache
+    - virtualenv3
+    - virtualenv
+    - django110env
     - node_modules
     - $GEM_HOME
 before_cache:
-  - pip uninstall datawire-mdk || echo "not installed?"
+  - virtualenv3/bin/pip uninstall datawire-mdk || echo "not installed?"
+  - virtualenv/bin/pip uninstall datawire-mdk || echo "not installed?"
+  - django110env/bin/pip uninstall datawire-mdk || echo "not installed?"
   - rm -rf $HOME/.m2/repository/io/datawire
   - gem uninstall --all datawire_mdk || echo "not installed?"
-  - npm uninstall --all datawire_mdk || echo "not installed?"
+  - gem uninstall --all rack-mdk || echo "not installed?"
+  - gem uninstall --all faraday_mdk || echo "not installed?"
+  - npm uninstall datawire_mdk || echo "not installed?"
+  - npm uninstall datawire_mdk_request || echo "not installed?"
+  - npm uninstall datawire_mdk_express || echo "not installed?"
 
 install:
   - rvm install 2.3
