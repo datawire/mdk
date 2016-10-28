@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_protocol 2.0.24;
+package datawire_mdk_protocol 2.0.27;
 
 import quark.concurrent;
 import quark.reflect;
@@ -163,6 +163,27 @@ namespace mdk_protocol {
         }
     }
 
+    @doc("""
+    An isolated environment with a name, and optionally a fallback environment.
+
+    By default the environment will be 'sandbox'.
+    """)
+    class OperationalEnvironment extends Serializable {
+        String name = "sandbox";
+        String fallbackName = null;
+
+        @doc("Return the fallback Environment, or null if there isn't one.")
+        OperationalEnvironment getFallback() {
+            if (self.fallbackName == null) {
+                return null;
+            }
+            OperationalEnvironment result = new OperationalEnvironment();
+            result.name = self.fallbackName;
+            result.fallbackName = null;
+            return result;
+        }
+    }
+
     class SharedContext extends Serializable {
         @doc("""
              Every SharedContext is given an ID at the moment of its
@@ -186,10 +207,8 @@ namespace mdk_protocol {
 
         @doc("""
         The environment for this context, e.g. 'sandbox' or 'production'.
-
-        If unspecified we use 'sandbox' by default.
         """)
-        String environment = "sandbox";
+        OperationalEnvironment environment = new OperationalEnvironment();
 
         int _lastEntry = 0;
 
@@ -287,7 +306,7 @@ namespace mdk_protocol {
         String version = "2.0.0";
         Map<String,String> properties = {};
         String nodeId;
-        String environment = "sandbox";  // Default environment is sandbox
+        OperationalEnvironment environment = new OperationalEnvironment();
     }
 
     // XXX: this should probably go somewhere in the library
@@ -377,9 +396,9 @@ namespace mdk_protocol {
         MessageDispatcher _dispatcher;
         WSClient _wsclient;
         String _node_id;
-        String _environment;
+        OperationalEnvironment _environment;
 
-        OpenCloseSubscriber(WSClient client, String node_id, String environment) {
+        OpenCloseSubscriber(WSClient client, String node_id, OperationalEnvironment environment) {
             self._wsclient = client;
             self._node_id = node_id;
             self._environment = environment;

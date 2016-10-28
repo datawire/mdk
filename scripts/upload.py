@@ -15,7 +15,7 @@ PYPI_CONFIG = """[distutils]
 index-servers=pypi
 
 [pypi]
-repository = https://pypi.python.org/pypi
+repository = https://upload.pypi.org/legacy/
 username = datawire
 password = {}
 """

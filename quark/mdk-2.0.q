@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk 2.0.24;
+package datawire_mdk 2.0.27;
 
 // DATAWIRE MDK
 
@@ -29,6 +29,20 @@ namespace mdk {
 
     String _get(EnvironmentVariables env, String name, String value) {
         return env.var(name).orElseGet(value);
+    }
+
+    @doc("Convert 'name' or 'fallback:name' into an Environment.")
+    OperationalEnvironment _parseEnvironment(String environment) {
+        String name = environment;
+        String fallback = null;
+        if (environment.find(":") != -1) {
+            fallback = environment.split(":")[0];
+            name = environment.split(":")[1];
+        }
+        OperationalEnvironment result = new OperationalEnvironment();
+        result.name = name;
+        result.fallbackName = fallback;
+        return result;
     }
 
     @doc("Create an unstarted instance of the MDK.")
@@ -335,7 +349,7 @@ namespace mdk {
         bool hasProperty(String property);
 
         @doc("Return the session's Environment.")
-        String getEnvironment();
+        OperationalEnvironment getEnvironment();
     }
 
     class MDKImpl extends MDK {
@@ -355,9 +369,9 @@ namespace mdk {
         String procUUID = Context.runtime().uuid();
         bool _running = false;
         float _defaultTimeout = null;
-        // The Environment this MDK is configured for, e.g. "sandbox" or
+        // The OperationalEnvironment this MDK is configured for, e.g. "sandbox" or
         // "production".
-        String _environment;
+        OperationalEnvironment _environment;
 
         @doc("Choose DiscoverySource based on environment variables.")
         DiscoverySourceFactory getDiscoveryFactory(EnvironmentVariables env) {
@@ -419,8 +433,9 @@ namespace mdk {
         MDKImpl(MDKRuntime runtime) {
             _reflection_hack = new Map<String,Object>();
             _runtime = runtime;
-            _environment = runtime.getEnvVarsService()
-                .var("MDK_ENVIRONMENT").orElseGet("sandbox");
+            _environment = _parseEnvironment(runtime.getEnvVarsService()
+                                             .var("MDK_ENVIRONMENT")
+                                             .orElseGet("sandbox"));
             if (!runtime.dependencies.hasService("failurepolicy_factory")) {
                 runtime.dependencies.registerService("failurepolicy_factory",
                                                      getFailurePolicy(runtime));
@@ -559,7 +574,7 @@ namespace mdk {
         SharedContext _context;
         bool _experimental = false;
 
-        SessionImpl(MDKImpl mdk, String encodedContext, String localEnvironment) {
+        SessionImpl(MDKImpl mdk, String encodedContext, OperationalEnvironment localEnvironment) {
             _experimental = (mdk._runtime.getEnvVarsService()
                              .var("MDK_EXPERIMENTAL").orElseGet("") != "");
             _mdk = mdk;
@@ -577,7 +592,7 @@ namespace mdk {
             self.start_interaction();
         }
 
-        String getEnvironment() {
+        OperationalEnvironment getEnvironment() {
             return self._context.environment;
         }
 
@@ -786,8 +801,13 @@ namespace mdk {
                 _interactionReports[_interactionReports.size() - 1].addNode(node, false);
             }
 
-            String text = "involved: " + ", ".join(involved) + "\n\n" + message;
-            self.error("interaction failure", text);
+            String text = "no dependent services involved";
+
+            if (involved.size() > 0) {
+                text = "involved: " + ", ".join(involved);
+            }
+
+            self.error("interaction failure", text + "\n\n" + message);
         }
 
         void finish_interaction() {

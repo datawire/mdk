@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_discovery 2.0.24;
+package datawire_mdk_discovery 2.0.27;
 
 include discovery-protocol-3.0.q;
 include synapse.q;
@@ -64,9 +64,9 @@ namespace mdk_discovery {
         @doc("The name of the service.")
         String cluster;
         @doc("The Environment for all nodes in this message.")
-        String environment = "sandbox";
+        OperationalEnvironment environment = new OperationalEnvironment();
 
-        ReplaceCluster(String cluster, String environment, List<Node> nodes) {
+        ReplaceCluster(String cluster, OperationalEnvironment environment, List<Node> nodes) {
             self.nodes = nodes;
             self.cluster = cluster;
             self.environment = environment;
@@ -291,6 +291,8 @@ namespace mdk_discovery {
         Map<String,FailurePolicy> _failurepolicies = {}; // Maps address->FailurePolicy
         int _counter = 0;
         FailurePolicyFactory _fpfactory;
+        // Versions that have been registered at some point in the past:
+        List<String> _registeredVersions = [];
 
         Cluster(FailurePolicyFactory fpfactory) {
             self._fpfactory = fpfactory;
@@ -338,10 +340,40 @@ namespace mdk_discovery {
             return null;
         }
 
+        @doc("""
+        Return whether node with semantically matching version was registered at
+        some point.
+        """)
+        bool matchingVersionRegistered(String version) {
+            int idx = 0;
+            while (idx < _registeredVersions.size()) {
+                if (versionMatch(version, _registeredVersions[idx])) {
+                    return true;
+                }
+                idx = idx + 1;
+            }
+            return false;
+        }
+
         @doc("Add a Node to the cluster (or, if it's already present in the cluster,")
         @doc("update its properties).  At present, this involves a linear search, so")
         @doc("very large Clusters are unlikely to perform well.")
         void add(Node node) {
+            // Register the node's version if we haven't seen it before:
+            int kdx = 0;
+            bool foundVersion = false;
+            while (kdx < _registeredVersions.size()) {
+                if (_registeredVersions[kdx] == node.version) {
+                    foundVersion = true;
+                    break;
+                }
+                kdx = kdx + 1;
+            }
+            if (!foundVersion) {
+                _registeredVersions.add(node.version);
+            }
+
+            // Create FailurePolicy for new addresses:
             if (!_failurepolicies.contains(node.address)) {
                 _failurepolicies[node.address] = self._fpfactory.create();
             }
@@ -441,7 +473,7 @@ namespace mdk_discovery {
         @doc("Additional metadata associated with this service instance.")
         Map<String,Object> properties = {};
         @doc("The Environment the Node is in.")
-        String environment = "sandbox";
+        OperationalEnvironment environment = new OperationalEnvironment();
 
         FailurePolicy _policy = null;
 
@@ -564,16 +596,16 @@ namespace mdk_discovery {
             return self;
         }
 
-        @doc("Get the service->Cluster mapping for an Environment.")
-        Map<String,Cluster> _getServices(String environment) {
-            if (!services.contains(environment)) {
-                services[environment] = {};
+        @doc("Get the service to Cluster mapping for an Environment.")
+        Map<String,Cluster> _getServices(OperationalEnvironment environment) {
+            if (!services.contains(environment.name)) {
+                services[environment.name] = {};
             }
-            return services[environment];
+            return services[environment.name];
         }
 
         @doc("Get the Cluster for a given service and environment.")
-        Cluster _getCluster(String service, String environment) {
+        Cluster _getCluster(String service, OperationalEnvironment environment) {
             Map<String,Cluster> clusters = _getServices(environment);
             if (!clusters.contains(service)) {
                 clusters[service] = new Cluster(self._fpfactory);
@@ -585,7 +617,7 @@ namespace mdk_discovery {
         Return the current known Nodes for a service in a particular
         Environment, if any.
         """)
-        List<Node> knownNodes(String service, String environment) {
+        List<Node> knownNodes(String service, OperationalEnvironment environment) {
             return _getCluster(service, environment).nodes;
         }
 
@@ -597,11 +629,21 @@ namespace mdk_discovery {
         @doc("Resolve a service name into an available service node. You must")
         @doc("usually start the uplink before this will do much; see start().")
         @doc("The returned Promise will end up with a Node as its value.")
-        Promise resolve(String service, String version, String environment) {
+        Promise resolve(String service, String version, OperationalEnvironment environment) {
             PromiseResolver factory = new PromiseResolver(runtime.dispatcher);
 
             self._lock();
             Cluster cluster = _getCluster(service, environment);
+            if (!cluster.matchingVersionRegistered(version)) {
+                // We've never seen a Node registered with a matching version. So
+                // check if there is parent environment, and if so use it.
+                OperationalEnvironment fallback = environment.getFallback();
+                if (fallback != null) {
+                    self._release();
+                    return resolve(service, version, fallback);
+                }
+            }
+
             Node result = cluster.chooseVersion(version);
             if (result == null) {
                 cluster._addRequest(version, factory);
@@ -633,7 +675,8 @@ namespace mdk_discovery {
             }
         }
 
-        void _replace(String service, String environment, List<Node> nodes) {
+        void _replace(String service, OperationalEnvironment environment,
+                      List<Node> nodes) {
             self._lock();
             logger.info("replacing all nodes for " + service + " with "
                         + nodes.toString());
