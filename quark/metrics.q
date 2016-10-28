@@ -2,7 +2,7 @@ quark 1.0;
 
 /* Metric reporting sub-protocol. */
 
-package datawire_mdk_tracing 2.0.26;
+package datawire_mdk_tracing 2.0.27;
 
 include protocol-1.0.q;
 include discovery-3.0.q;
