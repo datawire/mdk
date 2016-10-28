@@ -1,5 +1,6 @@
 quark 1.0;
 
+import mdk_protocol;
 import mdk_discovery;
 import mdk_runtime;
 import mdk_runtime.actors;
@@ -26,9 +27,9 @@ namespace synapse {
     """)
     class Synapse extends DiscoverySourceFactory {
         String _directory_path;
-        String _environment;
+        OperationalEnvironment _environment;
 
-        Synapse(String directory_path, String environment) {
+        Synapse(String directory_path, OperationalEnvironment environment) {
             self._directory_path = directory_path;
             self._environment = environment;
         }
@@ -49,10 +50,10 @@ namespace synapse {
         String directory_path;
         FileActor files;
         MessageDispatcher dispatcher;
-        String environment;
+        OperationalEnvironment environment;
 
         _SynapseSource(Actor subscriber, String directory_path, MDKRuntime runtime,
-                       String environment) {
+                       OperationalEnvironment environment) {
             self.subscriber = subscriber;
             self.directory_path = directory_path;
             self.files = runtime.getFileService();

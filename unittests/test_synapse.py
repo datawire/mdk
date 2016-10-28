@@ -11,8 +11,11 @@ from json import dumps
 import os
 
 from .common import fake_runtime
+from mdk_protocol import OperationalEnvironment
 from mdk_discovery import Discovery, Node
 from mdk_discovery.synapse import Synapse
+
+from .test_discovery import knownNodes
 
 class SynapseTests(TestCase):
     """Tests for Synapse."""
@@ -24,7 +27,9 @@ class SynapseTests(TestCase):
 
         self.directory = mkdtemp()
         self.addCleanup(lambda: rmtree(self.directory))
-        self.synapse = Synapse(self.directory, "staging").create(
+        env = OperationalEnvironment()
+        env.name = "staging"
+        self.synapse = Synapse(self.directory, env).create(
             self.disco, self.runtime)
         self.runtime.dispatcher.startActor(self.synapse)
 
@@ -74,7 +79,7 @@ class SynapseTests(TestCase):
         self.write("service2.json", [])
         self.pump()
         self.assertNodesEqual(
-            self.disco.knownNodes("service1", "staging"),
+            knownNodes(self.disco, "service1", "staging"),
             [self.node("service1", "host1", 123),
              self.node("service1", "host2", 124)])
 
@@ -87,7 +92,7 @@ class SynapseTests(TestCase):
                                      {"host": "host4", "port": 126}])
         self.pump()
         self.assertNodesEqual(
-            self.disco.knownNodes("service1", "staging"),
+            knownNodes(self.disco, "service1", "staging"),
             [self.node("service1", "host3", 125),
              self.node("service1", "host4", 126)])
 
@@ -98,18 +103,18 @@ class SynapseTests(TestCase):
         self.pump()
         self.remove("service1.json")
         self.pump()
-        self.assertNodesEqual(self.disco.knownNodes("service1", "staging"), [])
+        self.assertNodesEqual(knownNodes(self.disco, "service1", "staging"), [])
 
     def test_badFormat(self):
         """An unreadable file leaves Discovery unchanged."""
         with open(os.path.join(self.directory, "service2.json"), "w") as f:
             f.write("this is not json")
         self.pump()
-        self.assertNodesEqual(self.disco.knownNodes("service2", "staging"), [])
+        self.assertNodesEqual(knownNodes(self.disco, "service2", "staging"), [])
 
     def test_unexpectedFilename(self):
         """Files that don't end with '.json' are ignored."""
         self.write("service1.abcd", [{"host": "host1", "port": 123},
                                      {"host": "host2", "port": 124}])
         self.pump()
-        self.assertNodesEqual(self.disco.knownNodes("service1", "staging"), [])
+        self.assertNodesEqual(knownNodes(self.disco, "service1", "staging"), [])

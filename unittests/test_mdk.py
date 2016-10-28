@@ -20,7 +20,7 @@ from mdk_discovery import (
 )
 from mdk_protocol import Serializable
 
-from .test_discovery import create_node
+from .test_discovery import create_node, SANDBOX_ENV
 
 
 class MDKInitializationTestCase(TestCase):
@@ -95,9 +95,9 @@ class InteractionTestCase(TestCase):
         self.node4 = create_node("b2", "service2")
         self.all_nodes = set([self.node1, self.node2, self.node3, self.node4])
 
-        self.disco.onMessage(None, ReplaceCluster("service1", "sandbox",
+        self.disco.onMessage(None, ReplaceCluster("service1", SANDBOX_ENV,
                                                   [self.node1, self.node2]))
-        self.disco.onMessage(None, ReplaceCluster("service2", "sandbox",
+        self.disco.onMessage(None, ReplaceCluster("service2", SANDBOX_ENV,
                                                   [self.node3, self.node4]))
 
     def assertPolicyState(self, policies, successes, failures):
@@ -363,7 +363,7 @@ class SessionTests(TestCase):
     def test_newSesssionEnvironment(self):
         """New sessions get their environment from the MDK."""
         session = self.mdk.session()
-        self.assertEqual(session.getEnvironment(), "myenv")
+        assertEnvironmentEquals(self, session.getEnvironment(), "myenv", None)
 
     def test_sessionProperties(self):
         """Sessions have properties that can be set, checked and retrieved."""
@@ -395,7 +395,7 @@ class SessionTests(TestCase):
         connector = MDKConnector(env={"MDK_ENVIRONMENT": "env2"})
         encoded_session = connector.mdk.session().externalize()
         session2 = self.mdk.join(encoded_session)
-        self.assertEqual(session2.getEnvironment(), "env2")
+        assertEnvironmentEquals(self, session2.getEnvironment(), "env2", None)
 
     def test_childSession(self):
         """
@@ -415,6 +415,14 @@ class SessionTests(TestCase):
         self.assertEqual(session2.getRemainingTime(), None)
         self.assertSessionHas(session2, session2._context.traceId, [1],
                               other=123)
+
+
+def assertEnvironmentEquals(test, environment, name, fallback):
+    """
+    Assert the given environment has the given name and fallback name.
+    """
+    test.assertEqual(environment.name, name)
+    test.assertEqual(environment.fallbackName, fallback)
 
 
 class MDKConnector(object):
@@ -521,7 +529,11 @@ class ConnectionStartupTests(TestCase):
         connector = MDKConnector(env={"MDK_ENVIRONMENT": "myenv"})
         ws_actor = connector.expectSocket()
         open = connector.connect(ws_actor)
-        self.assertEqual(open.environment, "myenv")
+        assertEnvironmentEquals(self, open.environment, "myenv", None)
+        connector = MDKConnector(env={"MDK_ENVIRONMENT": "parent:child"})
+        ws_actor = connector.expectSocket()
+        open = connector.connect(ws_actor)
+        assertEnvironmentEquals(self, open.environment, "child", "parent")
 
     def test_default_environment(self):
         """
@@ -530,7 +542,7 @@ class ConnectionStartupTests(TestCase):
         connector = MDKConnector()
         ws_actor = connector.expectSocket()
         open = connector.connect(ws_actor)
-        self.assertEqual(open.environment, "sandbox")
+        assertEnvironmentEquals(self, open.environment, "sandbox", None)
 
 
 class InteractionReportingTests(TestCase):
