@@ -65,7 +65,8 @@ node_modules:
 
 .PHONY: js-dependencies
 js-dependencies: node_modules
-	npm install express connect-timeout
+	npm list express || npm install express
+	npm list connect-timeout || npm install connect-timeout
 
 .PHONY: ruby-dependencies
 ruby-dependencies:
