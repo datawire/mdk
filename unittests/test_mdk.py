@@ -18,7 +18,7 @@ from mdk_runtime import fakeRuntime
 from mdk_discovery import (
     ReplaceCluster, NodeActive, RecordingFailurePolicyFactory,
 )
-from mdk_protocol import Serializable
+from mdk_protocol import Serializable, Open
 
 from .test_discovery import create_node, SANDBOX_ENV
 
@@ -474,6 +474,7 @@ class MDKConnector(object):
     def connect(self, fake_wsactor):
         """Connect and then return the last sent Open message."""
         fake_wsactor.accept()
+        fake_wsactor.send(Open().encode())
         self.pump()
         return self.expectSerializable(fake_wsactor, "mdk_protocol.Open")
 
@@ -494,6 +495,17 @@ class MDKConnector(object):
 
 class ConnectionStartupTests(TestCase):
     """Tests for initial setup of MCP connections."""
+    def test_open_after_receiving_open(self):
+        """
+        The connection to MCP only sends an Open message after receiving one.
+        """
+        connector = MDKConnector()
+        ws_actor = connector.expectSocket()
+        ws_actor.accept()
+        connector.pump()
+        ws_actor.swallowLogMessages()
+        self.assertEqual(ws_actor.uninspectedSentMessages(), 0)
+
     def test_connection_node_identity(self):
         """
         Each connection to MCP sends an Open message with the same node identity.

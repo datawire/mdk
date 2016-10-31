@@ -64,10 +64,6 @@ class TracingTest {
 
     /////////////////
     // Helpers
-    Open expectOpen(FakeWSActor evt) {
-        return ?expectSerializable(evt, "mdk_protocol.Open");
-    }
-
     LogEvent expectLogEvent(FakeWSActor evt) {
         return ?expectSerializable(evt, "mdk_tracing.protocol.LogEvent");
     }
@@ -85,8 +81,6 @@ class TracingTest {
 
     Tracer newTracer(String url) {
         WSClient client = new WSClient(runtime, getRTPParser(), url, "the_token");
-        OpenCloseSubscriber openclose = new OpenCloseSubscriber(client, "abc", SANDBOX);
-        runtime.dispatcher.startActor(openclose);
         return new Tracer(runtime, client);
     }
 
@@ -102,9 +96,6 @@ class TracingTest {
             return null;
         }
         sev.accept();
-        self.pump();
-        Open open = expectOpen(sev);
-        if (open == null) { return null; }
         self.pump();
         return sev;
     }
@@ -141,8 +132,6 @@ class TracingTest {
         self.pump();
         FakeWSActor sev = startTracer(tracer);
         if (sev == null) { return; }
-        Open open = expectOpen(sev);
-        if (open == null) { return; }
         Subscribe sub = expectSubscribe(sev);
         if (sub == null) { return; }
         LogEvent e = new LogEvent();
@@ -177,11 +166,6 @@ class DiscoveryTest {
 
     /////////////////
     // Helpers
-
-    Open expectOpen(FakeWSActor evt) {
-        return ?expectSerializable(evt, "mdk_protocol.Open");
-    }
-
     Active expectActive(FakeWSActor evt) {
         return ?expectSerializable(evt, "mdk_discovery.protocol.Active");
     }
@@ -196,9 +180,7 @@ class DiscoveryTest {
     Discovery createDisco() {
         Discovery disco = new Discovery(runtime);
         WSClient wsclient = new WSClient(runtime, getRTPParser(), "http://url/", "");
-        OpenCloseSubscriber openclose = new OpenCloseSubscriber(wsclient, "xxasa", SANDBOX);
         runtime.dispatcher.startActor(wsclient);
-        runtime.dispatcher.startActor(openclose);
         self.client = ?new mdk_discovery.protocol.DiscoClientFactory(wsclient).create(disco, self.runtime);
         runtime.dependencies.registerService("discovery_registrar", self.client);
         return disco;
@@ -214,7 +196,6 @@ class DiscoveryTest {
             return null;
         }
         sev.accept();
-        sev.send(new Open().encode());
         return sev;
     }
 
@@ -246,9 +227,6 @@ class DiscoveryTest {
         FakeWSActor sev = startDisco(disco);
         if (sev == null) { return; }
 
-        Open open = expectOpen(sev);
-        if (open == null) { return; }
-
         Active active = expectActive(sev);
         if (active == null) { return; }
         checkEqualNodes(node, active.node);
@@ -264,8 +242,6 @@ class DiscoveryTest {
         node.version = "1.2.3";
         disco.register(node);
 
-        Open open = expectOpen(sev);
-        if (open == null) { return; }
         Active active = expectActive(sev);
         if (active == null) { return; }
         checkEqualNodes(node, active.node);
@@ -461,8 +437,6 @@ class DiscoveryTest {
         node.version = "1.2.3";
         disco.register(node);
 
-        Open open = expectOpen(sev);
-        if (open == null) { return; }
         Active active = expectActive(sev);
         if (active == null) { return; }
 
