@@ -19,7 +19,7 @@ def main():
         encoded_session = sys.argv[2]
     ssn = MDK.join(encoded_session)
     try:
-        address = ssn.resolve_until(sys.argv[1], "1.0.0", 10.0).address
+        address = ssn.resolve_until(sys.argv[1], "1.0.0", 5.0).address
     except:
         exc = traceback.format_exc()
         if "Timeout" not in exc:
