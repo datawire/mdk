@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_introspection 2.0.27;
+package datawire_mdk_introspection 2.0.28;
 
 /* 
  * Copyright 2016 Datawire. All rights reserved.

@@ -211,7 +211,7 @@ class RubyTests(TestCase):
                     random_string()])
 
     def test_discovery(self):
-        """Minimal discovery end-to-end test with a Javascript client."""
+        """Minimal discovery end-to-end test with a Ruby client."""
         assertRegisteryDiscoverable(
             self,
             lambda service: check_output(
@@ -231,7 +231,7 @@ class JavaTests(TestCase):
              random_string()])
 
     def test_discovery(self):
-        """Minimal discovery end-to-end test with a Javascript client."""
+        """Minimal discovery end-to-end test with a Java client."""
         check_call(["mvn", "-f", os.path.join(CODE_PATH, "resolve_java/pom.xml"),
                     "package"])
         assertRegisteryDiscoverable(
