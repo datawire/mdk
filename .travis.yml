@@ -36,10 +36,11 @@ before_cache:
 install:
   - rvm install 2.3
   - sudo docker pull datawire/quark-run:$(cat QUARK_VERSION.txt | cut -b 2-)
-  - rvm use --ruby-version 2.3 && make setup setup-docker
+  - rvm use --ruby-version 2.3 && make -j4 setup setup-docker
+  - rvm use --ruby-version 2.3 && make -j4 install-mdk
 
 script:
-  - ./.travis-test.sh
+  - rvm use --ruby-version 2.3 && make test
 
 # Upload packages on successful tagged builds:
 deploy:
