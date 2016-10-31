@@ -108,7 +108,7 @@ class Python3Tests(Python2Tests):
                                        additional_env={
                                            "MDK_ENVIRONMENT": "sandbox"}))
         # 2. Assert it can't be found in a different environment:
-        assertNotResolvable(service, {"MDK_ENVIRONMENT": "anotherenv"})
+        assertNotResolvable(self, service, {"MDK_ENVIRONMENT": "anotherenv"})
 
     def assertResolvable(self, service, environment, expected_address,
                          context=None):
@@ -144,7 +144,7 @@ class Python3Tests(Python2Tests):
         # 1. Register in one environment
         service, _ = self.registerInAnEnvironment("firstenv")
         # 2. Assert it can't be found in a different environment:
-        assertNotResolvable(service, {"MDK_ENVIRONMENT": "anotherenv"})
+        assertNotResolvable(self, service, {"MDK_ENVIRONMENT": "anotherenv"})
 
     def test_environmentFallback(self):
         """
