@@ -31,6 +31,8 @@ clean:
 	docker rmi datawire/mdk-quark-run:`sed s/v//g < QUARK_VERSION.txt`
 
 virtualenv: virtualenv/bin/pip
+
+virtualenv/bin/pip:
 	rm -rf virtualenv
 	virtualenv -p python2 virtualenv
 	virtualenv/bin/pip install -U pip
@@ -40,11 +42,15 @@ python-dependencies: virtualenv
 	virtualenv/bin/pip install -r dev-requirements.txt
 
 virtualenv3: virtualenv3/bin/pip
+
+virtualenv3/bin/pip:
 	rm -rf virtualenv3
 	virtualenv -p python3 virtualenv3
 	virtualenv3/bin/pip install -U pip
 
 django110env: django110env/bin/pip
+
+django110env/bin/pip:
 	rm -rf django110env
 	virtualenv -p python3 django110env
 	django110env/bin/pip install -U pip
