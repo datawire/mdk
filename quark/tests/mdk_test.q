@@ -196,6 +196,7 @@ class DiscoveryTest {
             return null;
         }
         sev.accept();
+        sev.send(new Clear().encode());
         return sev;
     }
 

@@ -48,6 +48,8 @@ namespace mdk_discovery {
 
             long lastHeartbeat = 0L;
             Actor sock; // Websocket actor for the WS connection
+            // Set to true after we receive first Clear:
+            bool _receivedClear = false;
 
             DiscoClient(Actor disco_subscriber, WSClient wsclient, MDKRuntime runtime) {
                 self._subscriber = disco_subscriber;
@@ -88,12 +90,15 @@ namespace mdk_discovery {
                     self.onExpire(expire);
                     return;
                 }
-                // XXX we don't handle Clear yet.
+                if (type == "mdk_discovery.protocol.Clear") {
+                    // XXX don't actually clear right now now
+                    self._receivedClear = true;
+                    self.heartbeat();
+                }
             }
 
             void onWSConnected(Actor websocket) {
                 self.sock = websocket;
-                heartbeat();
             }
 
             void onPump() {
@@ -113,10 +118,10 @@ namespace mdk_discovery {
                 }
                 registered[service].add(node);
 
-                // Trigger send of delta if we are connected, otherwise do
-                // nothing because the full set of nodes will be resent
-                // when we connect/reconnect.
-                if (self._wsclient.isConnected()) {
+                // Trigger send of delta if we are connected and already got
+                // Clear, otherwise do nothing because the full set of nodes
+                // will be resent when we connect/reconnect.
+                if (self._wsclient.isConnected() && _receivedClear) {
                     active(node);
                 }
             }
@@ -156,6 +161,11 @@ namespace mdk_discovery {
 
             @doc("Send all registered services.")
             void heartbeat() {
+                // Don't send anything until we receive Clear, which is how we
+                // know MCP is ready to process messages.
+                if (!_receivedClear) {
+                    return;
+                }
                 List<String> services = self.registered.keys();
                 int idx = 0;
                 while (idx < services.size()) {

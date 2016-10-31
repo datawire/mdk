@@ -120,7 +120,7 @@ namespace mdk_runtime {
                 expectIdx = expectIdx + 1;
                 return msg;
             }
-            Context.runtime().fail("no remaining message found");
+            panic("no remaining message found");
             return "unreachable";
         }
     }
