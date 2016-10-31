@@ -8,7 +8,6 @@ from past.builtins import unicode
 from unittest import TestCase
 from tempfile import mkdtemp
 from collections import Counter
-from json import loads
 
 import hypothesis.strategies as st
 from hypothesis import given, assume
@@ -18,9 +17,8 @@ from mdk_runtime import fakeRuntime
 from mdk_discovery import (
     ReplaceCluster, NodeActive, RecordingFailurePolicyFactory,
 )
-from mdk_protocol import Serializable
 
-from .test_discovery import create_node, SANDBOX_ENV
+from .common import MDKConnector, create_node, SANDBOX_ENV
 
 
 class MDKInitializationTestCase(TestCase):
@@ -425,75 +423,19 @@ def assertEnvironmentEquals(test, environment, name, fallback):
     test.assertEqual(environment.fallbackName, fallback)
 
 
-class MDKConnector(object):
-    """Manage an interaction with fake remote server."""
-
-    URL = "ws://localhost:1234/"
-
-    def __init__(self, failurepolicy_factory=None, env={}):
-        self.runtime = fakeRuntime()
-        env_vars = self.runtime.getEnvVarsService()
-        for key, value in env.items():
-            env_vars.set(key, value)
-        env_vars.set("DATAWIRE_TOKEN", "xxx");
-        env_vars.set("MDK_SERVER_URL", self.URL);
-        if failurepolicy_factory is not None:
-            self.runtime.dependencies.registerService(
-                "failurepolicy_factory", failurepolicy_factory)
-        self.mdk = MDKImpl(self.runtime)
-        self.mdk.start()
-        self.pump()
-
-    def pump(self):
-        """Deliver scheduled events."""
-        self.runtime.getTimeService().pump()
-
-    def advance_time(self, seconds):
-        """Advance the clock."""
-        ts = self.runtime.getTimeService()
-        ts.advance(seconds)
-        ts.pump()
-        ts.pump()
-
-    def expectSocket(self):
-        """Return the FakeWSActor we expect to have connected to a URL."""
-        ws = self.runtime.getWebSocketsService()
-        actor = ws.lastConnection()
-        assert actor.url.startswith(self.URL)
-        return actor
-
-    def expectSerializable(self, fake_wsactor, expected_type):
-        """Return the last sent message of given type."""
-        msg = fake_wsactor.expectTextMessage()
-        assert msg is not None
-        json = loads(msg)
-        evt = Serializable.decodeClassName(expected_type, msg)
-        assert json["type"] == evt._json_type
-        return evt
-
-    def connect(self, fake_wsactor):
-        """Connect and then return the last sent Open message."""
-        fake_wsactor.accept()
-        self.pump()
-        return self.expectSerializable(fake_wsactor, "mdk_protocol.Open")
-
-    def expectInteraction(self, test, fake_wsactor, session,
-                          failed_nodes, succeeded_nodes):
-        """Assert an InteractionEvent was sent, and return it."""
-        interaction = self.expectSerializable(
-            fake_wsactor, "mdk_metrics.InteractionEvent")
-        test.assertEqual(interaction.node, self.mdk.procUUID)
-        test.assertEqual(interaction.session, session._context.traceId)
-        expected = {node.properties["datawire_nodeId"]: 1
-                    for node in succeeded_nodes}
-        for node in failed_nodes:
-            expected[node.properties["datawire_nodeId"]] = 0
-        test.assertEqual(interaction.results, expected)
-        return interaction
-
-
 class ConnectionStartupTests(TestCase):
     """Tests for initial setup of MCP connections."""
+    def test_open_after_receiving_open(self):
+        """
+        The connection to MCP only sends an Open message after receiving one.
+        """
+        connector = MDKConnector()
+        ws_actor = connector.expectSocket()
+        ws_actor.accept()
+        connector.pump()
+        ws_actor.swallowLogMessages()
+        self.assertEqual(ws_actor.uninspectedSentMessages(), 0)
+
     def test_connection_node_identity(self):
         """
         Each connection to MCP sends an Open message with the same node identity.

@@ -397,6 +397,7 @@ namespace mdk_protocol {
         WSClient _wsclient;
         String _node_id;
         OperationalEnvironment _environment;
+        Actor _websocket;
 
         OpenCloseSubscriber(WSClient client, String node_id, OperationalEnvironment environment) {
             self._wsclient = client;
@@ -431,11 +432,7 @@ namespace mdk_protocol {
         }
 
         void onWSConnected(Actor websocket) {
-            // Send Open message to the server:
-            Open open = new Open();
-            open.nodeId = self._node_id;
-            open.environment = _environment;
-            self._dispatcher.tell(self, open.encode(), websocket);
+            _websocket = websocket;
         }
 
         void onPump() {}
@@ -443,6 +440,12 @@ namespace mdk_protocol {
         // WebSocket message handlers:
         void onOpen() {
             // Should assert version here ...
+
+            // Send Open message to the server:
+            Open open = new Open();
+            open.nodeId = self._node_id;
+            open.environment = _environment;
+            self._dispatcher.tell(self, open.encode(), _websocket);
         }
 
         void onClose(Close close) {

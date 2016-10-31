@@ -99,6 +99,14 @@ namespace mdk_runtime {
         }
 
         @doc("""
+        Return number of sent messages we haven't looked at yet with
+        expectTextMessage().
+        """)
+        int uninspectedSentMessages() {
+            return sent.size() - expectIdx;
+        }
+
+        @doc("""
         Check that a message has been sent via this actor.
         """)
         String expectTextMessage() {
@@ -112,7 +120,7 @@ namespace mdk_runtime {
                 expectIdx = expectIdx + 1;
                 return msg;
             }
-            Context.runtime().fail("no remaining message found");
+            panic("no remaining message found");
             return "unreachable";
         }
     }
