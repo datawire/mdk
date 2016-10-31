@@ -35,5 +35,4 @@ build-tools
 
 .cache
 npm-debug.log
-dist/
 functionaltests/webservers/db.sqlite3

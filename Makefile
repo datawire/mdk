@@ -18,7 +18,7 @@ clean:
 	rm -fr virtualenv3
 	rm -rf django110env
 	rm -fr output
-	rm -fr dist
+	rm -fr dist/?*.*
 	rm -f quark/*.qc quark/tests/*.qc
 	rm -fr ~/.m2/repository/datawire_mdk
 	rm -fr ~/.m2/repository/io/datawire/mdk
@@ -133,36 +133,28 @@ release-patch:
 	virtualenv/bin/python scripts/release.py patch
 
 # Packaging commands:
-output: $(wildcard quark/*.q) $(wildcard python/*.py) dist
+output: $(wildcard quark/*.q) $(wildcard python/*.py)
 	rm -rf output output.temp quark/*.qc quark/tests/*.qc
 	# Use installed Quark if we don't already have quark cli in PATH:
 	which quark || source ~/.quark/config.sh; quark compile --include-stdlib -o output.temp quark/mdk-2.0.q
 	cp python/*.py output.temp/py/mdk-2.0/mdk/
 	mv output.temp output
 
-dist:
-	mkdir dist
-
-.PHONY: packages
 packages: python-packages ruby-packages javascript-packages java-packages
 
-.PHONY: python-packages
 python-packages: output
 	python scripts/build-packages.py py output/py/mdk-2.0 dist/
 
-.PHONY: ruby-packages
-ruby-packages: output
+ruby-packages: output $(wildcard ruby/**)
 	python scripts/build-packages.py rb output/rb/mdk-2.0 dist/
 	cd ruby/rack-mdk && gem build rack-mdk.gemspec
 	mv ruby/rack-mdk/*.gem dist/
 	cd ruby/faraday_mdk && gem build faraday_mdk.gemspec
 	mv ruby/faraday_mdk/*.gem dist
 
-.PHONY: javascript-packages
-javascript-packages: output
+javascript-packages: output $(wildcard javascript/**)
 	python scripts/build-packages.py js output/js/mdk-2.0 dist/
 
-.PHONY: java-packages
 java-packages: output
 	python scripts/build-packages.py java output/java/mdk-2.0 dist/
 
