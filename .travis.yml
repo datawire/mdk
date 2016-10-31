@@ -22,13 +22,13 @@ cache:
     - node_modules
     - $GEM_HOME
 before_cache:
-  - virtualenv3/bin/pip uninstall datawire-mdk || echo "not installed?"
-  - virtualenv/bin/pip uninstall datawire-mdk || echo "not installed?"
-  - django110env/bin/pip uninstall datawire-mdk || echo "not installed?"
+  - virtualenv3/bin/pip uninstall --yes datawire-mdk || echo "not installed?"
+  - virtualenv/bin/pip uninstall --yes datawire-mdk || echo "not installed?"
+  - django110env/bin/pip uninstall -yes datawire-mdk || echo "not installed?"
   - rm -rf $HOME/.m2/repository/io/datawire
-  - gem uninstall --all datawire_mdk || echo "not installed?"
-  - gem uninstall --all rack-mdk || echo "not installed?"
-  - gem uninstall --all faraday_mdk || echo "not installed?"
+  - gem uninstall --all --force datawire_mdk || echo "not installed?"
+  - gem uninstall --all --force rack-mdk || echo "not installed?"
+  - gem uninstall --all --force faraday_mdk || echo "not installed?"
   - npm uninstall datawire_mdk || echo "not installed?"
   - npm uninstall datawire_mdk_request || echo "not installed?"
   - npm uninstall datawire_mdk_express || echo "not installed?"
