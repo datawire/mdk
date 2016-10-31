@@ -5,7 +5,8 @@ default:
 	@echo "You can run:"
 	@echo "* 'make setup' to setup the environment"
 	@echo "* '[sudo] make setup-docker' to prepare docker images for tests"
-	@echo "* 'make test' to run tests (requires setup, setup-docker, and DATAWIRE_TOKEN)"
+	@echo "* 'make install-mdk' to compile and install MDK."
+	@echo "* 'make test' to run tests (requires setup, setup-docker, and DATAWIRE_TOKEN). This will NOT rebuild/reinstall MDK."
 	@echo "* 'make packages' to build packages (.whl, .gem, etc.)"
 	@echo "* 'make release-patch' to do a patch release (2.0.x)"
 	@echo "* 'make release-minor' to do a minor release (2.x.0)"
@@ -82,18 +83,24 @@ install-quark:
 		curl -# -L https://raw.githubusercontent.com/datawire/quark/master/install.sh | \
 		bash -s -- -q `cat QUARK_VERSION.txt`
 
-.PHONY: install-mdk
-install-mdk: packages $(wildcard javascript/**/*)
+.PHONY: install-mdk-python install-mdk-ruby install-mdk-javascript install-mdk-java
+
+install-mdk-python: packages
 	virtualenv/bin/pip install --upgrade dist/datawire_mdk-*-py2*-none-any.whl
 	virtualenv3/bin/pip install --upgrade dist/datawire_mdk-*-*py3-none-any.whl
 	django110env/bin/pip install --upgrade dist/datawire_mdk-*-*py3-none-any.whl
-	gem install --no-doc dist/datawire_mdk-*.gem
-	gem install --no-doc dist/rack*.gem
-	gem install --no-doc dist/faraday*.gem
-	npm install output/js/mdk-2.0
-	npm install javascript/datawire_mdk_express/
-	npm install javascript/datawire_mdk_request/
+
+install-mdk-ruby: packages
+	gem install --no-doc dist/datawire_mdk-*.gem dist/rack*.gem dist/faraday*.gem
+
+install-mdk-javascript: packages $(wildcard javascript/**/*)
+	npm install output/js/mdk-2.0 javascript/datawire_mdk_express/ javascript/datawire_mdk_request/
+
+install-mdk-java:
 	cd output/java/mdk-2.0 && mvn install
+
+install-mdk: install-mdk-python install-mdk-ruby install-mdk-javascript install-mdk-java
+
 
 .PHONY: setup-docker
 setup-docker: docker
@@ -107,7 +114,7 @@ setup-docker: docker
 	docker tag datawire/mdk-quark-run datawire/mdk-quark-run:`sed s/v//g < QUARK_VERSION.txt`
 
 .PHONY: test
-test: install-mdk test-python test-python3
+test: test-python test-python3
 
 .PHONY: guard-token
 guard-token:
@@ -117,13 +124,13 @@ guard-token:
 	fi
 
 .PHONY: test-python
-test-python:
+test-python: python-dependencies
 	# Functional tests don't benefit from being run in another language, so
 	# we only run them under Python 3:
 	virtualenv/bin/py.test -n 4 -v unittests
 
 .PHONY: test-python3
-test-python3: guard-token
+test-python3: guard-token python3-dependencies
 	virtualenv3/bin/py.test -n 4 -v --timeout=180 --timeout_method=thread unittests functionaltests
 
 release-minor:
