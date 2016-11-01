@@ -16,7 +16,6 @@ def exit(*args):
 signal.signal(signal.SIGTERM, exit)
 
 def main():
-    time.sleep(3)
     MDK = init()
     MDK.start()
     try:
