@@ -40,8 +40,10 @@ def assertRegisteryDiscoverable(test, discover, additional_env={}):
 
 def assertNotResolvable(test, service, additional_env={}):
     """Assert the service isn't resolvable."""
+    env = os.environ.copy()
+    env.update(additional_env)
     resolved_address = run_python(sys.executable, "resolve.py",
-                                  [service], output=True)
+                                  [service], output=True, env=env)
     test.assertEqual(b"not found", resolved_address)
 
 
@@ -121,7 +123,7 @@ class Python3Tests(Python2Tests):
         address = run_python(self.python_binary, "resolve.py",
                              params, output=True,
                              additional_env={"MDK_ENVIRONMENT": environment})
-        self.assertEqual(address, expected_address)
+        self.assertEqual(address.decode("utf-8"), expected_address)
 
     def registerInAnEnvironment(self, environment):
         """
@@ -165,11 +167,11 @@ class Python3Tests(Python2Tests):
         serviceC, addressC = self.registerInAnEnvironment("parent:child")
         # 3. Services in parent:child can resolve B, even though it's in
         # parent, both with and without a parent:child session:
-        self.assertResolvable(serviceB, addressB, "parent:child")
-        self.assertResolvable(serviceB, addressB, "parent:child", context_id)
+        self.assertResolvable(serviceB, "parent:child", addressB)
+        self.assertResolvable(serviceB, "parent:child", addressB, context_id)
         # 4. Services in parent can resolve C if it's joined a parent:child
         # session, but not with its normal sessions:
-        self.assertResolvable(serviceC, addressC, "parent:child", context_id)
+        self.assertResolvable(serviceC, "parent:child", addressC, context_id)
         assertNotResolvable(self, serviceC, {"MDK_ENVIRONMENT": "parent"})
 
     def test_environmentWithFallbackIdentity(self):
@@ -182,8 +184,8 @@ class Python3Tests(Python2Tests):
         serviceC, addressC = self.registerInAnEnvironment("parent:child")
         # 2. parent:child can see anything in child, and vice versa
         # parent, both with and without a parent:child session:
-        self.assertResolvable(serviceB, addressB, "parent:child")
-        self.assertResolvable(serviceC, addressC, "child")
+        self.assertResolvable(serviceB, "parent:child", addressB)
+        self.assertResolvable(serviceC, "child", addressC)
 
 
 class JavascriptTests(TestCase):
