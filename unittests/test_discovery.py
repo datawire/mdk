@@ -7,7 +7,6 @@ Additional tests can be found in quark/tests/mdk_test.q.
 from __future__ import absolute_import
 from builtins import range
 from builtins import object
-from uuid import uuid4
 
 from unittest import TestCase
 from json import dumps
@@ -15,10 +14,10 @@ from json import dumps
 from hypothesis.stateful import GenericStateMachine
 from hypothesis import strategies as st
 
-from .common import fake_runtime
+from .common import fake_runtime, SANDBOX_ENV, create_node
 
 from mdk_discovery import (
-    Discovery, Node, NodeActive, NodeExpired, ReplaceCluster,
+    Discovery, NodeActive, NodeExpired, ReplaceCluster,
     CircuitBreakerFactory, StaticRoutes,
 )
 from mdk import _parseEnvironment
@@ -34,17 +33,6 @@ def create_disco():
     return disco
 
 
-def create_node(address, service="myservice", environment="sandbox"):
-    """Create a new Node."""
-    node = Node()
-    node.service = service
-    node.version = "1.0"
-    node.address = address
-    node.properties = {"datawire_nodeId": str(uuid4())}
-    node.environment = _parseEnvironment(environment)
-    return node
-
-
 def resolve(disco, service, version, environment="sandbox"):
     """Resolve a service to a Node."""
     return disco.resolve(service, version,
@@ -54,10 +42,6 @@ def resolve(disco, service, version, environment="sandbox"):
 def knownNodes(disco, service, environment="sandbox"):
     """Return known nodes for a service."""
     return disco.knownNodes(service, _parseEnvironment(environment))
-
-
-SANDBOX_ENV = _parseEnvironment("sandbox")
-
 
 
 class DiscoveryTests(TestCase):
