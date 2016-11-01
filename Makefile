@@ -24,6 +24,7 @@ clean:
 	rm -fr ~/.m2/repository/datawire_mdk
 	rm -fr ~/.m2/repository/io/datawire/mdk
 	rm -rf node_modules
+	rm -rf .make-guards/???*
 	find . -name "__pycache__" -print0 | xargs -0 rm -fr
 	-docker kill websocket-echo
 	docker rmi datawire/websocket-echo:latest
@@ -83,23 +84,25 @@ install-quark:
 		curl -# -L https://raw.githubusercontent.com/datawire/quark/master/install.sh | \
 		bash -s -- -q `cat QUARK_VERSION.txt`
 
-.PHONY: install-mdk-python install-mdk-ruby install-mdk-javascript install-mdk-java
-
-install-mdk-python: packages
+.make-guards/install-mdk-python: python-dependencies python3-dependencies .make-guards/python-packages
 	virtualenv/bin/pip install --upgrade dist/datawire_mdk-*-py2*-none-any.whl
 	virtualenv3/bin/pip install --upgrade dist/datawire_mdk-*-*py3-none-any.whl
 	django110env/bin/pip install --upgrade dist/datawire_mdk-*-*py3-none-any.whl
+	touch .make-guards/install-mdk-python
 
-install-mdk-ruby: packages
+.make-guards/install-mdk-ruby: .make-guards/ruby-packages
 	gem install --no-doc dist/datawire_mdk-*.gem dist/rack*.gem dist/faraday*.gem
+	touch .make-guards/install-mdk-ruby
 
-install-mdk-javascript: packages $(wildcard javascript/**/*)
+.make-guards/install-mdk-javascript: .make-guards/javascript-packages $(wildcard javascript/**/*)
 	npm install output/js/mdk-2.0 javascript/datawire_mdk_express/ javascript/datawire_mdk_request/
+	touch .make-guards/install-mdk-javascript
 
-install-mdk-java:
+.make-guards/install-mdk-java: .make-guards/java-packages
 	cd output/java/mdk-2.0 && mvn install
+	touch .make-guards/install-mdk-java
 
-install-mdk: install-mdk-python install-mdk-ruby install-mdk-javascript install-mdk-java
+install-mdk: .make-guards/install-mdk-python .make-guards/install-mdk-ruby .make-guards/install-mdk-javascript .make-guards/install-mdk-java
 
 
 .PHONY: setup-docker
@@ -124,13 +127,13 @@ guard-token:
 	fi
 
 .PHONY: test-python
-test-python: python-dependencies
+test-python: python-dependencies .make-guards/install-mdk-python
 	# Functional tests don't benefit from being run in another language, so
 	# we only run them under Python 3:
 	virtualenv/bin/py.test -n 4 -v unittests
 
 .PHONY: test-python3
-test-python3: guard-token python3-dependencies
+test-python3: guard-token python3-dependencies install-mdk
 	virtualenv3/bin/py.test -n 4 -v --timeout=180 --timeout_method=thread unittests functionaltests
 
 release-minor:
@@ -147,23 +150,29 @@ output: $(wildcard quark/*.q) $(wildcard python/*.py)
 	cp python/*.py output.temp/py/mdk-2.0/mdk/
 	mv output.temp output
 
-packages: python-packages ruby-packages javascript-packages java-packages
+packages: .make-guards/python-packages .make-guards/ruby-packages .make-guards/javascript-packages .make-guards/java-packages
 
-python-packages: output
+.make-guards/python-packages: output
+	rm -rf dist/*.whl
 	python scripts/build-packages.py py output/py/mdk-2.0 dist/
+	touch .make-guards/python-packages
 
-ruby-packages: output $(wildcard ruby/**)
+.make-guards/ruby-packages: output $(wildcard ruby/**)
+	rm -f dist/*.gem
 	python scripts/build-packages.py rb output/rb/mdk-2.0 dist/
 	cd ruby/rack-mdk && gem build rack-mdk.gemspec
 	mv ruby/rack-mdk/*.gem dist/
 	cd ruby/faraday_mdk && gem build faraday_mdk.gemspec
 	mv ruby/faraday_mdk/*.gem dist
+	touch .make-guards/ruby-packages
 
-javascript-packages: output $(wildcard javascript/**)
+.make-guards/javascript-packages: output $(wildcard javascript/**)
 	python scripts/build-packages.py js output/js/mdk-2.0 dist/
+	touch .make-guards/javascript-packages
 
-java-packages: output
+.make-guards/java-packages: output
 	python scripts/build-packages.py java output/java/mdk-2.0 dist/
+	touch .make-guards/java-packages
 
 
 # Package upload commands
