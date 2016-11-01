@@ -40,7 +40,7 @@ class MDKConnector(object):
 
     URL = "ws://localhost:1234/"
 
-    def __init__(self, failurepolicy_factory=None, env={}):
+    def __init__(self, failurepolicy_factory=None, env={}, start=True):
         self.runtime = fakeRuntime()
         env_vars = self.runtime.getEnvVarsService()
         for key, value in env.items():
@@ -51,8 +51,9 @@ class MDKConnector(object):
             self.runtime.dependencies.registerService(
                 "failurepolicy_factory", failurepolicy_factory)
         self.mdk = MDKImpl(self.runtime)
-        self.mdk.start()
-        self.pump()
+        if start:
+            self.mdk.start()
+            self.pump()
 
     def pump(self):
         """Deliver scheduled events."""
