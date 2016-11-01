@@ -93,7 +93,7 @@ namespace mdk_discovery {
 
             void onWSConnected(Actor websocket) {
                 self.sock = websocket;
-                heartbeat();
+                onPump();
             }
 
             void onPump() {
