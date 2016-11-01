@@ -19,11 +19,6 @@ def filepath(request):
     return request.param
 
 
-def test_run_python_only(quark_run, filepath, websocket_echo_server):
-    """Run Quark tests that don't need to run in multiple languages."""
-    quark_run(filepath, "python")
-
-
 def test_run_python3_only(quark_run, filepath, websocket_echo_server):
     """Run Quark tests that don't need to run in multiple languages."""
     quark_run(filepath, "python3")
