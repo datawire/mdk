@@ -43,7 +43,7 @@ def assertNotResolvable(test, service, additional_env={}):
     env = os.environ.copy()
     env.update(additional_env)
     resolved_address = run_python(sys.executable, "resolve.py",
-                                  [service], output=True, env=env)
+                                  [service], output=True, additional_env=env)
     test.assertEqual(b"not found", resolved_address)
 
 
