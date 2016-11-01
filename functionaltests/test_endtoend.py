@@ -171,7 +171,7 @@ class Python3Tests(Python2Tests):
         self.assertResolvable(serviceB, "parent:child", addressB, context_id)
         # 4. Services in parent can resolve C if it's joined a parent:child
         # session, but not with its normal sessions:
-        self.assertResolvable(serviceC, "parent:child", addressC, context_id)
+        self.assertResolvable(serviceC, "parent", addressC, context_id)
         assertNotResolvable(self, serviceC, {"MDK_ENVIRONMENT": "parent"})
 
     def test_environmentWithFallbackIdentity(self):
