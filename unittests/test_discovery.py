@@ -1,13 +1,10 @@
 """
 Tests for Discovery.
-
-Additional tests can be found in quark/tests/mdk_test.q.
 """
 
 from __future__ import absolute_import
 from builtins import range
 from builtins import object
-from uuid import uuid4
 
 from unittest import TestCase
 from json import dumps
@@ -15,12 +12,13 @@ from json import dumps
 from hypothesis.stateful import GenericStateMachine
 from hypothesis import strategies as st
 
-from .common import fake_runtime
+from .common import fake_runtime, SANDBOX_ENV, create_node, MDKConnector
 
 from mdk_discovery import (
-    Discovery, Node, NodeActive, NodeExpired, ReplaceCluster,
-    CircuitBreakerFactory, StaticRoutes,
+    Discovery, NodeActive, NodeExpired, ReplaceCluster,
+    CircuitBreakerFactory, StaticRoutes, Node,
 )
+from mdk_discovery.protocol import Active
 from mdk import _parseEnvironment
 
 
@@ -34,17 +32,6 @@ def create_disco():
     return disco
 
 
-def create_node(address, service="myservice", environment="sandbox"):
-    """Create a new Node."""
-    node = Node()
-    node.service = service
-    node.version = "1.0"
-    node.address = address
-    node.properties = {"datawire_nodeId": str(uuid4())}
-    node.environment = _parseEnvironment(environment)
-    return node
-
-
 def resolve(disco, service, version, environment="sandbox"):
     """Resolve a service to a Node."""
     return disco.resolve(service, version,
@@ -54,10 +41,6 @@ def resolve(disco, service, version, environment="sandbox"):
 def knownNodes(disco, service, environment="sandbox"):
     """Return known nodes for a service."""
     return disco.knownNodes(service, _parseEnvironment(environment))
-
-
-SANDBOX_ENV = _parseEnvironment("sandbox")
-
 
 
 class DiscoveryTests(TestCase):
@@ -603,3 +586,269 @@ class StaticDiscoverySourceTests(TestCase):
         self.assertEqual((node1.address, node1.version), ("a", "1.0"))
         [node2] = knownNodes(self.disco, "service2", "myenv2")
         self.assertEqual((node2.address, node2.version), ("b", "2.0"))
+
+
+class DiscoveryProtocolTests(TestCase):
+    """Tests for the Discovery protocol.
+
+    Originally part of mdk_test.q.
+    """
+
+    def setUp(self):
+        self.connector = MDKConnector(start=False)
+
+    def pump(self):
+        self.connector.pump()
+
+    ########/
+    # Helpers
+
+    def expectOpen(self, ws_actor):
+        return self.connector.connect(ws_actor)
+
+    def expectActive(self, ws_actor):
+        return self.connector.expectSerializable(
+            ws_actor, "mdk_discovery.protocol.Active")
+
+    def assertEqualNodes(self, expected, actual):
+        self.assertEqual(expected.service, actual.service)
+        self.assertEqual(expected.address, actual.address)
+        self.assertEqual(expected.version, actual.version)
+        self.assertEqual(expected.properties, actual.properties)
+
+    def createDisco(self):
+        return self.connector.mdk._disco
+
+    def startDisco(self):
+        self.connector.mdk.start()
+        self.pump()
+        ws_actor = self.connector.expectSocket()
+        self.connector.connect(ws_actor)
+        return ws_actor
+
+    ########/
+    # Tests
+
+    def testStart(self):
+        sev = self.startDisco()
+        self.assertFalse(sev == None)
+
+    def testFailedStart(self):
+        # ...
+        pass
+
+    def testRegisterPreStart(self):
+        disco = self.createDisco()
+
+        node = Node()
+        node.service = "svc"
+        node.address = "addr"
+        node.version = "1.2.3"
+        disco.register(node)
+
+        sev = self.startDisco()
+
+        active = self.expectActive(sev)
+        self.assertFalse(active == None)
+        self.assertEqualNodes(node, active.node)
+
+    def testRegisterPostStart(self):
+        disco = self.createDisco()
+        sev = self.startDisco()
+
+        node = Node()
+        node.service = "svc"
+        node.address = "addr"
+        node.version = "1.2.3"
+        disco.register(node)
+
+        active = self.expectActive(sev)
+        self.assertFalse(active == None)
+        self.assertEqualNodes(node, active.node)
+
+    def doActive(self, sev, svc, addr, version):
+        active = Active()
+        active.node = Node()
+        active.node.service = svc
+        active.node.address = addr
+        active.node.version = version
+        sev.send(active.encode())
+        return active.node
+
+    def testResolvePreStart(self):
+        disco = self.createDisco()
+
+        promise = disco.resolve("svc", "1.0", SANDBOX_ENV)
+        self.assertEqual(False, promise.value().hasValue())
+
+        sev = self.startDisco()
+        self.assertFalse(sev == None)
+
+        node = self.doActive(sev, "svc", "addr", "1.2.3")
+
+        self.assertEqualNodes(node, promise.value().getValue())
+
+    def testResolvePostStart(self):
+        disco = self.createDisco()
+        sev = self.startDisco()
+
+        promise = disco.resolve("svc", "1.0", SANDBOX_ENV)
+        self.assertEqual(False, promise.value().hasValue())
+
+        node = self.doActive(sev, "svc", "addr", "1.2.3")
+
+        self.assertEqualNodes(node, promise.value().getValue())
+
+    def testResolveAfterNotification(self):
+        disco = self.createDisco()
+        sev = self.startDisco()
+
+        node = self.doActive(sev, "svc", "addr", "1.2.3")
+
+        promise = disco.resolve("svc", "1.0", SANDBOX_ENV)
+        self.assertEqualNodes(node, promise.value().getValue())
+
+    # This variant caught a bug in the code, so it's useful to have all of
+    # these even though they're seemingly similar.
+    def testResolveBeforeAndBeforeNotification(self):
+        disco = self.createDisco()
+        sev = self.startDisco()
+        promise = disco.resolve("svc", "1.0", SANDBOX_ENV)
+        promise2 = disco.resolve("svc", "1.0", SANDBOX_ENV)
+        self.assertEqual(False, promise.value().hasValue())
+        self.assertEqual(False, promise2.value().hasValue())
+
+        node = self.doActive(sev, "svc", "addr", "1.2.3")
+
+        self.assertEqualNodes(node, promise.value().getValue())
+        self.assertEqualNodes(node, promise2.value().getValue())
+
+    def testResolveBeforeAndAfterNotification(self):
+        disco = self.createDisco()
+        sev = self.startDisco()
+        promise = disco.resolve("svc", "1.0", SANDBOX_ENV)
+
+        node = self.doActive(sev, "svc", "addr", "1.2.3")
+
+        promise2 = disco.resolve("svc", "1.0", SANDBOX_ENV)
+        self.assertEqualNodes(node, promise.value().getValue())
+        self.assertEqualNodes(node, promise2.value().getValue())
+
+    def testResolveDifferentActive(self):
+        disco = self.createDisco()
+        sev = self.startDisco()
+
+        node = self.doActive(sev, "svc", "addr", "1.2.3")
+        self.doActive(sev, "svc2", "addr", "1.2.3")
+
+        promise = disco.resolve("svc", "1.0", SANDBOX_ENV)
+        self.assertEqualNodes(node, promise.value().getValue())
+
+    def testResolveVersionAfterActive(self):
+        disco = self.createDisco()
+        sev = self.startDisco()
+
+        n1 = self.doActive(sev, "svc", "addr1.0", "1.0.0")
+        n2 = self.doActive(sev, "svc", "addr1.2.3", "1.2.3")
+
+        promise = disco.resolve("svc", "1.0", SANDBOX_ENV)
+        self.assertEqualNodes(n1, promise.value().getValue())
+        promise = disco.resolve("svc", "1.1", SANDBOX_ENV)
+        self.assertEqualNodes(n2, promise.value().getValue())
+
+    def testResolveVersionBeforeActive(self):
+        disco = self.createDisco()
+        sev = self.startDisco()
+
+        p1 = disco.resolve("svc", "1.0", SANDBOX_ENV)
+        p2 = disco.resolve("svc", "1.1", SANDBOX_ENV)
+
+        n1 = self.doActive(sev, "svc", "addr1.0", "1.0.0")
+        n2 = self.doActive(sev, "svc", "addr1.2.3", "1.2.3")
+
+        self.assertEqualNodes(n1, p1.value().getValue())
+        self.assertEqualNodes(n2, p2.value().getValue())
+
+    def testResolveBreaker(self):
+        disco = self.createDisco()
+        sev = self.startDisco()
+
+        n1 = self.doActive(sev, "svc", "addr1", "1.0.0")
+        n2 = self.doActive(sev, "svc", "addr2", "1.0.0")
+
+        p = disco.resolve("svc", "1.0", SANDBOX_ENV)
+        self.assertEqualNodes(n1, p.value().getValue())
+        p = disco.resolve("svc", "1.0", SANDBOX_ENV)
+        self.assertEqualNodes(n2, p.value().getValue())
+
+        failed = p.value().getValue()
+        fpfactory = disco._fpfactory
+        for idx in range(fpfactory.threshold):
+            failed.failure()
+
+        p = disco.resolve("svc", "1.0", SANDBOX_ENV)
+        self.assertEqualNodes(n1, p.value().getValue())
+        p = disco.resolve("svc", "1.0", SANDBOX_ENV)
+        self.assertEqualNodes(n1, p.value().getValue())
+
+    def testLoadBalancing(self):
+        disco = self.createDisco()
+        sev = self.startDisco()
+
+        promise = disco.resolve("svc", "1.0", SANDBOX_ENV)
+        self.assertEqual(False, promise.value().hasValue())
+
+        active = Active()
+
+        count = 10
+        for idx in range(count):
+            active.node = Node()
+            active.node.service = "svc"
+            active.node.address = "addr" + str(idx)
+            active.node.version = "1.2.3"
+            sev.send(active.encode())
+            idx = idx + 1
+
+        for idx in range(count*10):
+            node = disco.resolve("svc", "1.0", SANDBOX_ENV).value().getValue()
+            self.assertEqual("addr" + str(idx % count), node.address)
+
+    def testReconnect(self):
+        # ...
+        pass
+
+    # Unexpected messages are ignored.
+    def testUnexpectedMessage(self):
+        sev = self.startDisco()
+        sev.send("{\"type\": \"UnknownMessage\"}")
+        self.pump()
+        self.assertEqual("CONNECTED", sev.state)
+
+    def testStop(self):
+        timeService = self.connector.runtime.getTimeService()
+        disco = self.createDisco()
+        sev = self.startDisco()
+
+        node = Node()
+        node.service = "svc"
+        node.address = "addr"
+        node.version = "1.2.3"
+        disco.register(node)
+
+        active = self.expectActive(sev)
+        self.assertNotEqual(active, None)
+
+        self.connector.mdk.stop()
+        # Might take some cleanup to stop everything:
+        timeService.advance(15.0)
+        self.pump()
+        self.pump()
+        self.pump()
+        self.pump()
+
+        # At this point we should have nothing scheduled and socket should be
+        # closed:
+        ws = self.connector.runtime.getWebSocketsService()
+        self.assertEqual([sev], ws.fakeActors) # Only the one connection
+        self.assertEqual("DISCONNECTED", sev.state)
+        self.assertEqual(0, timeService.scheduled())
