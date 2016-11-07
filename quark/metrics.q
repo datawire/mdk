@@ -18,6 +18,9 @@ namespace mdk_metrics {
         @doc("Interaction start time, milliseconds since the Unix epoch.")
         long timestamp;
 
+        @doc("Interaction (really, session's) environment.")
+        OperationalEnvironment environment;
+
         long getTimestamp() {
             return self.timestamp;
         }

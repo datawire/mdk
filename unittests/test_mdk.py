@@ -481,9 +481,9 @@ class InteractionReportingTests(TestCase):
     """The results of interactions are reported to the MCP."""
 
     def setUp(self):
-        self.node1 = create_node("a1", "service1")
-        self.node2 = create_node("a2", "service2")
-        self.node3 = create_node("a3", "service3")
+        self.node1 = create_node("a1", "service1", environment="myenv")
+        self.node2 = create_node("a2", "service2", environment="myenv")
+        self.node3 = create_node("a3", "service3", environment="myenv")
 
     def add_nodes(self, mdk):
         """Register existence of nodes with the MDK instance."""
@@ -493,7 +493,7 @@ class InteractionReportingTests(TestCase):
 
     def test_interaction(self):
         """Interaction results are sent to the MCP."""
-        connector = MDKConnector()
+        connector = MDKConnector(env={"MDK_ENVIRONMENT": "myenv"})
         time_service = connector.runtime.getTimeService()
         ws_actor = connector.expectSocket()
         connector.connect(ws_actor)
@@ -517,3 +517,4 @@ class InteractionReportingTests(TestCase):
         interaction = connector.expectInteraction(self, ws_actor, session,
                                                   [self.node1], [self.node2])
         self.assertEqual(interaction.timestamp, int(1000*start_time))
+        self.assertEqual(interaction.environment.name, "myenv")
