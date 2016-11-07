@@ -372,6 +372,36 @@ class DiscoveryEnvironmentTests(TestCase):
         self.assertEqual(resolve(disco, "myservice", "1.0", "parent:child"),
                          None)
 
+    def test_unknownServiceChildArrivesFirst(self):
+        """
+        If resolution can't return an answer immediately, and the child environment
+        gets a node later on, the resolution gets that result.
+        """
+        env = _parseEnvironment("parent:child")
+        node = create_node("somewhere", "myservice", "parent:child")
+        disco = create_disco()
+        promise = disco.resolve("myservice", "1.0", env)
+        disco.onMessage(None, NodeActive(node))
+        self.assertEqual(promise.value().getValue().address, "somewhere")
+        # If a parent node arrives we don't blow up:
+        disco.onMessage(None, NodeActive(create_node("somewhereelse", "myservice",
+                                                     "parent")))
+
+    def test_unknownServiceParentArrivesFirst(self):
+        """
+        If resolution can't return an answer immediately, and the parent environment
+        gets a node later on, the resolution gets that result.
+        """
+        env = _parseEnvironment("parent:child")
+        node = create_node("somewhere", "myservice", "parent")
+        disco = create_disco()
+        promise = disco.resolve("myservice", "1.0", env)
+        disco.onMessage(None, NodeActive(node))
+        self.assertEqual(promise.value().getValue().address, "somewhere")
+        # If a child node arrives we don't blow up:
+        disco.onMessage(None, NodeActive(create_node("somewhereelse", "myservice",
+                                                     "parent:child")))
+
 
 class CircuitBreakerTests(TestCase):
     """
