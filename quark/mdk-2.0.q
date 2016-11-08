@@ -771,6 +771,7 @@ namespace mdk {
             interactionReport.timestamp =
                 (1000.0 * _mdk._runtime.getTimeService().time()).round();
             interactionReport.session = _context.traceId;
+            interactionReport.environment = _context.environment;
             _interactionReports.add(interactionReport);
             _resolved.add([]);
         }
