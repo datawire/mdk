@@ -701,8 +701,9 @@ namespace mdk {
                     return null;
                 }
                 _inLogging.setValue(true);
-                LogEvent evt = _mdk._tracer
-                    .log(_context, _mdk.procUUID, level, category, text);
+                LogEvent evt = logToTracer(_mdk._tracer, _context,
+                                           _mdk.procUUID, level, category,
+                                           text);
                 _inLogging.setValue(false);
                 // XXX create LoggedMessageId from evt
                 return null;

@@ -43,20 +43,45 @@ namespace mdk_tracing {
 
     @doc("MDK can use this to handle logging on the Session.")
     interface TracingDestination extends Actor {
-        @doc("Send a log message to the server.")
-        LogEvent log(SharedContext ctx, String procUUID, String level,
-                     String category, String text);
+        @doc("Send a log message to the server. Call using logToTracer().")
+        void log(LogEvent event);
+    }
+
+    @doc("Construct a LogEvent and write to a tracer.")
+    LogEvent logToTracer(TracingDestination tracer,
+                         SharedContext ctx, String procUUID, String level,
+                         String category, String text) {
+        ctx.tick();
+        LogEvent evt = new LogEvent();
+
+        // Copy context so multiple events don't have the same
+        // context object, which is getting mutated over time,
+        // e.g., the ctx.tick() call above. This potentially
+        // duplicates a large amount of baggage (ctx.properties),
+        // but hopefully that baggage is empty/unused right now.
+        // Perhaps a better workaround would be to send just the
+        // relevant data from the context object. An actual
+        // solution would involve having sensible definitions/APIs
+        // for the context object and its clock.
+
+        evt.context = ctx.copy();
+        evt.timestamp = now();
+        evt.node = procUUID;
+        evt.level = level;
+        evt.category = category;
+        evt.contentType = "text/plain";
+        evt.text = text;
+        tracer.log(evt);
+        return evt;
     }
 
     @doc("In-memory testing of logs.")
     class FakeTracer extends TracingDestination {
         List<Map<String,String>> messages = [];
 
-        LogEvent log(SharedContext ctx, String procUUID, String level,
-                 String category, String text) {
-            messages.add({"level": level, "category": category,
-                          "text": text, "context": ctx.traceId});
-            return null; // XXX move LogEvent creation into function
+        void log(LogEvent event) {
+            messages.add({"level": event.level, "category": event.category,
+                          "text": event.text, "context": event.context.traceId});
         }
 
         void onStart(MessageDispatcher dispatcher) {}
@@ -102,32 +127,9 @@ namespace mdk_tracing {
         void onMessage(Actor origin, Object mesage) {}
 
         @doc("Send a log message to the server.")
-        LogEvent log(SharedContext ctx, String procUUID, String level,
-                     String category, String text) {
-            ctx.tick();
-            logger.trace("CTX " + ctx.toString());
-
-            LogEvent evt = new LogEvent();
-
-            // Copy context so multiple events don't have the same
-            // context object, which is getting mutated over time,
-            // e.g., the ctx.tick() call above. This potentially
-            // duplicates a large amount of baggage (ctx.properties),
-            // but hopefully that baggage is empty/unused right now.
-            // Perhaps a better workaround would be to send just the
-            // relevant data from the context object. An actual
-            // solution would involve having sensible definitions/APIs
-            // for the context object and its clock.
-
-            evt.context = ctx.copy();
-            evt.timestamp = now();
-            evt.node = procUUID;
-            evt.level = level;
-            evt.category = category;
-            evt.contentType = "text/plain";
-            evt.text = text;
-            _client.log(evt);
-            return evt;
+        void log(LogEvent event) {
+            logger.trace("CTX " + event.context.toString());
+            _client.log(event);
         }
 
         void subscribe(UnaryCallable handler) {
