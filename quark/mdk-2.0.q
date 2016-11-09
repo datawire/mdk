@@ -564,13 +564,21 @@ namespace mdk {
         String traceId;
 
         @doc("The causal clock level within the trace.")
-        List<int> causal_level;
+        List<int> causalLevel;
 
         @doc("The operational environment.")
         String environment;
 
         @doc("The fallback operational environment.")
-        String environment_fallback;
+        String environmentFallback;
+
+        LoggedMessageId(String traceId, List<int> causalLevel,
+                        String environment, String environmentFallback) {
+            self.traceId = traceId;
+            self.causalLevel = causalLevel;
+            self.environment = environment;
+            self.environmentFallback = environmentFallback;
+        }
     }
 
     class SessionImpl extends Session {
@@ -705,8 +713,10 @@ namespace mdk {
                                            _mdk.procUUID, level, category,
                                            text);
                 _inLogging.setValue(false);
-                // XXX create LoggedMessageId from evt
-                return null;
+                return new LoggedMessageId(_context.traceId,
+                                           evt.context.clock.clocks,
+                                           _context.environment.name,
+                                           _context.environment.fallbackName);
             }
         }
 
