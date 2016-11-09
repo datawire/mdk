@@ -542,6 +542,41 @@ class LoggingTests(TestCase):
         self.assertEqual(result, expected_levels)
 
     def test_log_levels_enforced(self):
-        """Only log messages at or above the a level are sent."""
+        """
+        Only log messages at or above the set trace level are sent onwards.
+        """
         for level in self.LEVELS:
             self.assert_log_level_enforced(level)
+
+    def test_log_result(self):
+        """
+        A LoggedMessageId matching the logged message is returned by logging APIs.
+        """
+        mdk, tracer = create_mdk_with_faketracer(environment="fallback:child")
+        session = mdk.session()
+        session.info("cat", "message")
+        lmid = session.info("cat", "another message")
+        logged = tracer.messages[1]
+        self.assertEqual((lmid.traceId, lmid.causalLevel, lmid.environment,
+                          lmid.environmentFallback),
+                         (logged["context"], [2], "child", "fallback"))
+
+    def test_log_result_too_low_level(self):
+        """
+        A LoggedMessageId matching the logged message is returned by logging APIs
+        even when the given level is low enough that a message wasn't sent to
+        the MCP.
+        """
+        mdk, tracer = create_mdk_with_faketracer()
+        session = mdk.session()
+        session.info("cat", "message")
+        lmid = session.debug("cat", "another message")
+        lmid2 = session.info("cat", "message")
+        # Debug message wasn't set:
+        self.assertEqual([d["level"] for d in tracer.messages],
+                         ["INFO", "INFO"])
+        # But we still got LoggedMessageId for debug message:
+        self.assertEqual((lmid.causalLevel, lmid.traceId,
+                          lmid2.causalLevel, lmid2.traceId),
+                         (session._context.traceId, session._context.traceId,
+                          [2], [3]))

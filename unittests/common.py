@@ -36,7 +36,7 @@ def create_node(address, service="myservice", environment="sandbox"):
 SANDBOX_ENV = _parseEnvironment("sandbox")
 
 
-def create_mdk_with_faketracer():
+def create_mdk_with_faketracer(environment="sandbox"):
     """Create an MDK with a FakeTracer.
 
     Returns (mdk, fake_tracer).
@@ -45,6 +45,7 @@ def create_mdk_with_faketracer():
     tracer = FakeTracer()
     runtime.dependencies.registerService("tracer", tracer)
     runtime.getEnvVarsService().set("MDK_DISCOVERY_SOURCE", "static:nodes={}")
+    runtime.getEnvVarsService().set("MDK_ENVIRONMENT", environment)
     mdk = MDKImpl(runtime)
     mdk.start()
     return mdk, tracer
