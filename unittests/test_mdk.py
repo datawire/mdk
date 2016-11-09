@@ -578,5 +578,22 @@ class LoggingTests(TestCase):
         # But we still got LoggedMessageId for debug message:
         self.assertEqual((lmid.causalLevel, lmid.traceId,
                           lmid2.causalLevel, lmid2.traceId),
-                         (session._context.traceId, session._context.traceId,
-                          [2], [3]))
+                         ([2], session._context.traceId,
+                          [3], session._context.traceId))
+
+    def test_no_tracer(self):
+        """
+        If no tracer was setup, logging still returns a LoggedMessageId.
+        """
+        runtime = fakeRuntime()
+        runtime.getEnvVarsService().set("MDK_DISCOVERY_SOURCE", "static:nodes={}")
+        mdk = MDKImpl(runtime)
+        mdk.start()
+        # No DATAWIRE_TOKEN, so no tracer:
+        self.assertEqual(mdk._tracer, None)
+        session = mdk.session()
+        session.info("cat", "message")
+        lmid = session.info("cat", "another message")
+        self.assertEqual((lmid.traceId, lmid.causalLevel),
+                         (session._context.traceId, [2]))
+

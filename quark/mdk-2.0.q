@@ -698,26 +698,23 @@ namespace mdk {
         }
 
         LoggedMessageId _log(String level, String category, String text) {
-            if (!_enabled(level)) {
+            if (_inLogging.getValue()) {
+                // We're being called recursively. We don't want logging
+                // inside the tracer to trigger logging to the tracer! So
+                // sadly we have to just drop the message on the floor.
                 return null;
             }
-            if (_mdk._tracer != null) {
-                if (_inLogging.getValue()) {
-                    // We're being called recursively. We don't want logging
-                    // inside the tracer to trigger logging to the tracer! So
-                    // sadly we have to just drop the message on the floor.
-                    return null;
-                }
-                _inLogging.setValue(true);
-                LogEvent evt = logToTracer(_mdk._tracer, _context,
-                                           _mdk.procUUID, level, category,
-                                           text);
-                _inLogging.setValue(false);
-                return new LoggedMessageId(_context.traceId,
-                                           evt.context.clock.clocks,
-                                           _context.environment.name,
-                                           _context.environment.fallbackName);
+            _inLogging.setValue(true);
+            LogEvent evt = createLogEvent(_context, _mdk.procUUID, level,
+                                          category, text);
+            if (_mdk._tracer != null && _enabled(level)) {
+                _mdk._tracer.log(evt);
             }
+            _inLogging.setValue(false);
+            return new LoggedMessageId(_context.traceId,
+                                       evt.context.clock.clocks,
+                                       _context.environment.name,
+                                       _context.environment.fallbackName);
         }
 
         LoggedMessageId critical(String category, String text) {

@@ -7,7 +7,7 @@ from __future__ import absolute_import
 from unittest import TestCase
 
 from mdk_protocol import SharedContext
-from mdk_tracing import logToTracer
+from mdk_tracing import createLogEvent
 from mdk_tracing.protocol import LogEvent
 from .common import MDKConnector
 
@@ -41,8 +41,8 @@ class TracingProtocolTests(TestCase):
         self.connector.mdk.start()
         self.pump()
         ctx = SharedContext()
-        logToTracer(self.connector.mdk._tracer,
-                    ctx, "procUUID", "DEBUG", "blah", "testing...")
+        event = createLogEvent(ctx, "procUUID", "DEBUG", "blah", "testing...")
+        self.connector.mdk._tracer.log(event)
         self.pump()
         ws_actor = self.connector.expectSocket()
         self.assertFalse(ws_actor == None)

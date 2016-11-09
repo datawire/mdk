@@ -48,9 +48,8 @@ namespace mdk_tracing {
     }
 
     @doc("Construct a LogEvent and write to a tracer.")
-    LogEvent logToTracer(TracingDestination tracer,
-                         SharedContext ctx, String procUUID, String level,
-                         String category, String text) {
+    LogEvent createLogEvent(SharedContext ctx, String procUUID, String level,
+                            String category, String text) {
         ctx.tick();
         LogEvent evt = new LogEvent();
 
@@ -71,7 +70,6 @@ namespace mdk_tracing {
         evt.category = category;
         evt.contentType = "text/plain";
         evt.text = text;
-        tracer.log(evt);
         return evt;
     }
 
