@@ -17,9 +17,10 @@ from mdk_runtime import fakeRuntime
 from mdk_discovery import (
     ReplaceCluster, NodeActive, RecordingFailurePolicyFactory,
 )
-from mdk_protocol import Serializable
 
-from .common import create_node, SANDBOX_ENV, MDKConnector
+from .common import (
+    create_node, SANDBOX_ENV, MDKConnector, create_mdk_with_faketracer,
+)
 
 
 class MDKInitializationTestCase(TestCase):
@@ -518,3 +519,29 @@ class InteractionReportingTests(TestCase):
                                                   [self.node1], [self.node2])
         self.assertEqual(interaction.timestamp, int(1000*start_time))
         self.assertEqual(interaction.environment.name, "myenv")
+
+
+class LoggingTests(TestCase):
+    """Tests for logging API of Session."""
+    LEVELS = ["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"]
+
+    def assert_log_level_enforced(self, minimum_level):
+        """Only log messages at or above the given level are sent."""
+        mdk, tracer = create_mdk_with_faketracer()
+        session = mdk.session()
+        messages = ["a", "b", "c", "d", "e"]
+
+        # Set logging level of the session:
+        session.trace(minimum_level)
+        # Log messages at all levels:
+        for (l, m) in zip(self.LEVELS, messages):
+            getattr(session, l.lower())("category", m)
+        # Only messages at or above current level should actually be logged:
+        result = [d["level"] for d in tracer.messages]
+        expected_levels = self.LEVELS[self.LEVELS.index(minimum_level):]
+        self.assertEqual(result, expected_levels)
+
+    def test_log_levels_enforced(self):
+        """Only log messages at or above the a level are sent."""
+        for level in self.LEVELS:
+            self.assert_log_level_enforced(level)

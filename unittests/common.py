@@ -9,6 +9,7 @@ from mdk_runtime import fakeRuntime
 from mdk_discovery import CircuitBreakerFactory, Node
 from mdk_protocol import Serializable
 from mdk import MDKImpl, _parseEnvironment
+from mdk_tracing import FakeTracer
 
 
 def fake_runtime():
@@ -34,6 +35,19 @@ def create_node(address, service="myservice", environment="sandbox"):
 
 SANDBOX_ENV = _parseEnvironment("sandbox")
 
+
+def create_mdk_with_faketracer():
+    """Create an MDK with a FakeTracer.
+
+    Returns (mdk, fake_tracer).
+    """
+    runtime = fakeRuntime()
+    tracer = FakeTracer()
+    runtime.dependencies.registerService("tracer", tracer)
+    runtime.getEnvVarsService().set("MDK_DISCOVERY_SOURCE", "static:nodes={}")
+    mdk = MDKImpl(runtime)
+    mdk.start()
+    return mdk, tracer
 
 class MDKConnector(object):
     """Manage an interaction with fake remote server."""

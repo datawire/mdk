@@ -7,25 +7,10 @@ from unittest import TestCase
 
 from flask import Flask, g
 
-from mdk_tracing import FakeTracer
-from mdk_runtime import fakeRuntime
-from mdk import MDKImpl
 from mdk.logging import MDKHandler
 from mdk.flask import MDKLoggingHandler, mdk_setup
 
-
-def create_mdk():
-    """Create an MDK with a FakeTracer.
-
-    Returns (mdk, fake_tracer).
-    """
-    runtime = fakeRuntime()
-    tracer = FakeTracer()
-    runtime.dependencies.registerService("tracer", tracer)
-    runtime.getEnvVarsService().set("MDK_DISCOVERY_SOURCE", "static:nodes={}")
-    mdk = MDKImpl(runtime)
-    mdk.start()
-    return mdk, tracer
+from .common import create_mdk_with_faketracer
 
 
 class LoggingTests(TestCase):
@@ -35,7 +20,7 @@ class LoggingTests(TestCase):
         """If MDKHandler is used, logging via stdlib is passed to MDK."""
         logger = logging.Logger("mylog")
         logger.setLevel(logging.DEBUG)
-        mdk, tracer = create_mdk()
+        mdk, tracer = create_mdk_with_faketracer()
         session = mdk.session()
         session.trace("DEBUG")
         logger.addHandler(MDKHandler(mdk, lambda: session))
@@ -55,7 +40,7 @@ class LoggingTests(TestCase):
     def test_format(self):
         """MDKHandler uses Python stdlib formatting."""
         logger = logging.Logger("mylog")
-        mdk, tracer = create_mdk()
+        mdk, tracer = create_mdk_with_faketracer()
         session = mdk.session()
         logger.addHandler(MDKHandler(mdk, lambda: session))
 
@@ -67,7 +52,7 @@ class LoggingTests(TestCase):
         Sometimes MDK logging results in native, i.e. Python logging. Ensure this
         doesn't cause infinite loop when we route Python logging to MDK.
         """
-        mdk, tracer = create_mdk()
+        mdk, tracer = create_mdk_with_faketracer()
         # Make logging into MDK log back into Python logging:
         tracer.log = lambda *args, **kwargs: logging.info("hello!")
         handler = MDKHandler(mdk, lambda: mdk.session())
@@ -82,7 +67,7 @@ class LoggingTests(TestCase):
         The given session's context is used; if no session is available a default
         session is used.
         """
-        mdk, tracer = create_mdk()
+        mdk, tracer = create_mdk_with_faketracer()
         session1, session3 = mdk.session(), mdk.session()
         def get_session(results=[session1, None, session3]):
             return results.pop(0)
@@ -118,7 +103,7 @@ class FlaskLoggingTests(TestCase):
         if MDKLoggingHandler was set up.
         """
         logger = logging.Logger("logz")
-        mdk, tracer = create_mdk()
+        mdk, tracer = create_mdk_with_faketracer()
         app = make_flask_app(logger)
         mdk_setup(app, mdk=mdk)
 
@@ -135,7 +120,7 @@ class FlaskLoggingTests(TestCase):
         passed to MDK.
         """
         logger = logging.Logger("logz")
-        mdk, tracer = create_mdk()
+        mdk, tracer = create_mdk_with_faketracer()
 
         handler = MDKLoggingHandler(mdk)
         logger.addHandler(handler)
