@@ -44,18 +44,19 @@ namespace mdk_tracing {
     @doc("MDK can use this to handle logging on the Session.")
     interface TracingDestination extends Actor {
         @doc("Send a log message to the server.")
-        void log(SharedContext ctx, String procUUID, String level,
-                 String category, String text);
+        LogEvent log(SharedContext ctx, String procUUID, String level,
+                     String category, String text);
     }
 
     @doc("In-memory testing of logs.")
     class FakeTracer extends TracingDestination {
         List<Map<String,String>> messages = [];
 
-        void log(SharedContext ctx, String procUUID, String level,
+        LogEvent log(SharedContext ctx, String procUUID, String level,
                  String category, String text) {
             messages.add({"level": level, "category": category,
                           "text": text, "context": ctx.traceId});
+            return null; // XXX move LogEvent creation into function
         }
 
         void onStart(MessageDispatcher dispatcher) {}
@@ -101,8 +102,8 @@ namespace mdk_tracing {
         void onMessage(Actor origin, Object mesage) {}
 
         @doc("Send a log message to the server.")
-        void log(SharedContext ctx, String procUUID, String level,
-                 String category, String text) {
+        LogEvent log(SharedContext ctx, String procUUID, String level,
+                     String category, String text) {
             ctx.tick();
             logger.trace("CTX " + ctx.toString());
 
@@ -126,6 +127,7 @@ namespace mdk_tracing {
             evt.contentType = "text/plain";
             evt.text = text;
             _client.log(evt);
+            return evt;
         }
 
         void subscribe(UnaryCallable handler) {
