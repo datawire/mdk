@@ -35,8 +35,8 @@ def build_javascript(package_dir):
     copyfile(os.path.join(OVERRIDES, "README.md"),
              os.path.join(package_dir, "README.md"))
     package_json_path = os.path.join(package_dir, "package.json")
-    package_json = loads(os.path.join(OVERRIDES, "package.json.in"))
-    generated_json = loads(file(package_json_path).read())
+    package_json = loads(open(os.path.join(OVERRIDES, "package.json.in")).read())
+    generated_json = loads(open(package_json_path).read())
     package_json["dependencies"] = generated_json["dependencies"]
     with open(package_json_path, "w") as f:
         f.write(dumps(package_json))
