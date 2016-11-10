@@ -814,8 +814,32 @@ class DiscoveryProtocolTests(TestCase):
             self.assertEqual("addr" + str(idx % count), node.address)
 
     def testReconnect(self):
-        # ...
-        pass
+        """
+        Upon disconnecting the client will:
+
+        1. Reconnect.
+        2. Resend all registered nodes.
+        """
+        disco = self.createDisco()
+        ws_actor = self.startDisco()
+        node = create_node("myaddress")
+        disco.register(node)
+        active = self.expectActive(ws_actor)
+        self.assertFalse(active == None)
+        self.assertEqualNodes(node, active.node)
+
+        # Disconnect:
+        ws_actor.close()
+        del ws_actor
+
+        # It should reconnect:
+        self.connector.advance_time(1)
+        ws_actor2 = self.connector.expectSocket()
+        self.connector.connect(ws_actor2)
+        # And it should resent registration message:
+        active = self.expectActive(ws_actor2)
+        self.assertFalse(active == None)
+        self.assertEqualNodes(node, active.node)
 
     # Unexpected messages are ignored.
     def testUnexpectedMessage(self):
