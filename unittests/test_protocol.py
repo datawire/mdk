@@ -28,8 +28,11 @@ class Payload(object):
     def __init__(self, message):
         self.message = message
 
+    def __repr__(self):
+        return "<Payload: {}>".format(self.message)
+
     def getTimestamp(self):
-        return 1
+        return 1342342
 
 
 class NetworkSimulator(object):
@@ -71,13 +74,16 @@ class NetworkSimulator(object):
         if self.connection_to_server:
             message = self.connection_to_server.pop()
             self.server_received.add(message.payload)
-            self.connection_to_client.appendleft(message.sequence)
+            if message.sync:
+                # Send ack since sync flag was set:
+                self.connection_to_client.appendleft(message.sequence)
 
         # Tell client time has passed:
         self.client.onPump(SendToServer(self))
 
 
-def test_sendWithAcks_delivery():
+@given(st.streaming(st.integers(min_value=1, max_value=5)))
+def test_sendWithAcks_delivery(disconnect_intervals):
     """
     Demonstrate that sendWithAcks algorithm delivers messages even though
     connections are dropped.
@@ -101,10 +107,20 @@ def test_sendWithAcks_delivery():
     for m in messages:
         simulator.client.send("my_type", m)
 
-    simulator.reconnect()
-    for _ in range(10000):
+    # Do some delivery interrupted by disconnects:
+    disconnect_intervals = iter(disconnect_intervals)
+    ticks_until_reconnect = 1
+    for _ in range(100):
+        ticks_until_reconnect -= 1
+        if ticks_until_reconnect == 0:
+            simulator.reconnect()
+            ticks_until_reconnect = next(disconnect_intervals)
+        simulator.tick()
+
+    # Now reliably deliver anything that's left:
+    for _ in range(100):
         simulator.tick()
 
     assert simulator.server_received == messages
     assert len(simulator.client._buffered) == 0
-    assert len(simulator.client._inFlight) == 0
+    #assert len(simulator.client._inFlight) == 0
