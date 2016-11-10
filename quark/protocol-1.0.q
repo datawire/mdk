@@ -733,6 +733,34 @@ namespace mdk_protocol {
         }
     }
 
+
+    @doc("Send a message to the other side.")
+    interface SendAckableEvent {
+        void send(AckableEvent event);
+    }
+
+    @doc("Send using a WebSocket actor.")
+    class WSSend extends SendAckableEvent {
+        Actor origin;
+        MessageDispatcher dispatcher;
+        Actor sock;
+
+        WSSend(Actor origin, MessageDispatcher dispatcher, Actor sock) {
+            self.origin = origin;
+            self.dispatcher = dispatcher;
+            self.sock = sock;
+        }
+
+        void send(AckableEvent event) {
+            dispatcher.tell(origin, event.encode(), sock);
+        }
+
+        String toString() {
+            return self.sock.toString();
+        }
+    }
+
+
     @doc("""
     Utility class for sending messages with a protocol that sends back acks.
     """)
@@ -755,7 +783,7 @@ namespace mdk_protocol {
         }
 
         @doc("Call when (re)connected to other side.")
-        void onConnected(Actor origin, MessageDispatcher dispatcher, Actor sock) {
+        void onConnected(SendAckableEvent sender) {
             // Send buffered messages and move them to the in-flight queue
             // Set the sync flag as appropriate
             while (_buffered.size() > 0) {
@@ -768,16 +796,16 @@ namespace mdk_protocol {
                     _lastSyncTime = evt.getTimestamp();
                     debugSuffix = " with sync set";
                 }
-                dispatcher.tell(origin, evt.encode(), sock);
+                sender.send(evt);
                 evt.sync = 0;
                 _sent = _sent + 1;
                 _debug("sent #" + evt.sequence.toString() + debugSuffix +
-                       " to " + sock.toString());
+                       " to " + sender.toString());
             }
         }
 
         @doc("Call to send buffered messages.")
-        void onPump(Actor origin, MessageDispatcher dispatcher, Actor sock) {
+        void onPump(SendAckableEvent sender) {
             // Send buffered messages and move them to the in-flight queue
             // Set the sync flag as appropriate
             while (_buffered.size() > 0) {
@@ -790,11 +818,11 @@ namespace mdk_protocol {
                     _lastSyncTime = evt.getTimestamp();
                     debugSuffix = " with sync set";
                 }
-                dispatcher.tell(origin, evt.encode(), sock);
+                sender.send(evt);
                 evt.sync = 0;
                 _sent = _sent + 1;
                 _debug("sent #" + evt.sequence.toString() + debugSuffix +
-                       " to " + sock.toString());
+                       " to " + sender.toString());
             }
         }
 

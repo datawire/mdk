@@ -285,16 +285,16 @@ namespace mdk_tracing {
             void onWSConnected(Actor websock) {
                 _mutex.acquire();
                 self._sock = websock;
-                self._sendWithAcks.onConnected(self, self._dispatcher, websock);
                 if (_handler != null) {
                     self._dispatcher.tell(self, new Subscribe().encode(), self._sock);
                 }
+                self._sendWithAcks.onConnected(new WSSend(self, self._dispatcher, self._sock));
                 _mutex.release();
             }
 
             void onPump() {
                 _mutex.acquire();
-                self._sendWithAcks.onPump(self, self._dispatcher, self._sock);
+                self._sendWithAcks.onPump(new WSSend(self, self._dispatcher, self._sock));
                 _mutex.release();
             }
 
