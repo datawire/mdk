@@ -16,7 +16,7 @@ setup(name="datawire_mdk",
       py_modules=[path.splitext(i)[0] for i in glob("*.py") if i != "setup.py"],
       packages=find_packages(),
       license='Apache-2.0',
-      url='https://github.com/datawire/mdk',
+      url='https://www.datawire.io',
       author='Datawire.io',
       description='The Microservices Development Kit (MDK)',
       long_description=long_description)

@@ -5,6 +5,6 @@ Gem::Specification.new do |s|
   s.summary     = "Datawire MDK integration for the Faraday HTTP client."
   s.authors     = ["Datawire Inc."]
   s.files       = ["lib/faraday_mdk.rb"]
-  s.homepage    = 'https://github.com/datawire/mdk'
+  s.homepage    = 'https://www.datawire.io'
   s.license     = 'Apache-2.0'
 end

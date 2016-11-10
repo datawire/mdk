@@ -4,6 +4,6 @@ Gem::Specification.new do |s|
   s.summary     = "Datawire MDK integration Rack middleware."
   s.authors     = ["Datawire Inc."]
   s.files       = ["lib/rack-mdk.rb", "lib/rack/mdk.rb"]
-  s.homepage    = 'https://github.com/datawire/mdk'
+  s.homepage    = 'https://www.datawire.io'
   s.license     = 'Apache-2.0'
 end
