@@ -6,5 +6,6 @@
     "url": "https://github.com/datawire/mdk",
     "peerDependencies": {
         "express": "4.x"
-    }
+    },
+    "description": "Datawire MDK integration for the Express.js web framework."
 }
