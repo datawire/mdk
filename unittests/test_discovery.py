@@ -372,6 +372,36 @@ class DiscoveryEnvironmentTests(TestCase):
         self.assertEqual(resolve(disco, "myservice", "1.0", "parent:child"),
                          None)
 
+    def test_unknownServiceChildArrivesFirst(self):
+        """
+        If resolution can't return an answer immediately, and the child environment
+        gets a node later on, the resolution gets that result.
+        """
+        env = _parseEnvironment("parent:child")
+        node = create_node("somewhere", "myservice", "parent:child")
+        disco = create_disco()
+        promise = disco.resolve("myservice", "1.0", env)
+        disco.onMessage(None, NodeActive(node))
+        self.assertEqual(promise.value().getValue().address, "somewhere")
+        # If a parent node arrives we don't blow up:
+        disco.onMessage(None, NodeActive(create_node("somewhereelse", "myservice",
+                                                     "parent")))
+
+    def test_unknownServiceParentArrivesFirst(self):
+        """
+        If resolution can't return an answer immediately, and the parent environment
+        gets a node later on, the resolution gets that result.
+        """
+        env = _parseEnvironment("parent:child")
+        node = create_node("somewhere", "myservice", "parent")
+        disco = create_disco()
+        promise = disco.resolve("myservice", "1.0", env)
+        disco.onMessage(None, NodeActive(node))
+        self.assertEqual(promise.value().getValue().address, "somewhere")
+        # If a child node arrives we don't blow up:
+        disco.onMessage(None, NodeActive(create_node("somewhereelse", "myservice",
+                                                     "parent:child")))
+
 
 class CircuitBreakerTests(TestCase):
     """
@@ -784,8 +814,32 @@ class DiscoveryProtocolTests(TestCase):
             self.assertEqual("addr" + str(idx % count), node.address)
 
     def testReconnect(self):
-        # ...
-        pass
+        """
+        Upon disconnecting the client will:
+
+        1. Reconnect.
+        2. Resend all registered nodes.
+        """
+        disco = self.createDisco()
+        ws_actor = self.startDisco()
+        node = create_node("myaddress")
+        disco.register(node)
+        active = self.expectActive(ws_actor)
+        self.assertFalse(active == None)
+        self.assertEqualNodes(node, active.node)
+
+        # Disconnect:
+        ws_actor.close()
+        del ws_actor
+
+        # It should reconnect:
+        self.connector.advance_time(1)
+        ws_actor2 = self.connector.expectSocket()
+        self.connector.connect(ws_actor2)
+        # And it should resent registration message:
+        active = self.expectActive(ws_actor2)
+        self.assertFalse(active == None)
+        self.assertEqualNodes(node, active.node)
 
     # Unexpected messages are ignored.
     def testUnexpectedMessage(self):

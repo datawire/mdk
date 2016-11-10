@@ -93,6 +93,10 @@ namespace mdk_discovery {
 
             void onWSConnected(Actor websocket) {
                 self.sock = websocket;
+                // make sure onPump doesn't send immediately, since we are
+                // sending now:
+                self.lastHeartbeat = (self._timeService.time()*1000.0).round();
+                // send all registered nodes:
                 heartbeat();
             }
 

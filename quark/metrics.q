@@ -2,7 +2,7 @@ quark 1.0;
 
 /* Metric reporting sub-protocol. */
 
-package datawire_mdk_tracing 2.0.28;
+package datawire_mdk_tracing 2.0.29;
 
 include protocol-1.0.q;
 include discovery-3.0.q;
@@ -17,6 +17,9 @@ namespace mdk_metrics {
 
         @doc("Interaction start time, milliseconds since the Unix epoch.")
         long timestamp;
+
+        @doc("Interaction (really, session's) environment.")
+        OperationalEnvironment environment;
 
         long getTimestamp() {
             return self.timestamp;
@@ -79,11 +82,11 @@ namespace mdk_metrics {
 
         void onWSConnected(Actor websock) {
             self._sock = websock;
-            self._sendWithAcks.onConnected(self, self._dispatcher, websock);
+            self._sendWithAcks.onConnected(new WSSend(self, self._dispatcher, self._sock));
         }
 
         void onPump() {
-            self._sendWithAcks.onPump(self, self._dispatcher, self._sock);
+            self._sendWithAcks.onPump(new WSSend(self, self._dispatcher, self._sock));
         }
 
         void onMessageFromServer(Object message) {
@@ -96,5 +99,3 @@ namespace mdk_metrics {
         }
     }
 }
-
-

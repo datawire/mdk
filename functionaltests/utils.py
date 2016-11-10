@@ -7,7 +7,8 @@ CODE_PATH = os.path.abspath(
 ROOT_PATH = os.path.abspath(os.path.join(CODE_PATH, "../.."))
 
 
-def run_python(python_binary, command, extra_args=(), output=False):
+def run_python(python_binary, command, extra_args=(), output=False,
+               additional_env={}):
     """
     Run a Python program.
 
@@ -18,4 +19,6 @@ def run_python(python_binary, command, extra_args=(), output=False):
         command = check_output
     else:
         command = check_call
-    return command(args)
+    env = os.environ.copy()
+    env.update(additional_env)
+    return command(args, env=env)

@@ -17,9 +17,10 @@ from mdk_runtime import fakeRuntime
 from mdk_discovery import (
     ReplaceCluster, NodeActive, RecordingFailurePolicyFactory,
 )
-from mdk_protocol import Serializable
 
-from .common import create_node, SANDBOX_ENV, MDKConnector
+from .common import (
+    create_node, SANDBOX_ENV, MDKConnector, create_mdk_with_faketracer,
+)
 
 
 class MDKInitializationTestCase(TestCase):
@@ -481,9 +482,9 @@ class InteractionReportingTests(TestCase):
     """The results of interactions are reported to the MCP."""
 
     def setUp(self):
-        self.node1 = create_node("a1", "service1")
-        self.node2 = create_node("a2", "service2")
-        self.node3 = create_node("a3", "service3")
+        self.node1 = create_node("a1", "service1", environment="myenv")
+        self.node2 = create_node("a2", "service2", environment="myenv")
+        self.node3 = create_node("a3", "service3", environment="myenv")
 
     def add_nodes(self, mdk):
         """Register existence of nodes with the MDK instance."""
@@ -493,7 +494,7 @@ class InteractionReportingTests(TestCase):
 
     def test_interaction(self):
         """Interaction results are sent to the MCP."""
-        connector = MDKConnector()
+        connector = MDKConnector(env={"MDK_ENVIRONMENT": "myenv"})
         time_service = connector.runtime.getTimeService()
         ws_actor = connector.expectSocket()
         connector.connect(ws_actor)
@@ -517,3 +518,82 @@ class InteractionReportingTests(TestCase):
         interaction = connector.expectInteraction(self, ws_actor, session,
                                                   [self.node1], [self.node2])
         self.assertEqual(interaction.timestamp, int(1000*start_time))
+        self.assertEqual(interaction.environment.name, "myenv")
+
+
+class LoggingTests(TestCase):
+    """Tests for logging API of Session."""
+    LEVELS = ["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"]
+
+    def assert_log_level_enforced(self, minimum_level):
+        """Only log messages at or above the given level are sent."""
+        mdk, tracer = create_mdk_with_faketracer()
+        session = mdk.session()
+        messages = ["a", "b", "c", "d", "e"]
+
+        # Set logging level of the session:
+        session.trace(minimum_level)
+        # Log messages at all levels:
+        for (l, m) in zip(self.LEVELS, messages):
+            getattr(session, l.lower())("category", m)
+        # Only messages at or above current level should actually be logged:
+        result = [d["level"] for d in tracer.messages]
+        expected_levels = self.LEVELS[self.LEVELS.index(minimum_level):]
+        self.assertEqual(result, expected_levels)
+
+    def test_log_levels_enforced(self):
+        """
+        Only log messages at or above the set trace level are sent onwards.
+        """
+        for level in self.LEVELS:
+            self.assert_log_level_enforced(level)
+
+    def test_log_result(self):
+        """
+        A LoggedMessageId matching the logged message is returned by logging APIs.
+        """
+        mdk, tracer = create_mdk_with_faketracer(environment="fallback:child")
+        session = mdk.session()
+        session.info("cat", "message")
+        lmid = session.info("cat", "another message")
+        logged = tracer.messages[1]
+        self.assertEqual((lmid.traceId, lmid.causalLevel, lmid.environment,
+                          lmid.environmentFallback),
+                         (logged["context"], [2], "child", "fallback"))
+
+    def test_log_result_too_low_level(self):
+        """
+        A LoggedMessageId matching the logged message is returned by logging APIs
+        even when the given level is low enough that a message wasn't sent to
+        the MCP.
+        """
+        mdk, tracer = create_mdk_with_faketracer()
+        session = mdk.session()
+        session.info("cat", "message")
+        lmid = session.debug("cat", "another message")
+        lmid2 = session.info("cat", "message")
+        # Debug message wasn't set:
+        self.assertEqual([d["level"] for d in tracer.messages],
+                         ["INFO", "INFO"])
+        # But we still got LoggedMessageId for debug message:
+        self.assertEqual((lmid.causalLevel, lmid.traceId,
+                          lmid2.causalLevel, lmid2.traceId),
+                         ([2], session._context.traceId,
+                          [3], session._context.traceId))
+
+    def test_no_tracer(self):
+        """
+        If no tracer was setup, logging still returns a LoggedMessageId.
+        """
+        runtime = fakeRuntime()
+        runtime.getEnvVarsService().set("MDK_DISCOVERY_SOURCE", "static:nodes={}")
+        mdk = MDKImpl(runtime)
+        mdk.start()
+        # No DATAWIRE_TOKEN, so no tracer:
+        self.assertEqual(mdk._tracer, None)
+        session = mdk.session()
+        session.info("cat", "message")
+        lmid = session.info("cat", "another message")
+        self.assertEqual((lmid.traceId, lmid.causalLevel),
+                         (session._context.traceId, [2]))
+

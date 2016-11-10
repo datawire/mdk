@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_discovery 2.0.28;
+package datawire_mdk_discovery 2.0.29;
 
 include discovery-protocol-3.0.q;
 include synapse.q;
@@ -386,7 +386,13 @@ namespace mdk_discovery {
                 while (jdx < waiting.size()) {
                     _Request req = waiting[jdx];
                     if (versionMatch(req.version, node.version)) {
-                        req.factory.resolve(self._copyNode(node));
+                        // It's possible the factory's promise was already
+                        // resolved if we're dealing with fallback environments,
+                        // in which case a factory might be added to two
+                        // Clusters. See Discovery.resolve() implementation.
+                        if (!req.factory.promise.value().hasValue()) {
+                            req.factory.resolve(self._copyNode(node));
+                        }
                     } else {
                         self._waiting.add(req);
                     }
@@ -639,8 +645,19 @@ namespace mdk_discovery {
                 // check if there is parent environment, and if so use it.
                 OperationalEnvironment fallback = environment.getFallback();
                 if (fallback != null) {
-                    self._release();
-                    return resolve(service, version, fallback);
+                    Cluster fallbackCluster = _getCluster(service, fallback);
+                    if (!fallbackCluster.matchingVersionRegistered(version)) {
+                        // Neither main nor fallback cluster know about this
+                        // service, so we want to get whichever gets an answer
+                        // first.  Register with fallback cluster here, we'll
+                        // register with main cluster below:
+                        fallbackCluster._addRequest(version, factory);
+                    } else {
+                        self._release();
+                        // Fallback cluster knows about this service, so lets use
+                        // it:
+                        return resolve(service, version, fallback);
+                    }
                 }
             }
 
