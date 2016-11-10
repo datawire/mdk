@@ -765,9 +765,6 @@ namespace mdk_protocol {
     Utility class for sending messages with a protocol that sends back acks.
     """)
     class SendWithAcks {
-        long _syncRequestPeriod = 5000L;  // how often (in ms) sync requests should be sent
-        int  _syncInFlightMax = 50;       // max size of the in-flight buffer before sending a sync request
-
         List<AckableEvent> _buffered = [];  // events that are ready to be sent
         List<AckableEvent> _inFlight = [];  // events that have been sent but not yet acknowledged
         long _added = 0L;              // count of events that were added for sending; event sequence number
@@ -788,47 +785,31 @@ namespace mdk_protocol {
             // previously sent in-flight messages may never have arrived.
             while (_inFlight.size() > 0) {
                 _buffered.insert(0, _inFlight.remove(_inFlight.size() - 1));
+                _failedSends = _failedSends + 1;
+                _debug("no ack for #" + _buffered[0].sequence.toString());
             }
 
-            // Send buffered messages and move them to the in-flight queue
-            // Set the sync flag as appropriate
-            while (_buffered.size() > 0) {
-                String debugSuffix = "";
-                AckableEvent evt = _buffered.remove(0);
-                _inFlight.add(evt);
-                if ((evt.getTimestamp() > _lastSyncTime + _syncRequestPeriod) ||
-                    (_inFlight.size() == _syncInFlightMax)) {
-                    evt.sync = 1;
-                    _lastSyncTime = evt.getTimestamp();
-                    debugSuffix = " with sync set";
-                }
-                sender.send(evt);
-                evt.sync = 0;
-                _sent = _sent + 1;
-                //_debug("sent #" + evt.sequence.toString() + debugSuffix +
-                //       " to " + sender.toString());
-            }
+            onPump(sender);
         }
 
         @doc("Call to send buffered messages.")
         void onPump(SendAckableEvent sender) {
             // Send buffered messages and move them to the in-flight queue
-            // Set the sync flag as appropriate
+            // Set the sync flag on last message in this batch.
             while (_buffered.size() > 0) {
                 String debugSuffix = "";
                 AckableEvent evt = _buffered.remove(0);
                 _inFlight.add(evt);
-                if ((evt.getTimestamp() > _lastSyncTime + _syncRequestPeriod) ||
-                    (_inFlight.size() == _syncInFlightMax)) {
+                evt.sync = 0;
+                if (_buffered.size() == 0) {
+                    // Last message we're sending in this round, so set sync
                     evt.sync = 1;
-                    _lastSyncTime = evt.getTimestamp();
                     debugSuffix = " with sync set";
                 }
                 sender.send(evt);
-                evt.sync = 0;
                 _sent = _sent + 1;
-                //_debug("sent #" + evt.sequence.toString() + debugSuffix +
-                //       " to " + sender.toString());
+                _debug("sent #" + evt.sequence.toString() + debugSuffix +
+                       " to " + sender.toString());
             }
         }
 
@@ -839,10 +820,10 @@ namespace mdk_protocol {
                 if (_inFlight[0].sequence <= sequence) {
                     AckableEvent evt = _inFlight.remove(0);
                     _recorded = _recorded + 1;
-                    //_debug("ack #" + sequence.toString() + ", discarding #" + evt.sequence.toString());
+                    _debug("ack #" + sequence.toString() + ", discarding #" + evt.sequence.toString());
                 } else {
                     // Subsequent events are too new
-                        break;
+                    break;
                 }
             }
         }
@@ -854,7 +835,7 @@ namespace mdk_protocol {
             AckableEvent wrapper = new AckableEvent(json_type, event, _added);
             _added = _added + 1;
             _buffered.add(wrapper);
-            //_debug("logged #" + wrapper.sequence.toString());
+            _debug("logged #" + wrapper.sequence.toString());
         }
     }
 }
