@@ -7,5 +7,6 @@
     "dependencies": {
         "request": "2.x",
         "extend": "~3.0.0"
-    }
+    },
+    "description": "Datawire MDK integration for the Request HTTP client."
 }
