@@ -214,19 +214,19 @@ namespace mdk {
         String externalize();
 
         @doc("Record a log entry at the CRITICAL logging level.")
-        void critical(String category, String text);
+        LoggedMessageId critical(String category, String text);
 
         @doc("Record a log entry at the ERROR logging level.")
-        void error(String category, String text);
+        LoggedMessageId error(String category, String text);
 
         @doc("Record a log entry at the WARN logging level.")
-        void warn(String category, String text);
+        LoggedMessageId warn(String category, String text);
 
         @doc("Record a log entry at the INFO logging level.")
-        void info(String category, String text);
+        LoggedMessageId info(String category, String text);
 
         @doc("Record a log entry at the DEBUG logging level.")
-        void debug(String category, String text);
+        LoggedMessageId debug(String category, String text);
 
         @doc("EXPERIMENTAL: Set the logging level for the session.")
         void trace(String level);
@@ -556,6 +556,31 @@ namespace mdk {
         bool getValue() { return false; }
     }
 
+    @doc("""
+    Information about the message that was just logged.
+    """)
+    class LoggedMessageId {
+        @doc("The ID of the trace this message was logged in.")
+        String traceId;
+
+        @doc("The causal clock level within the trace.")
+        List<int> causalLevel;
+
+        @doc("The operational environment.")
+        String environment;
+
+        @doc("The fallback operational environment.")
+        String environmentFallback;
+
+        LoggedMessageId(String traceId, List<int> causalLevel,
+                        String environment, String environmentFallback) {
+            self.traceId = traceId;
+            self.causalLevel = causalLevel;
+            self.environment = environment;
+            self.environmentFallback = environmentFallback;
+        }
+    }
+
     class SessionImpl extends Session {
 
         static Map<String,int> _levels = {"CRITICAL": 0,
@@ -672,48 +697,44 @@ namespace mdk {
             return _level(level) <= ilevel;
         }
 
-        void _log(String level, String category, String text) {
-            if (_mdk._tracer != null) {
-                if (_inLogging.getValue()) {
-                    // We're being called recursively. We don't want logging
-                    // inside the tracer to trigger logging to the tracer! So
-                    // sadly we have to just drop the message on the floor.
-                    return;
-                }
-                _inLogging.setValue(true);
-                _mdk._tracer.log(_context, _mdk.procUUID, level, category, text);
-                _inLogging.setValue(false);
+        LoggedMessageId _log(String level, String category, String text) {
+            if (_inLogging.getValue()) {
+                // We're being called recursively. We don't want logging
+                // inside the tracer to trigger logging to the tracer! So
+                // sadly we have to just drop the message on the floor.
+                return null;
             }
+            _inLogging.setValue(true);
+            LogEvent evt = createLogEvent(_context, _mdk.procUUID, level,
+                                          category, text);
+            if (_mdk._tracer != null && _enabled(level)) {
+                _mdk._tracer.log(evt);
+            }
+            _inLogging.setValue(false);
+            return new LoggedMessageId(_context.traceId,
+                                       evt.context.clock.clocks,
+                                       _context.environment.name,
+                                       _context.environment.fallbackName);
         }
 
-        void critical(String category, String text) {
-            if (_enabled("CRITICAL")) {
-                _log("CRITICAL", category, text);
-            }
+        LoggedMessageId critical(String category, String text) {
+            return _log("CRITICAL", category, text);
         }
 
-        void error(String category, String text) {
-            if (_enabled("ERROR")) {
-                _log("ERROR", category, text);
-            }
+        LoggedMessageId error(String category, String text) {
+            return _log("ERROR", category, text);
         }
 
-        void warn(String category, String text) {
-            if (_enabled("WARN")) {
-                _log("WARN", category, text);
-            }
+        LoggedMessageId warn(String category, String text) {
+            return _log("WARN", category, text);
         }
 
-        void info(String category, String text) {
-            if (_enabled("INFO")) {
-                _log("INFO", category, text);
-            }
+        LoggedMessageId info(String category, String text) {
+            return _log("INFO", category, text);
         }
 
-        void debug(String category, String text) {
-            if (_enabled("DEBUG")) {
-                _log("DEBUG", category, text);
-            }
+        LoggedMessageId debug(String category, String text) {
+            return _log("DEBUG", category, text);
         }
 
         Promise _resolve(String service, String version) {
