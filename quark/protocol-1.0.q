@@ -784,6 +784,12 @@ namespace mdk_protocol {
 
         @doc("Call when (re)connected to other side.")
         void onConnected(SendAckableEvent sender) {
+            // Move all in flight messages into buffered; reconnection implies
+            // previously sent in-flight messages may never have arrived.
+            while (_inFlight.size() > 0) {
+                _buffered.insert(0, _inFlight.remove(_inFlight.size() - 1));
+            }
+
             // Send buffered messages and move them to the in-flight queue
             // Set the sync flag as appropriate
             while (_buffered.size() > 0) {
@@ -799,8 +805,8 @@ namespace mdk_protocol {
                 sender.send(evt);
                 evt.sync = 0;
                 _sent = _sent + 1;
-                _debug("sent #" + evt.sequence.toString() + debugSuffix +
-                       " to " + sender.toString());
+                //_debug("sent #" + evt.sequence.toString() + debugSuffix +
+                //       " to " + sender.toString());
             }
         }
 
@@ -821,8 +827,8 @@ namespace mdk_protocol {
                 sender.send(evt);
                 evt.sync = 0;
                 _sent = _sent + 1;
-                _debug("sent #" + evt.sequence.toString() + debugSuffix +
-                       " to " + sender.toString());
+                //_debug("sent #" + evt.sequence.toString() + debugSuffix +
+                //       " to " + sender.toString());
             }
         }
 
@@ -833,7 +839,7 @@ namespace mdk_protocol {
                 if (_inFlight[0].sequence <= sequence) {
                     AckableEvent evt = _inFlight.remove(0);
                     _recorded = _recorded + 1;
-                    _debug("ack #" + sequence.toString() + ", discarding #" + evt.sequence.toString());
+                    //_debug("ack #" + sequence.toString() + ", discarding #" + evt.sequence.toString());
                 } else {
                     // Subsequent events are too new
                         break;
@@ -848,7 +854,7 @@ namespace mdk_protocol {
             AckableEvent wrapper = new AckableEvent(json_type, event, _added);
             _added = _added + 1;
             _buffered.add(wrapper);
-            _debug("logged #" + wrapper.sequence.toString());
+            //_debug("logged #" + wrapper.sequence.toString());
         }
     }
 }

@@ -123,4 +123,4 @@ def test_sendWithAcks_delivery(disconnect_intervals):
 
     assert simulator.server_received == messages
     assert len(simulator.client._buffered) == 0
-    #assert len(simulator.client._inFlight) == 0
+    assert len(simulator.client._inFlight) == 0
