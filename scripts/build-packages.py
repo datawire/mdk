@@ -30,7 +30,7 @@ def build_javascript(package_dir):
 
 def build_java(package_dir):
     """Build Java packages from the output of quark compile (output/java/mdk-2.0)."""
-    copyfile(os.path.join(ROOT_DIR, "pom.xml.manual"),
+    copyfile(os.path.join(ROOT_DIR, "quark-overrides", "pom.xml.manual"),
              os.path.join(package_dir, "pom.xml"))
     return []
 
