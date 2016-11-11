@@ -1,6 +1,6 @@
 {
     "name": "datawire_mdk_request",
-    "version": "2.0.31",
+    "version": "2.0.32",
     "main": "datawire_mdk_request.js",
     "license": "Apache-2.0",
     "url": "https://www.datawire.io",
