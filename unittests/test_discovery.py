@@ -249,6 +249,18 @@ class DiscoveryTests(TestCase):
         resolved_node.success()
         self.assertNodesEqual(resolve(disco, "myservice", "1.0"), node)
 
+    def test_notify(self):
+        """
+        The notify() API allows getting all events passed to the Discovery instance.
+        """
+        disco = create_disco()
+        messages = [object(), NodeActive(create_node("hello"))]
+        result = []
+        disco.notify(result.append)
+        for m in messages:
+            disco.onMessage(None, m)
+        self.assertEqual(messages, result)
+
 
 class DiscoveryEnvironmentTests(TestCase):
     """Tests for interaction between Discovery and environments."""

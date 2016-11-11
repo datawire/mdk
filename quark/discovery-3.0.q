@@ -546,6 +546,7 @@ namespace mdk_discovery {
         Lock mutex = new Lock();
         MDKRuntime runtime;
         FailurePolicyFactory _fpfactory;
+        UnaryCallable _notificationCallback = null;
 
         @doc("Construct a Discovery object. You must set the token before doing")
         @doc("anything else; see the withToken() method.")
@@ -674,6 +675,9 @@ namespace mdk_discovery {
         }
 
         void onMessage(Actor origin, Object message) {
+            if (_notificationCallback != null) {
+                _notificationCallback.__call__(message);
+            }
             String klass = message.getClass().id;
             if (klass == "mdk_discovery.NodeActive") {
                 NodeActive active = ?message;
@@ -737,6 +741,11 @@ namespace mdk_discovery {
             // have unresolved promises in _waiting.
 
             self._release();
+        }
+
+        @doc("Register a callable that will be called with all incoming messages.")
+        void notify(UnaryCallable callback) {
+            self._notificationCallback = callback;
         }
     }
 
