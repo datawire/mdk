@@ -9,10 +9,10 @@
   <version>2.0.31</version><!-- PACKAGE VERSION HERE -->
   <name>datawire_mdk</name>
   <description>Java mdk</description>
-  <url>http://datawire.github.io/mdk/</url>
+  <url>https://www.datawire.io</url>
   <organization>
     <name>Datawire</name>
-    <url>https://github.com/datawire</url>
+    <url>https://www.datawire.io</url>
   </organization>
   <licenses>
     <license>
