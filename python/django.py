@@ -2,6 +2,8 @@
 Django middleware that enables the MDK.
 """
 
+from __future__ import absolute_import
+
 import atexit
 from traceback import format_exception_only
 
