@@ -27,4 +27,4 @@ class MDKHandler(StreamHandler):
         session = self._get_session()
         if session is None:
             session = self._default_session
-        getattr(session, level.lower())(record.name, self.format(record))
+        return getattr(session, level.lower())(record.name, self.format(record))
