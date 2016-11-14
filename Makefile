@@ -7,6 +7,7 @@ default:
 	@echo "* '[sudo] make setup-docker' to prepare docker images for tests"
 	@echo "* 'make install-mdk' to compile and install MDK."
 	@echo "* 'make test' to run tests (requires setup, setup-docker, and DATAWIRE_TOKEN). This will NOT rebuild/reinstall MDK."
+	@echo "* 'make system-tests' will setup the MDK and run a subset of the tests, specifically the end-to-end MDK-MCP tests."
 	@echo "* 'make packages' to build packages (.whl, .gem, etc.)"
 	@echo "* 'make release-patch' to do a patch release (2.0.x)"
 	@echo "* 'make release-minor' to do a minor release (2.x.0)"
@@ -57,10 +58,14 @@ django110env/bin/pip:
 	virtualenv -p python3 django110env
 	django110env/bin/pip install -U pip
 
-.PHONY: python3-dependencies
-python3-dependencies: virtualenv3 django110env
-	virtualenv3/bin/pip install -r dev-requirements.txt
+.PHONY: django110-dependencies
+django110-dependencies: django110env
 	django110env/bin/pip install django\>=1.10
+
+.PHONY: python3-dependencies
+python3-dependencies: virtualenv3
+	virtualenv3/bin/pip install -r dev-requirements.txt
+
 
 node_modules:
 	mkdir node_modules
@@ -76,7 +81,7 @@ ruby-dependencies:
 	gem install --no-doc json
 
 .PHONY: setup
-setup: python-dependencies python3-dependencies js-dependencies ruby-dependencies install-quark
+setup: python-dependencies python3-dependencies django110-dependencies js-dependencies ruby-dependencies install-quark
 
 .PHONY: install-quark
 install-quark:
@@ -84,11 +89,17 @@ install-quark:
 		curl -# -L https://raw.githubusercontent.com/datawire/quark/master/install.sh | \
 		bash -s -- -q `cat QUARK_VERSION.txt`
 
-.make-guards/install-mdk-python: python-dependencies python3-dependencies .make-guards/python-packages
+.make-guards/install-mdk-python2: python-dependencies .make-guards/python-packages
 	virtualenv/bin/pip install --upgrade dist/datawire_mdk-*-py2*-none-any.whl
-	virtualenv3/bin/pip install --upgrade dist/datawire_mdk-*-*py3-none-any.whl
+	touch .make-guards/install-mdk-python2
+
+.make-guards/install-mdk-python-django110: django110-dependencies .make-guards/python-packages
 	django110env/bin/pip install --upgrade dist/datawire_mdk-*-*py3-none-any.whl
-	touch .make-guards/install-mdk-python
+	touch .make-guards/install-mdk-python-django110
+
+.make-guards/install-mdk-python3: python3-dependencies .make-guards/python-packages
+	virtualenv3/bin/pip install --upgrade dist/datawire_mdk-*-*py3-none-any.whl
+	touch .make-guards/install-mdk-python3
 
 .make-guards/install-mdk-ruby: .make-guards/ruby-packages
 	gem install --no-doc dist/datawire_mdk-*.gem dist/rack*.gem dist/faraday*.gem
@@ -102,7 +113,7 @@ install-quark:
 	cd output/java/mdk-2.0 && mvn install
 	touch .make-guards/install-mdk-java
 
-install-mdk: .make-guards/install-mdk-python .make-guards/install-mdk-ruby .make-guards/install-mdk-javascript .make-guards/install-mdk-java
+install-mdk: .make-guards/install-mdk-python2 .make-guards/install-mdk-python3  .make-guards/install-mdk-python-django110 .make-guards/install-mdk-ruby .make-guards/install-mdk-javascript .make-guards/install-mdk-java
 
 
 .PHONY: setup-docker
@@ -127,13 +138,17 @@ guard-token:
 	fi
 
 .PHONY: test-python
-test-python: python-dependencies .make-guards/install-mdk-python
+test-python: python-dependencies .make-guards/install-mdk-python2
 	# Only need to run tests that are specific to Python APIs:
 	virtualenv/bin/py.test -n 4 -v unittests/test_python.py
 
 .PHONY: test-python3
-test-python3: guard-token python3-dependencies install-mdk
+test-python3: guard-token python3-dependencies django110-dependencies install-mdk
 	virtualenv3/bin/py.test -n 4 -v --durations=30 --timeout=180 --timeout_method=thread unittests functionaltests
+
+.PHONY: system-tests
+system-tests: guard-token python3-dependencies .make-guards/install-mdk-python3
+	virtualenv3/bin/py.test -n 4 -v --durations=30 --timeout=180 --timeout_method=thread functionaltests/test_endtoend.py -k Python3
 
 release-minor:
 	virtualenv/bin/python scripts/release.py minor
