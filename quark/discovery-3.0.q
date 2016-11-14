@@ -307,6 +307,7 @@ namespace mdk_discovery {
         @doc("Create a Node for external use.")
         Node _copyNode(Node node) {
             Node result = new Node();
+            result.id = node.id;
             result.address = node.address;
             result.version = node.version;
             result.service = node.service;
@@ -469,7 +470,8 @@ namespace mdk_discovery {
     @doc("The Node class captures address and metadata information about a")
     @doc("server functioning as a service instance.")
     class Node {
-
+        @doc("The Node's unique identifier.")
+        String id;
         @doc("The service name.")
         String service;
         @doc("The service version (e.g. '1.2.3')")
@@ -482,6 +484,14 @@ namespace mdk_discovery {
         OperationalEnvironment environment = new OperationalEnvironment();
 
         FailurePolicy _policy = null;
+
+        @doc("Return the ID of the node.")
+        String getId() {
+            if (id != null) {
+                return id;
+            }
+            return ?properties["datawire_nodeId"];
+        }
 
         void success() {
             _policy.success();
@@ -498,7 +508,7 @@ namespace mdk_discovery {
         @doc("Return a string representation of the Node.")
         String toString() {
             // XXX: this doesn't get mapped into __str__, etc in targets
-            String result = "Node(";
+            String result = "Node(id:" + getId() + " ";
 
             if (service == null) {
                 result = result + "<unnamed>";

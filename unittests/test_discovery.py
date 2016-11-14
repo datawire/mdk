@@ -8,6 +8,7 @@ from builtins import object
 
 from unittest import TestCase
 from json import dumps
+from uuid import uuid4
 
 from hypothesis.stateful import GenericStateMachine
 from hypothesis import strategies as st
@@ -41,6 +42,21 @@ def resolve(disco, service, version, environment="sandbox"):
 def knownNodes(disco, service, environment="sandbox"):
     """Return known nodes for a service."""
     return disco.knownNodes(service, _parseEnvironment(environment))
+
+
+class NodeTests(TestCase):
+    """Tests for Node."""
+    def test_id(self):
+        """Node.getId() uses Node.id if present."""
+        node = Node()
+        node.id = "1234"
+        self.assertEqual(node.getId(), node.id)
+
+    def test_missingId(self):
+        """Node.getId() uses the datawire_nodeId property if the id is not set."""
+        node = Node()
+        node.properties["datawire_nodeId"] = "4567"
+        self.assertEqual(node.getId(), "4567")
 
 
 class DiscoveryTests(TestCase):
@@ -587,9 +603,11 @@ class StaticDiscoverySourceTests(TestCase):
         """
         static = StaticRoutes.parseJSON(dumps(
             [{"service": "service1", "address": "a", "version": "1.0",
-              "environment": {"name": "myenv", "fallbackName": None}},
+              "environment": {"name": "myenv", "fallbackName": None},
+              "id": "1234"},
              {"service": "service2", "address": "b", "version": "2.0",
-              "environment": {"name": "myenv2", "fallbackName": None}}]
+              "environment": {"name": "myenv2", "fallbackName": None},
+              "id": "4567"}]
         )).create(self.disco, self.runtime)
 
         self.runtime.dispatcher.startActor(static)
@@ -653,6 +671,7 @@ class DiscoveryProtocolTests(TestCase):
         disco = self.createDisco()
 
         node = Node()
+        node.id = str(uuid4())
         node.service = "svc"
         node.address = "addr"
         node.version = "1.2.3"
@@ -669,6 +688,7 @@ class DiscoveryProtocolTests(TestCase):
         sev = self.startDisco()
 
         node = Node()
+        node.id = str(uuid4())
         node.service = "svc"
         node.address = "addr"
         node.version = "1.2.3"
@@ -681,6 +701,7 @@ class DiscoveryProtocolTests(TestCase):
     def doActive(self, sev, svc, addr, version):
         active = Active()
         active.node = Node()
+        active.node.id = str(uuid4())
         active.node.service = svc
         active.node.address = addr
         active.node.version = version
@@ -815,6 +836,7 @@ class DiscoveryProtocolTests(TestCase):
         count = 10
         for idx in range(count):
             active.node = Node()
+            active.node.id = str(uuid4())
             active.node.service = "svc"
             active.node.address = "addr" + str(idx)
             active.node.version = "1.2.3"
@@ -866,9 +888,10 @@ class DiscoveryProtocolTests(TestCase):
         sev = self.startDisco()
 
         node = Node()
+        node.id = str(uuid4())
         node.service = "svc"
-        node.address = "addr"
         node.version = "1.2.3"
+        node.address = "addr"
         disco.register(node)
 
         active = self.expectActive(sev)

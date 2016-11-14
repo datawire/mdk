@@ -25,10 +25,11 @@ def fake_runtime():
 def create_node(address, service="myservice", environment="sandbox"):
     """Create a new Node."""
     node = Node()
+    node.id = str(uuid4())
     node.service = service
     node.version = "1.0"
     node.address = address
-    node.properties = {"datawire_nodeId": str(uuid4())}
+    node.properties = {"datawire_nodeId": node.id}
     node.environment = _parseEnvironment(environment)
     return node
 
