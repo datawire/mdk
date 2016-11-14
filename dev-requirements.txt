@@ -9,7 +9,6 @@ pytest-timeout==1.0.0
 future==0.15.2
 requests==2.11.1
 flask==0.11.1
-blinker==1.4
 django==1.9.9
 twisted==16.4
 crochet==1.5.0
