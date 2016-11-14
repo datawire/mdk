@@ -9,6 +9,7 @@ from flask import Flask, g
 
 from mdk.logging import MDKHandler
 from mdk.flask import MDKLoggingHandler, mdk_setup
+from mdk import LoggedMessageId
 
 from .common import create_mdk_with_faketracer
 
@@ -81,6 +82,19 @@ class LoggingTests(TestCase):
                          [s._context.traceId for s in
                           [session1, handler._default_session, session3]])
 
+    def test_emitReturnsLoggedMessageId(self):
+        """
+        MDKHandler.emit returns the LoggedMessageId from the Session.
+        """
+        mdk, tracer = create_mdk_with_faketracer()
+        session = mdk.session()
+        handler = MDKHandler(mdk, lambda: session)
+        record = logging.makeLogRecord({"name": "", "levelname": "INFO",
+                                        "message": "hello"})
+        mid = handler.emit(record)
+        self.assertIsInstance(mid, LoggedMessageId)
+        self.assertEqual(mid.traceId, session._context.traceId)
+
 
 def make_flask_app(logger):
     """Create a Flask app that logs to the given Logger."""
@@ -127,3 +141,14 @@ class FlaskLoggingTests(TestCase):
         logger.info("helloz!")
         message = tracer.messages[-1]
         self.assertEqual("helloz!", message["text"])
+
+    def test_emitReturnsLoggedMessageId(self):
+        """
+        MDKLoggingHandler.emit returns the LoggedMessageId.
+        """
+        mdk, tracer = create_mdk_with_faketracer()
+        handler = MDKLoggingHandler(mdk)
+        record = logging.makeLogRecord({"name": "", "levelname": "INFO",
+                                        "message": "hello"})
+        mid = handler.emit(record)
+        self.assertIsInstance(mid, LoggedMessageId)
