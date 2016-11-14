@@ -51,13 +51,19 @@ def port_number(worker_id):
 
 
 @pytest.fixture(params=[
-    [sys.executable, str(WEBSERVERS_ROOT / "flaskserver.py"), "$PORTNUMBER"],
-    # Django 1.9:
-    [sys.executable, str(WEBSERVERS_ROOT / "django-manage.py"),
+    # Flask, Python 3
+    ["virtualenv3/bin/python", str(WEBSERVERS_ROOT / "flaskserver.py"), "$PORTNUMBER"],
+    # Flask, Python 2
+    ["virtualenv/bin/python", str(WEBSERVERS_ROOT / "flaskserver.py"), "$PORTNUMBER"],
+    # Django 1.9, Python 3:
+    ["virtualenv3/bin/python", str(WEBSERVERS_ROOT / "django-manage.py"),
      # Add --noreload so we don't have two Django processes,
      # which makes cleanup harder:
      "runserver", "$PORTNUMBER", "--noreload"],
-    # Django 1.10, with different middleware API:
+    # Django 1.10, Python 2:
+    ["virtualenv/bin/python", str(WEBSERVERS_ROOT / "django-manage.py"),
+     "runserver", "$PORTNUMBER", "--noreload"],
+    # Django 1.10, Python 3, with different middleware API:
     ["django110env/bin/python", str(WEBSERVERS_ROOT / "django110-manage.py"),
      "runserver", "$PORTNUMBER", "--noreload"],
     ["node", str(WEBSERVERS_ROOT / "expressserver.js"), "$PORTNUMBER"],

@@ -69,7 +69,10 @@ def webserver():
         stop()
 
 @pytest.fixture(params=[
-    [sys.executable, str(WEBCLIENTS_ROOT / "requeststest.py")],
+    # Python 3:
+    ["virtualenv3/bin/python", str(WEBCLIENTS_ROOT / "requeststest.py")],
+    # Python 2:
+    ["virtualenv/bin/python", str(WEBCLIENTS_ROOT / "requeststest.py")],
     ["ruby", str(WEBCLIENTS_ROOT / "faraday.rb")],
     ["node", str(WEBCLIENTS_ROOT / "request.js")],
 ])
