@@ -17,6 +17,7 @@ from mdk_runtime import fakeRuntime
 from mdk_discovery import (
     ReplaceCluster, NodeActive, RecordingFailurePolicyFactory,
 )
+from mdk_protocol import Close, ProtocolError
 
 from .common import (
     create_node, SANDBOX_ENV, MDKConnector, create_mdk_with_faketracer,
@@ -425,8 +426,8 @@ def assertEnvironmentEquals(test, environment, name, fallback):
     test.assertEqual(environment.fallbackName, fallback)
 
 
-class ConnectionStartupTests(TestCase):
-    """Tests for initial setup of MCP connections."""
+class ConnectionStartupShutdownTests(TestCase):
+    """Tests for initial setup and shutdown of MCP connections."""
     def test_connection_node_identity(self):
         """
         Each connection to MCP sends an Open message with the same node identity.
@@ -476,6 +477,40 @@ class ConnectionStartupTests(TestCase):
         ws_actor = connector.expectSocket()
         open = connector.connect(ws_actor)
         assertEnvironmentEquals(self, open.environment, "sandbox", None)
+
+    def test_close_no_error(self):
+        """
+        Receiving Close message with no error is handled without blowing up.
+        """
+        connector = MDKConnector()
+        ws_actor = connector.expectSocket()
+        connector.connect(ws_actor)
+        ws_actor.send(Close().encode())
+        connector.pump()
+
+    def test_close_with_error(self):
+        """
+        Receiving a Close message with a ProtocolError logs the information in the error.
+        """
+        code = "300"
+        detail = "MONKEYS EVERYWHERE AIIEEEEEEE"
+        title = "Something bad happened"
+        id = "specialsnowflake"
+        close = Close()
+        close.error = ProtocolError()
+        close.error.code = code
+        close.error.title = title
+        close.error.detail = detail
+        close.error.id = id
+        connector = MDKConnector()
+        ws_actor = connector.expectSocket()
+        connector.connect(ws_actor)
+        with self.assertLogs("quark.protocol", "INFO") as cm:
+            ws_actor.send(close.encode())
+            connector.pump()
+        for text in [code, title, detail, id]:
+            self.assertIn(text, cm.output[0])
+        self.assertTrue(cm.output[0].startswith("ERROR"))
 
 
 class InteractionReportingTests(TestCase):

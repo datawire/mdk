@@ -323,6 +323,10 @@ namespace mdk_protocol {
 
         @doc("A unique identifier for this particular occurrence of the problem.")
         String id;
+
+        String toString() {
+            return "ID:" + id + " code:" + code + " " + title + "\n" + detail;
+        }
     }
 
     @doc("Close the event stream.")
@@ -446,7 +450,7 @@ namespace mdk_protocol {
         }
 
         void onClose(Close close) {
-            self._wsclient.onClose(close.error != null);
+            self._wsclient.onClose(close.error);
         }
 
     }
@@ -543,12 +547,9 @@ namespace mdk_protocol {
         }
 
         @doc("Called when the connection is closed via message by the server.")
-        void onClose(bool error) {
-            logger.info("close!");
-            if (error) {
-                doBackoff();
-            } else {
-                reconnectDelay = firstDelay;
+        void onClose(ProtocolError error) {
+            if (error != null) {
+                logger.error("Server closing connection due to error: " + error.toString());
             }
         }
 
