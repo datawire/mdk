@@ -10,7 +10,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
 
 
 setup(name="datawire_mdk",
-      version='2.0.32',
+      version='2.0.33',
       install_requires=["wheel", "ws4py==0.3.4", "future==0.15.2"],
       setup_requires=["wheel"],
       py_modules=[path.splitext(i)[0] for i in glob("*.py") if i != "setup.py"],

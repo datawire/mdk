@@ -1,6 +1,6 @@
 Gem::Specification.new do |spec|
   spec.name        = 'datawire_mdk'
-  spec.version     = '2.0.32'
+  spec.version     = '2.0.33'
   spec.summary     = 'Microservices Development Kit: build your own microservices.'
   spec.author      = 'Datawire.io'
   spec.license     = 'Apache-2.0'
