@@ -3,6 +3,8 @@ Requests HTTP library (http://requests.readthedocs.io/) integration for the
 MDK.
 """
 
+from __future__ import absolute_import
+
 from sys import maxsize
 
 from mdk import MDK
