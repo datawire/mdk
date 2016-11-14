@@ -128,9 +128,8 @@ guard-token:
 
 .PHONY: test-python
 test-python: python-dependencies .make-guards/install-mdk-python
-	# Functional tests don't benefit from being run in another language, so
-	# we only run them under Python 3:
-	virtualenv/bin/py.test -n 4 -v unittests
+	# Only need to run tests that are specific to Python APIs:
+	virtualenv/bin/py.test -n 4 -v unittests/test_python.py
 
 .PHONY: test-python3
 test-python3: guard-token python3-dependencies install-mdk
