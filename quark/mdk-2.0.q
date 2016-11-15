@@ -788,7 +788,7 @@ namespace mdk {
         void start_interaction() {
             InteractionEvent interactionReport = new InteractionEvent();
             interactionReport.node = _mdk.procUUID;
-            interactionReport.timestamp =
+            interactionReport.startTimestamp =
                 (1000.0 * _mdk._runtime.getTimeService().time()).round();
             interactionReport.session = _context.traceId;
             interactionReport.environment = _context.environment;
@@ -837,6 +837,8 @@ namespace mdk {
             _resolved.remove(_resolved.size() - 1);
             InteractionEvent report = _interactionReports
                 .remove(_interactionReports.size() - 1);
+            report.endTimestamp =
+                (1000.0 * _mdk._runtime.getTimeService().time()).round();
             int idx = 0;
             while (idx < nodes.size()) {
                 Node node = nodes[idx];

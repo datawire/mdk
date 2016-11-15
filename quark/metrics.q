@@ -13,16 +13,19 @@ import mdk_protocol;
 namespace mdk_metrics {
     @doc("Wire protocol message for reporting interaction results to MCP.")
     class InteractionEvent extends Serializable, AckablePayload {
-        static String _json_type = "interaction_event";
+        static String _json_type = "interactionevent";
 
         @doc("Interaction start time, milliseconds since the Unix epoch.")
-        long timestamp;
+        long startTimestamp;
+
+        @doc("Interaction end time, milliseconds since the Unix epoch.")
+        long endTimestamp;
 
         @doc("Interaction (really, session's) environment.")
         OperationalEnvironment environment;
 
         long getTimestamp() {
-            return self.timestamp;
+            return self.startTimestamp;
         }
 
         @doc("Unique identifier for this interaction.")
@@ -49,7 +52,7 @@ namespace mdk_metrics {
 
     @doc("Wire protocol message for MCP to acknowledge InteractionEvent receipt.")
     class InteractionAck extends Serializable {
-        static String _json_type = "interaction_ack";
+        static String _json_type = "interactionack";
 
         @doc("Sequence number of the last interaction event message being acknowledged.")
         long sequence;
