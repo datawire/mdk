@@ -85,12 +85,27 @@ class DiscoveryTests(TestCase):
             (resolved.version, resolved.address, resolved.service, resolved.properties),
             ("1.0", "somewhere", "myservice", {"x": 1}))
 
-    def test_activeUpdates(self):
+    def test_activeUpdatesMatchingAddress(self):
         """NodeActive updates a Node with same address to new version and properties."""
         disco = create_disco()
         node = create_node("somewhere")
         disco.onMessage(None, NodeActive(node))
         node2 = create_node("somewhere")
+        node2.version = "1.7"
+        node2.properties = {"a": 123}
+        disco.onMessage(None, NodeActive(node2))
+        self.assertEqual(knownNodes(disco, "myservice", "sandbox"), [node2])
+        resolved = resolve(disco, "myservice", "1.7")
+        self.assertEqual((resolved.version, resolved.properties),
+                         ("1.7", {"a": 123}))
+
+    def test_activeUpdatesMatchingId(self):
+        """NodeActive updates a Node with same id as existing one."""
+        disco = create_disco()
+        node = create_node("somewhere")
+        disco.onMessage(None, NodeActive(node))
+        node2 = create_node("somewhere_else")
+        node2.id = node.id
         node2.version = "1.7"
         node2.properties = {"a": 123}
         disco.onMessage(None, NodeActive(node2))
@@ -554,19 +569,25 @@ class StatefulDiscoveryTesting(GenericStateMachine):
             result |= self.remove_strategy()
         return result
 
+    def create_node(self, address, service):
+        """Create a node with consistent id."""
+        node = create_node(address, service)
+        node.id = address + "_" + service
+        return node
+
     def execute_step(self, step):
         command, args = step
         if command == "add":
             service, address = args
-            message = NodeActive(create_node(address, service))
+            message = NodeActive(self.create_node(address, service))
             self.fake.add(service, address)
         elif command == "remove":
             service, address = args
-            message = NodeExpired(create_node(address, service))
+            message = NodeExpired(self.create_node(address, service))
             self.fake.remove(service, address)
         elif command == "replace":
             service, addresses = args
-            nodes = [create_node(address, service) for address in addresses]
+            nodes = [self.create_node(address, service) for address in addresses]
             message = ReplaceCluster(service, SANDBOX_ENV, nodes)
             self.fake.replace(service, addresses)
         else:
