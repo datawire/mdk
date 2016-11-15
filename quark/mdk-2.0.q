@@ -500,13 +500,12 @@ namespace mdk {
 
         void register(String service, String version, String address) {
             Node node = new Node();
+            node.id = procUUID;
             node.service = service;
             node.version = version;
             node.address = address;
             node.environment = self._environment;
-
             node.properties = { "datawire_nodeId": procUUID };
-
             _disco.register(node);
         }
 

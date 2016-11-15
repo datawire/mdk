@@ -25,10 +25,10 @@ def fake_runtime():
 def create_node(address, service="myservice", environment="sandbox"):
     """Create a new Node."""
     node = Node()
+    node.id = str(uuid4())
     node.service = service
     node.version = "1.0"
     node.address = address
-    node.properties = {"datawire_nodeId": str(uuid4())}
     node.environment = _parseEnvironment(environment)
     return node
 
@@ -110,9 +110,9 @@ class MDKConnector(object):
             fake_wsactor, "mdk_metrics.InteractionEvent")
         test.assertEqual(interaction.node, self.mdk.procUUID)
         test.assertEqual(interaction.session, session._context.traceId)
-        expected = {node.properties["datawire_nodeId"]: 1
+        expected = {node.getId(): 1
                     for node in succeeded_nodes}
         for node in failed_nodes:
-            expected[node.properties["datawire_nodeId"]] = 0
+            expected[node.getId()] = 0
         test.assertEqual(interaction.results, expected)
         return interaction

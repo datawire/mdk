@@ -8,6 +8,7 @@ from unittest import TestCase
 from shutil import rmtree
 from tempfile import mkdtemp
 from json import dumps
+from uuid import uuid4
 import os
 
 from .common import fake_runtime
@@ -57,6 +58,7 @@ class SynapseTests(TestCase):
     def node(self, service, host, port):
         """Create a Node."""
         node = Node()
+        node.id = str(uuid4())
         node.service = service
         node.address = "%s:%d" % (host, port)
         node.version = "1.0"

@@ -43,7 +43,7 @@ namespace mdk_metrics {
             if (success) {
                 value = 1;
             }
-            self.results[?destination.properties["datawire_nodeId"]] = value;
+            self.results[destination.getId()] = value;
         }
     }
 

@@ -76,8 +76,10 @@ def webserver(request, port_number):
     env = os.environ.copy()
     env.update({"MDK_DISCOVERY_SOURCE":
                 "static:nodes=" + dumps([
-                    {"service": "service1", "address": "address1", "version": "1.0"},
-                    {"service": "service2", "address": "address2", "version": "1.0"},
+                    {"service": "service1", "address": "address1", "version": "1.0",
+                     "id": "1234"},
+                    {"service": "service2", "address": "address2", "version": "1.0",
+                     "id": "5678"},
                 ]),
                 "MDK_FAILURE_POLICY": "recording"})
     command = [(str(port_number) if i == "$PORTNUMBER" else i)

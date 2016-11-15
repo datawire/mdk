@@ -8,6 +8,7 @@ from builtins import object
 
 from unittest import TestCase
 from json import dumps
+from uuid import uuid4
 
 from hypothesis.stateful import GenericStateMachine
 from hypothesis import strategies as st
@@ -43,6 +44,21 @@ def knownNodes(disco, service, environment="sandbox"):
     return disco.knownNodes(service, _parseEnvironment(environment))
 
 
+class NodeTests(TestCase):
+    """Tests for Node."""
+    def test_id(self):
+        """Node.getId() uses Node.id if present."""
+        node = Node()
+        node.id = "1234"
+        self.assertEqual(node.getId(), node.id)
+
+    def test_missingId(self):
+        """Node.getId() uses the datawire_nodeId property if the id is not set."""
+        node = Node()
+        node.properties["datawire_nodeId"] = "4567"
+        self.assertEqual(node.getId(), "4567")
+
+
 class DiscoveryTests(TestCase):
     """Tests for Discovery."""
 
@@ -69,12 +85,27 @@ class DiscoveryTests(TestCase):
             (resolved.version, resolved.address, resolved.service, resolved.properties),
             ("1.0", "somewhere", "myservice", {"x": 1}))
 
-    def test_activeUpdates(self):
+    def test_activeUpdatesMatchingAddress(self):
         """NodeActive updates a Node with same address to new version and properties."""
         disco = create_disco()
         node = create_node("somewhere")
         disco.onMessage(None, NodeActive(node))
         node2 = create_node("somewhere")
+        node2.version = "1.7"
+        node2.properties = {"a": 123}
+        disco.onMessage(None, NodeActive(node2))
+        self.assertEqual(knownNodes(disco, "myservice", "sandbox"), [node2])
+        resolved = resolve(disco, "myservice", "1.7")
+        self.assertEqual((resolved.version, resolved.properties),
+                         ("1.7", {"a": 123}))
+
+    def test_activeUpdatesMatchingId(self):
+        """NodeActive updates a Node with same id as existing one."""
+        disco = create_disco()
+        node = create_node("somewhere")
+        disco.onMessage(None, NodeActive(node))
+        node2 = create_node("somewhere_else")
+        node2.id = node.id
         node2.version = "1.7"
         node2.properties = {"a": 123}
         disco.onMessage(None, NodeActive(node2))
@@ -538,19 +569,25 @@ class StatefulDiscoveryTesting(GenericStateMachine):
             result |= self.remove_strategy()
         return result
 
+    def create_node(self, address, service):
+        """Create a node with consistent id."""
+        node = create_node(address, service)
+        node.id = address + "_" + service
+        return node
+
     def execute_step(self, step):
         command, args = step
         if command == "add":
             service, address = args
-            message = NodeActive(create_node(address, service))
+            message = NodeActive(self.create_node(address, service))
             self.fake.add(service, address)
         elif command == "remove":
             service, address = args
-            message = NodeExpired(create_node(address, service))
+            message = NodeExpired(self.create_node(address, service))
             self.fake.remove(service, address)
         elif command == "replace":
             service, addresses = args
-            nodes = [create_node(address, service) for address in addresses]
+            nodes = [self.create_node(address, service) for address in addresses]
             message = ReplaceCluster(service, SANDBOX_ENV, nodes)
             self.fake.replace(service, addresses)
         else:
@@ -587,9 +624,11 @@ class StaticDiscoverySourceTests(TestCase):
         """
         static = StaticRoutes.parseJSON(dumps(
             [{"service": "service1", "address": "a", "version": "1.0",
-              "environment": {"name": "myenv", "fallbackName": None}},
+              "environment": {"name": "myenv", "fallbackName": None},
+              "id": "1234"},
              {"service": "service2", "address": "b", "version": "2.0",
-              "environment": {"name": "myenv2", "fallbackName": None}}]
+              "environment": {"name": "myenv2", "fallbackName": None},
+              "id": "4567"}]
         )).create(self.disco, self.runtime)
 
         self.runtime.dispatcher.startActor(static)
@@ -653,6 +692,7 @@ class DiscoveryProtocolTests(TestCase):
         disco = self.createDisco()
 
         node = Node()
+        node.id = str(uuid4())
         node.service = "svc"
         node.address = "addr"
         node.version = "1.2.3"
@@ -669,6 +709,7 @@ class DiscoveryProtocolTests(TestCase):
         sev = self.startDisco()
 
         node = Node()
+        node.id = str(uuid4())
         node.service = "svc"
         node.address = "addr"
         node.version = "1.2.3"
@@ -681,6 +722,7 @@ class DiscoveryProtocolTests(TestCase):
     def doActive(self, sev, svc, addr, version):
         active = Active()
         active.node = Node()
+        active.node.id = str(uuid4())
         active.node.service = svc
         active.node.address = addr
         active.node.version = version
@@ -815,6 +857,7 @@ class DiscoveryProtocolTests(TestCase):
         count = 10
         for idx in range(count):
             active.node = Node()
+            active.node.id = str(uuid4())
             active.node.service = "svc"
             active.node.address = "addr" + str(idx)
             active.node.version = "1.2.3"
@@ -866,9 +909,10 @@ class DiscoveryProtocolTests(TestCase):
         sev = self.startDisco()
 
         node = Node()
+        node.id = str(uuid4())
         node.service = "svc"
-        node.address = "addr"
         node.version = "1.2.3"
+        node.address = "addr"
         disco.register(node)
 
         active = self.expectActive(sev)

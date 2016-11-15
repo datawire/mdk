@@ -307,6 +307,7 @@ namespace mdk_discovery {
         @doc("Create a Node for external use.")
         Node _copyNode(Node node) {
             Node result = new Node();
+            result.id = node.id;
             result.address = node.address;
             result.version = node.version;
             result.service = node.service;
@@ -400,10 +401,15 @@ namespace mdk_discovery {
                 }
             }
 
-            // Update stored values:
+            // Update stored values. We replace an existing Node in two cases:
+            // 1. Update has same id as existing Node; that means it's same
+            // process just with more up-to-date data.
+            // 2. Update has same address as existing Node. Suggests old process
+            //    died and this is the new replacement at same address.
             int idx = 0;
             while (idx < nodes.size()) {
-                if (nodes[idx].address == node.address) {
+                if (nodes[idx].address == node.address ||
+                    nodes[idx].getId() == node.id) {
                     nodes[idx] = node;
                     return;
                 }
@@ -426,7 +432,7 @@ namespace mdk_discovery {
             while (idx < nodes.size()) {
                 Node ep = nodes[idx];
 
-                if (ep.address == null || ep.address == node.address) {
+                if (ep.getId() == node.getId()) {
                     nodes.remove(idx);
                     return;
                 }
@@ -469,7 +475,8 @@ namespace mdk_discovery {
     @doc("The Node class captures address and metadata information about a")
     @doc("server functioning as a service instance.")
     class Node {
-
+        @doc("The Node's unique identifier.")
+        String id;
         @doc("The service name.")
         String service;
         @doc("The service version (e.g. '1.2.3')")
@@ -482,6 +489,14 @@ namespace mdk_discovery {
         OperationalEnvironment environment = new OperationalEnvironment();
 
         FailurePolicy _policy = null;
+
+        @doc("Return the ID of the node.")
+        String getId() {
+            if (id != null) {
+                return id;
+            }
+            return ?properties["datawire_nodeId"];
+        }
 
         void success() {
             _policy.success();
@@ -498,7 +513,7 @@ namespace mdk_discovery {
         @doc("Return a string representation of the Node.")
         String toString() {
             // XXX: this doesn't get mapped into __str__, etc in targets
-            String result = "Node(";
+            String result = "Node(id:" + getId() + " ";
 
             if (service == null) {
                 result = result + "<unnamed>";
