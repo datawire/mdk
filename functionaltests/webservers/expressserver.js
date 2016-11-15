@@ -17,7 +17,9 @@ app.get('/resolve', function (req, res) {
     var isError = req.query.error !== undefined;
     req.mdk_session.resolve_async("service1", "1.0").then(
         function (node) {
-            var policy = req.mdk_session._mdk._disco.failurePolicy(node);
+            // Use the other way of getting MDK session here, to see if cls
+            // actually works.
+            var policy = mdk_express.getMdkSession()._mdk._disco.failurePolicy(node);
             var result = {};
             result[node.address] = [policy.successes, policy.failures];
             if (isError) {

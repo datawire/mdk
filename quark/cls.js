@@ -1,7 +1,7 @@
 /* continuation-local-storage support for MDK sessions. */
 
 var cls = require('continuation-local-storage');
-var namespace = cls.createNamespace('io.datawire.mdk');
+var namespace = exports.namespace = cls.createNamespace('io.datawire.mdk');
 
 exports.setMDKSession = function (session) {
     namespace.set('session', session);
@@ -9,8 +9,4 @@ exports.setMDKSession = function (session) {
 
 exports.getMDKSession = function () {
     return namespace.get('session');
-};
-
-exports.run = function (f) {
-    return namespace.run(f);
 };
