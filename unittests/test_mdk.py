@@ -555,8 +555,8 @@ class InteractionReportingTests(TestCase):
 
         interaction = connector.expectInteraction(self, ws_actor, session,
                                                   [self.node1], [self.node2])
-        self.assertEqual(interaction.start_timestamp, int(1000*start_time))
-        self.assertEqual(interaction.end_timestamp, int(1000*end_time))
+        self.assertEqual(interaction.startTimestamp, int(1000*start_time))
+        self.assertEqual(interaction.endTimestamp, int(1000*end_time))
         self.assertEqual(interaction.environment.name, "myenv")
 
 

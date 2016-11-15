@@ -16,16 +16,16 @@ namespace mdk_metrics {
         static String _json_type = "interaction_event";
 
         @doc("Interaction start time, milliseconds since the Unix epoch.")
-        long start_timestamp;
+        long startTimestamp;
 
         @doc("Interaction end time, milliseconds since the Unix epoch.")
-        long end_timestamp;
+        long endTimestamp;
 
         @doc("Interaction (really, session's) environment.")
         OperationalEnvironment environment;
 
         long getTimestamp() {
-            return self.start_timestamp;
+            return self.startTimestamp;
         }
 
         @doc("Unique identifier for this interaction.")
