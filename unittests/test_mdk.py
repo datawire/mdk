@@ -542,6 +542,9 @@ class InteractionReportingTests(TestCase):
         session.resolve("service1", "1.0")
         session.fail_interaction("fail")
         session.resolve("service2", "1.0")
+        time_service.advance(5)
+        time_service.pump()
+        end_time = time_service.time()
         session.finish_interaction()
         time_service.pump()
         time_service.advance(5)
@@ -552,7 +555,8 @@ class InteractionReportingTests(TestCase):
 
         interaction = connector.expectInteraction(self, ws_actor, session,
                                                   [self.node1], [self.node2])
-        self.assertEqual(interaction.timestamp, int(1000*start_time))
+        self.assertEqual(interaction.start_timestamp, int(1000*start_time))
+        self.assertEqual(interaction.end_timestamp, int(1000*end_time))
         self.assertEqual(interaction.environment.name, "myenv")
 
 
