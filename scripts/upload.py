@@ -71,13 +71,14 @@ def upload_npm():
     mdk_npm = "output/js/mdk-2.0"
     express_npm = "javascript/datawire_mdk_express"
     request_npm = "javascript/datawire_mdk_request"
+    winston_npm = "javascript/datawire_mdk_winston"
     config = os.path.expanduser("~/.npmrc")
     config_existed = os.path.exists(config)
     try:
         if not config_existed:
             with open(config, "w") as f:
                 f.write(NPM_CONFIG.format(os.environ["NPM_API_KEY"]))
-        for npm in [mdk_npm, express_npm, request_npm]:
+        for npm in [mdk_npm, express_npm, request_npm, winston_npm]:
             check_call(["npm", "publish", npm])
     finally:
         if not config_existed:

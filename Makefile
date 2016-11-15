@@ -106,7 +106,7 @@ install-quark:
 	touch .make-guards/install-mdk-ruby
 
 .make-guards/install-mdk-javascript: .make-guards/javascript-packages $(wildcard javascript/**/*)
-	npm install output/js/mdk-2.0 javascript/datawire_mdk_express/ javascript/datawire_mdk_request/
+	npm install output/js/mdk-2.0 javascript/datawire_mdk_express/ javascript/datawire_mdk_request/ javascript/datawire_mdk_winston/
 	touch .make-guards/install-mdk-javascript
 
 .make-guards/install-mdk-java: .make-guards/java-packages
