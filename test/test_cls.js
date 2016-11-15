@@ -1,11 +1,6 @@
 var assert = require("assert");
 var cls = require("datawire_mdk/cls.js");
 
-var Promise = require('bluebird');
-var clsBluebird = require('cls-bluebird');
-
-clsBluebird( cls.namespace );
-
 describe('continuation-local-storage', function() {
     it('cls.setMDKSession stores an object that can be retrieved with cls.getMDKSession', function() {
         var thing1 = 1234;
