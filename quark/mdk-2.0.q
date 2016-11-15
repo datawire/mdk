@@ -788,7 +788,7 @@ namespace mdk {
         void start_interaction() {
             InteractionEvent interactionReport = new InteractionEvent();
             interactionReport.node = _mdk.procUUID;
-            interactionReport.startTimestamp =
+            interactionReport.timestamp =
                 (1000.0 * _mdk._runtime.getTimeService().time()).round();
             interactionReport.session = _context.traceId;
             interactionReport.environment = _context.environment;
