@@ -29,7 +29,6 @@ def create_node(address, service="myservice", environment="sandbox"):
     node.service = service
     node.version = "1.0"
     node.address = address
-    node.properties = {"datawire_nodeId": node.id}
     node.environment = _parseEnvironment(environment)
     return node
 
