@@ -99,6 +99,7 @@ namespace synapse {
                 while (idx < json.size()) {
                     JSONObject entry = json.getListItem(idx);
                     Node node = new Node();
+                    node.id = Context.runtime().uuid();
                     node.service = service;
                     node.version = "1.0";
                     String host = entry.getObjectItem("host").getString();
