@@ -1,6 +1,6 @@
 {
     "name": "datawire_mdk_express",
-    "version": "2.0.33",
+    "version": "2.0.34",
     "main": "datawire_mdk_express.js",
     "license": "Apache-2.0",
     "url": "https://www.datawire.io",
