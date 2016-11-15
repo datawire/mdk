@@ -111,9 +111,9 @@ class MDKConnector(object):
             fake_wsactor, "mdk_metrics.InteractionEvent")
         test.assertEqual(interaction.node, self.mdk.procUUID)
         test.assertEqual(interaction.session, session._context.traceId)
-        expected = {node.properties["datawire_nodeId"]: 1
+        expected = {node.getId(): 1
                     for node in succeeded_nodes}
         for node in failed_nodes:
-            expected[node.properties["datawire_nodeId"]] = 0
+            expected[node.getId()] = 0
         test.assertEqual(interaction.results, expected)
         return interaction
