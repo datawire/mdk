@@ -4,8 +4,9 @@
     "main": "datawire_mdk_winston.js",
     "license": "Apache-2.0",
     "url": "https://www.datawire.io",
-    "peerDependencies": {
-        "winston": "2.x"
+    "dependencies": {
+        "winston": "2.x",
+        "datawire_mdk": ">=2.0.34"
     },
     "description": "Datawire MDK integration for the Winston logging framework."
 }
