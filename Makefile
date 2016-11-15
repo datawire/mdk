@@ -74,6 +74,8 @@ node_modules:
 js-dependencies: node_modules
 	npm list express || npm install express
 	npm list connect-timeout || npm install connect-timeout
+	npm list winston || npm install winston
+	npm list mocha || npm install mocha
 
 .PHONY: ruby-dependencies
 ruby-dependencies:
@@ -128,7 +130,7 @@ setup-docker: docker
 	docker tag datawire/mdk-quark-run datawire/mdk-quark-run:`sed s/v//g < QUARK_VERSION.txt`
 
 .PHONY: test
-test: test-python test-python3
+test: test-python test-python3 test-javascript
 
 .PHONY: guard-token
 guard-token:
@@ -146,6 +148,11 @@ test-python: python-dependencies .make-guards/install-mdk-python2
 test-python3: guard-token python3-dependencies django110-dependencies install-mdk
 	virtualenv3/bin/py.test -n 4 -v --durations=30 --timeout=180 --timeout_method=thread unittests functionaltests
 
+.PHONY: test-javascript
+test-javascript: js-dependencies .make-guards/install-mdk-javascript
+	`npm bin`/mocha
+
+# Run just the end-to-end tests in Python 3, for use by MCP:
 .PHONY: system-tests
 system-tests: guard-token python3-dependencies .make-guards/install-mdk-python3
 	virtualenv3/bin/py.test -n 4 -v --durations=30 --timeout=180 --timeout_method=thread functionaltests/test_endtoend.py -k Python3
@@ -157,7 +164,7 @@ release-patch:
 	virtualenv/bin/python scripts/release.py patch
 
 # Packaging commands:
-output: $(wildcard quark/*.q) $(wildcard python/*.py)
+output: $(wildcard quark/*.q) $(wildcard python/*.py) $(wildcard quark/*.js)
 	rm -rf output output.temp quark/*.qc quark/tests/*.qc
 	# Use installed Quark if we don't already have quark cli in PATH:
 	which quark || source ~/.quark/config.sh; quark compile --include-stdlib -o output.temp quark/mdk-2.0.q

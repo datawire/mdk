@@ -37,7 +37,8 @@ def build_javascript(package_dir):
     package_json_path = os.path.join(package_dir, "package.json")
     package_json = loads(open(os.path.join(OVERRIDES, "package.json.in")).read())
     generated_json = loads(open(package_json_path).read())
-    package_json["dependencies"] = generated_json["dependencies"]
+    # Merge dependencies from generated JSON into version we hand-wrote:
+    package_json["dependencies"].update(generated_json["dependencies"])
     with open(package_json_path, "w") as f:
         f.write(dumps(package_json))
     return []
