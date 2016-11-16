@@ -1,4 +1,5 @@
 var datawire_mdk = require('datawire_mdk');
+var cls = require("datawire_mdk/cls.js");
 var process = require('process');
 
 exports.mdk = datawire_mdk.mdk.start();
@@ -25,7 +26,14 @@ exports.mdkSessionStart = function (req, res, next) {
     }
     res.on("finish", endSession);
     res.on("close", endSession);
-    next();
+
+    // Setup continuation-local-storage:
+    cls.namespace.bindEmitter(req);
+    cls.namespace.bindEmitter(res);
+    cls.namespace.run(function() {
+        cls.setMDKSession(req.mdk_session);
+        next();
+    });
 };
 
 // Fail the interaction on errors.
@@ -33,3 +41,6 @@ exports.mdkErrorHandler = function (err, req, res, next) {
     req.mdk_session.fail_interaction(err.toString());
     next(err);
 };
+
+// Get the current session:
+exports.getMdkSession = cls.getMDKSession;

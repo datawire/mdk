@@ -4,5 +4,9 @@
     "license": "Apache-2.0",
     "url": "https://www.datawire.io",
     "main": "index.js",
-    "description": "An open source SDK for building microservices."
+    "description": "An open source SDK for building microservices.",
+    "dependencies": {
+        "continuation-local-storage": "^3.2.0",
+        "cls-bluebird": "^2.0.1"
+    }
 }

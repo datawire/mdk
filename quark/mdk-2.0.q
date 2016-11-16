@@ -2,8 +2,7 @@ quark 1.0;
 
 package datawire_mdk 2.0.34;
 
-// DATAWIRE MDK
-
+// Quark includes:
 include mdk_runtime.q;
 include util-1.0.q;
 include introspection-1.0.q;
@@ -11,6 +10,9 @@ include discovery-3.0.q;
 include tracing-2.0.q;
 include rtp.q;
 include metrics.q;
+
+// Native includes:
+include cls.js;
 
 import mdk_discovery;
 import mdk_tracing;

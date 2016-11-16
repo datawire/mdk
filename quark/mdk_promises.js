@@ -22,7 +22,11 @@
 (function () {
     "use strict";
 
-    Promise = require("bluebird");
+    var Promise = require("bluebird").getNewLibraryCopy();
+    var clsBluebird = require('cls-bluebird');
+    var cls = require("datawire_mdk/cls.js");
+
+    clsBluebird( cls.namespace, Promise );
 
     function quark_promise_to_bluebird(quark_promise) {
         // Luckily we don't have to handle errors for now in MDK resolve(), but
@@ -35,9 +39,9 @@
                 return null;
             }
             quark_promise.andThen(resolveWithoutUndefined);
-        })
+        });
     }
 
-    exports.quark_promise_to_bluebird = quark_promise_to_bluebird
+    exports.quark_promise_to_bluebird = quark_promise_to_bluebird;
 })();
 
