@@ -167,6 +167,7 @@ def test_timeout(webserver, port_number):
     default = requests.get(url, timeout=5).json()
     assert abs(10 - default) < 2
 
+    # Create a context with deadline of 5 seconds:
     context = run_python(sys.executable, "create-context.py", output=True)
     overriden = requests.get(url, headers={"X-MDK-CONTEXT": context},
                              timeout=5).json()
