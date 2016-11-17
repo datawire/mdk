@@ -40,8 +40,8 @@ void failTest(String message) {
 
 class RealSleep extends UnaryCallable {
     Object call(Object seconds) {
-	// Don't actually have to do anything, time passes on its own.
-	return true;
+        // Don't actually have to do anything, time passes on its own.
+        return true;
     }
 }
 
@@ -49,13 +49,13 @@ class FakeSleep extends UnaryCallable {
     FakeTime fakeTime;
 
     FakeSleep(FakeTime time) {
-	self.fakeTime = time;
+        self.fakeTime = time;
     }
 
     Object call(Object seconds) {
-	self.fakeTime.advance(?seconds);
-	self.fakeTime.pump();
-	return true;
+        self.fakeTime.advance(?seconds);
+        self.fakeTime.pump();
+        return true;
     }
 }
 
@@ -63,7 +63,7 @@ class Start {
     Actor testRunner;
 
     Start(Actor testRunner) {
-	self.testRunner = testRunner;
+        self.testRunner = testRunner;
     }
 }
 
@@ -71,7 +71,7 @@ class Sleep {
     float seconds;
 
     Sleep(float seconds) {
-	self.seconds = seconds;
+        self.seconds = seconds;
     }
 }
 
@@ -86,21 +86,21 @@ class TimeScheduleTest extends TestActor {
     bool scheduling = false;
 
     TimeScheduleTest(Time time, Actor scheduling, UnaryCallable sleepCallable) {
-	self.timeService = time;
-	self.schedulingService = scheduling;
-	self.sleepCallable = sleepCallable;
+        self.timeService = time;
+        self.schedulingService = scheduling;
+        self.sleepCallable = sleepCallable;
     }
 
     void onStart(MessageDispatcher dispatcher) {
-	self.dispatcher = dispatcher;
+        self.dispatcher = dispatcher;
     }
 
     void assertElapsed(float expected, float reportedTime) {
-	float elapsed = reportedTime - self.startTime;
-	print("Expected: " + expected.toString() + " delay, actually elapsed: " + elapsed.toString());
-	if (elapsed - expected > 0.1 || elapsed - expected < -0.1) {
-	    failTest("Scheduled for too long!");
-	}
+        float elapsed = reportedTime - self.startTime;
+        print("Expected: " + expected.toString() + " delay, actually elapsed: " + elapsed.toString());
+        if (elapsed - expected > 0.1 || elapsed - expected < -0.1) {
+            failTest("Scheduled for too long!");
+        }
     }
 
     void start(TestRunner runner) {
@@ -119,13 +119,13 @@ class TimeScheduleTest extends TestActor {
     }
 
     void onMessage(Actor origin, Object message) {
-	if (message.getClass().id == "runtime_test.Sleep") {
-	    Sleep sleep = ?message;
-	    self.sleepCallable.__call__(sleep.seconds);
-	    return;
-	}
+        if (message.getClass().id == "runtime_test.Sleep") {
+            Sleep sleep = ?message;
+            self.sleepCallable.__call__(sleep.seconds);
+            return;
+        }
 
-	Happening happened = ?message;
+        Happening happened = ?message;
         if (happened.event == "0second") {
             print("0 second event delivered.");
             if (self.scheduling) {
@@ -135,20 +135,20 @@ class TimeScheduleTest extends TestActor {
             self.dispatcher.tell(self, new Sleep(1.0), self);
             return;
         }
-	if (happened.event == "1second") {
+        if (happened.event == "1second") {
             print("1 second event delivered.");
-	    self.assertElapsed(1.0, happened.currentTime);
-	    self.assertElapsed(1.0, self.timeService.time());
-	    // Already slept 1 seconds, now sleep 4 to hit 5 seconds:
-	    self.dispatcher.tell(self, new Sleep(4.0), self);
-	    return;
-	}
-	if (happened.event == "5second") {
+            self.assertElapsed(1.0, happened.currentTime);
+            self.assertElapsed(1.0, self.timeService.time());
+            // Already slept 1 seconds, now sleep 4 to hit 5 seconds:
+            self.dispatcher.tell(self, new Sleep(4.0), self);
+            return;
+        }
+        if (happened.event == "5second") {
             print("5 second event delivered.");
-	    self.assertElapsed(5.0, happened.currentTime);
-	    self.assertElapsed(5.0, self.timeService.time());
+            self.assertElapsed(5.0, happened.currentTime);
+            self.assertElapsed(5.0, self.timeService.time());
             self.runner.runNextTest();
-	}
+        }
     }
 }
 
@@ -168,83 +168,83 @@ class WebSocketsTest extends TestActor {
     String state = "initial";
 
     WebSocketsTest(WebSockets websockets, String serverURL, String badURL) {
-	self.websockets = websockets;
-	self.serverURL = serverURL;
-	self.badURL = badURL;
+        self.websockets = websockets;
+        self.serverURL = serverURL;
+        self.badURL = badURL;
     }
 
     void onStart(MessageDispatcher dispatcher) {
-	self.dispatcher = dispatcher;
+        self.dispatcher = dispatcher;
     }
 
     void failure(Object result, String reason) {
-	failTest("WebSocket test failed: " + reason + " with " + result.toString());
+        failTest("WebSocket test failed: " + reason + " with " + result.toString());
     }
 
     void changeState(String state) {
-	print("State: " + state);
-	self.state = state;
+        print("State: " + state);
+        self.state = state;
     }
 
     bool _gotError(WSConnectError error) {
-	self.testGoodURL();
-	return true;
+        self.testGoodURL();
+        return true;
     }
 
     @doc("Bad URLs result in Promise rejected with WSError.")
     void testBadURL() {
-	self.changeState("testBadURL");
-	mdk_runtime.promise.Promise p = self.websockets.connect(badURL, self);
-	p.andEither(bind(self, "failure", ["unexpected successful connection"]),
-		    bind(self, "_gotError", []));
+        self.changeState("testBadURL");
+        mdk_runtime.promise.Promise p = self.websockets.connect(badURL, self);
+        p.andEither(bind(self, "failure", ["unexpected successful connection"]),
+                    bind(self, "_gotError", []));
     }
 
     bool _gotWebSocket(WSActor actor) {
-	self.connection = actor;
-	testMessages();
-	return true;
+        self.connection = actor;
+        testMessages();
+        return true;
     }
 
     @doc("A good URL results in a Promise resolved with a WSActor.")
     void testGoodURL() {
-	self.changeState("testGoodURL");
-	mdk_runtime.promise.Promise p = self.websockets.connect(serverURL, self);
-	p.andEither(bind(self, "_gotWebSocket", []),
-		    bind(self, "failure", ["unexpected connect error"]));
+        self.changeState("testGoodURL");
+        mdk_runtime.promise.Promise p = self.websockets.connect(serverURL, self);
+        p.andEither(bind(self, "_gotWebSocket", []),
+                    bind(self, "failure", ["unexpected connect error"]));
     }
 
     void _gotMessage(String message) {
-	if (message != "can you hear me?") {
-	    failTest("Unexpected echo message: " + message);
-	}
-	self.testClose();
+        if (message != "can you hear me?") {
+            failTest("Unexpected echo message: " + message);
+        }
+        self.testClose();
     }
 
     @doc("Messages can be sent and received.")
     void testMessages() {
-	self.changeState("testMessages");
-	self.dispatcher.tell(self, "can you hear me?", self.connection);
-	// Response will go to _gotMessage.
+        self.changeState("testMessages");
+        self.dispatcher.tell(self, "can you hear me?", self.connection);
+        // Response will go to _gotMessage.
     }
 
     void _gotClose() {
-	self.testSendToClosed();
+        self.testSendToClosed();
     }
 
     @doc("The connection can be closed.")
     void testClose() {
-	self.changeState("testClose");
-	self.dispatcher.tell(self, new WSClose(), self.connection);
-	// Close will be delivered by calling _gotClose().
+        self.changeState("testClose");
+        self.dispatcher.tell(self, new WSClose(), self.connection);
+        // Close will be delivered by calling _gotClose().
     }
 
     @doc("Send to closed socket is just dropped on the floor.")
     void testSendToClosed() {
-	self.changeState("testSendToClosed");
-	// These should not blow up, should instead just be dropped on the floor:
-	self.dispatcher.tell(self, "goes nowhere", self.connection);
-	self.dispatcher.tell(self, new WSClose(), self.connection);
-	// All done, tell test runner to proceed.
+        self.changeState("testSendToClosed");
+        // These should not blow up, should instead just be dropped on the floor:
+        self.dispatcher.tell(self, "goes nowhere", self.connection);
+        self.dispatcher.tell(self, new WSClose(), self.connection);
+        // All done, tell test runner to proceed.
         self.runner.runNextTest();
     }
 
@@ -254,19 +254,19 @@ class WebSocketsTest extends TestActor {
     }
 
     void onMessage(Actor origin, Object message) {
-	if (connection == null) {
-	    failTest("Got message while still unconnected.");
-	}
-	if (message.getClass().id == "mdk_runtime.WSMessage" && self.state == "testMessages") {
-	    WSMessage m = ?message;
-	    self._gotMessage(m.body);
-	    return;
-	}
-	if (message.getClass().id == "mdk_runtime.WSClosed" && self.state == "testClose") {
-	    self._gotClose();
-	    return;
-	}
-	failTest("Unexpected message, state: " + self.state + " message: " + message.toString());
+        if (connection == null) {
+            failTest("Got message while still unconnected.");
+        }
+        if (message.getClass().id == "mdk_runtime.WSMessage" && self.state == "testMessages") {
+            WSMessage m = ?message;
+            self._gotMessage(m.body);
+            return;
+        }
+        if (message.getClass().id == "mdk_runtime.WSClosed" && self.state == "testClose") {
+            self._gotClose();
+            return;
+        }
+        failTest("Unexpected message, state: " + self.state + " message: " + message.toString());
     }
 }
 
@@ -283,14 +283,14 @@ class FileActorTests extends TestActor {
     String file;
 
     FileActorTests(FileActor actor) {
-	self.actor = actor;
+        self.actor = actor;
         self.directory = actor.mktempdir();
         self.file = self.directory + "/file1";
     }
 
     void changeState(String state) {
-	print("State: " + state);
-	self.state = state;
+        print("State: " + state);
+        self.state = state;
     }
 
     void onStart(MessageDispatcher dispatcher) {
@@ -391,12 +391,12 @@ class KeepaliveActor extends Actor {
     bool stopping = false;
 
     KeepaliveActor(MDKRuntime runtime) {
-	self.runtime = runtime;
+        self.runtime = runtime;
     }
 
     void onStart(MessageDispatcher tell) {
-	self.timeStarted = self.runtime.getTimeService().time();
-	self.onMessage(self, "go");
+        self.timeStarted = self.runtime.getTimeService().time();
+        self.onMessage(self, "go");
     }
 
     void onStop() {
@@ -405,15 +405,15 @@ class KeepaliveActor extends Actor {
 
     void onMessage(Actor origin, Object message) {
         // Must be a Happening message from the scheduling service.
-	if (self.stopping) {
-	    return;
-	}
-	if (self.runtime.getTimeService().time() - self.timeStarted > 60.0) {
-	    failTest("Test took too long.");
-	    return;
-	}
-	self.runtime.dispatcher.tell(self, new Schedule("wakeup", 1.0),
-				     self.runtime.getScheduleService());
+        if (self.stopping) {
+            return;
+        }
+        if (self.runtime.getTimeService().time() - self.timeStarted > 60.0) {
+            failTest("Test took too long.");
+            return;
+        }
+        self.runtime.dispatcher.tell(self, new Schedule("wakeup", 1.0),
+                                     self.runtime.getScheduleService());
     }
 }
 
@@ -492,7 +492,7 @@ class TestRunner {
     bool allTestsDone = false;
 
     TestRunner() {
-	self.tests = {"real runtime: time, scheduling":
+        self.tests = {"real runtime: time, scheduling":
                       bind(self, "testRealRuntimeScheduling", []),
                       "fake runtime: time, scheduling":
                       bind(self, "testFakeRuntimeScheduling", []),
@@ -505,7 +505,7 @@ class TestRunner {
         if (isPython()) {
             self.tests["files"] = bind(self, "testFiles", []);
         }
-	self.testNames = tests.keys();
+        self.testNames = tests.keys();
         self.testNames.sort();
     }
 
@@ -543,30 +543,30 @@ class TestRunner {
 
     void runNextTest() {
         // If we're not the first test, cleanup:
-	if (self.nextTest > 0) {
-	    self.runtime.dispatcher.stopActor(self.keepalive);
+        if (self.nextTest > 0) {
+            self.runtime.dispatcher.stopActor(self.keepalive);
             self.runtime.stop();
-	    print("Test finished successfully.\n");
-	}
+            print("Test finished successfully.\n");
+        }
 
         // If there are no more tests we're done:
-	if (self.nextTest == testNames.size()) {
+        if (self.nextTest == testNames.size()) {
             self.allTestsDone = true;
-	    print("All done.");
-	    return;
-	}
+            print("All done.");
+            return;
+        }
 
         // Setup new runtime for a new test:
         self.runtime = defaultRuntime();
 
         // Don't exit if we run out of events somehow, but do exit if we hit a
-	// timeout:
-	self.keepalive = new KeepaliveActor(self.runtime);
-	self.runtime.dispatcher.startActor(keepalive);
+        // timeout:
+        self.keepalive = new KeepaliveActor(self.runtime);
+        self.runtime.dispatcher.startActor(keepalive);
 
         // Run the next test:
-	String testName = self.testNames[self.nextTest];
-	print("Testing " + testName);
+        String testName = self.testNames[self.nextTest];
+        print("Testing " + testName);
         TestActor test = ?self.tests[testName].__call__(self.runtime);
         self.runtime.dispatcher.startActor(test);
         self.nextTest = self.nextTest + 1;
