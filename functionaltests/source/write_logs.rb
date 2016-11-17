@@ -8,10 +8,10 @@ def main()
   messages = []
   category = ARGV[0]
   sent_messages = ["hello critical " + category,
-		   "hello debug " + category,
-		   "hello error " + category,
-		   "hello info " + category,
-		   "hello warn " + category]
+                   "hello debug " + category,
+                   "hello error " + category,
+                   "hello info " + category,
+                   "hello warn " + category]
 
   $mdk._tracer.subscribe(
     Proc.new {|event|
