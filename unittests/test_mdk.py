@@ -559,6 +559,32 @@ class InteractionReportingTests(TestCase):
         self.assertEqual(interaction.endTimestamp, int(1000*end_time))
         self.assertEqual(interaction.environment.name, "myenv")
 
+    def test_interactionClocks(self):
+        """
+        The interaction event records the clock level at start and end.
+        """
+        connector = MDKConnector()
+        ws_actor = connector.expectSocket()
+        connector.connect(ws_actor)
+        session = connector.mdk.session()
+
+        # Figure out previous level of clock for start
+        [start_level] = session.info("doop", "didoop").causalLevel
+        session.start_interaction()
+        session.info("doop", "didup")
+        # Figure out previous level of clock for end
+        [end_level] = session.info("doop", "didoop").causalLevel
+        session.finish_interaction()
+        # Ensure message is sent:
+        connector.advance_time(5)
+
+        ws_actor.swallowLogMessages()
+        interaction = connector.expectInteraction(self, ws_actor, session,
+                                                  [], [])
+
+        self.assertEqual((interaction.startClock, interaction.endClock),
+                         ([start_level + 1], [end_level + 1]))
+
 
 class LoggingTests(TestCase):
     """Tests for logging API of Session."""

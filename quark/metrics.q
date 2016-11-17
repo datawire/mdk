@@ -40,6 +40,12 @@ namespace mdk_metrics {
         @doc("Map destination node UUID to success=1/failure=0 of interaction.")
         Map<String,int> results = {};
 
+        @doc("Causal clock level at start.")
+        List<int> startClock = [];
+
+        @doc("Causal clock level at end.")
+        List<int> endClock = [];
+
         @doc("Add the result of communicating with a specific node.")
         void addNode(Node destination, bool success) {
             int value = 0;
