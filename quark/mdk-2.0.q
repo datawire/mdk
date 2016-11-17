@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk 2.0.34;
+package datawire_mdk 2.0.35;
 
 // Quark includes:
 include mdk_runtime.q;
