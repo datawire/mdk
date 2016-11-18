@@ -483,13 +483,14 @@ Run a series of actor-based tests. Receiving \"next\" triggers next test.
 Deliberately not an Actor so MessageDispatcher doesn't get affected by it and
 hide e.g. reentrancy issues in scheduling.
 """)
-class TestRunner {
+class TestRunner extends Task {
     Map<String,UnaryCallable> tests;
     List<String> testNames;
     int nextTest = 0;
     MDKRuntime runtime;
     KeepaliveActor keepalive;
     bool allTestsDone = false;
+    TestActor testToStart = null;
 
     TestRunner() {
         self.tests = {"real runtime: time, scheduling":
@@ -546,8 +547,8 @@ class TestRunner {
         if (self.nextTest > 0) {
             self.runtime.dispatcher.stopActor(self.keepalive);
             self.runtime.stop();
-            print("Test finished successfully.\n");
-        }
+            print("Test (" + self.testNames[self.nextTest - 1] + ") finished successfully.\n");
+	}
 
         // If there are no more tests we're done:
         if (self.nextTest == testNames.size()) {
@@ -570,7 +571,19 @@ class TestRunner {
         TestActor test = ?self.tests[testName].__call__(self.runtime);
         self.runtime.dispatcher.startActor(test);
         self.nextTest = self.nextTest + 1;
-        test.start(self);
+
+        // Launch next test after messages have been delivered
+        self.testToStart = test;
+        Context.runtime().schedule(self, 0.0);
+    }
+
+    void onExecute(Runtime runtime) {
+        if (self.runtime.dispatcher.queued()) {
+            Context.runtime().schedule(self, 0.1);
+        } else {
+            self.testToStart.start(self);
+            self.testToStart = null;
+        }
     }
 }
 

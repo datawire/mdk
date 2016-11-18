@@ -242,6 +242,7 @@ namespace mdk_runtime {
     MDKRuntime defaultRuntime() {
         //logging.makeConfig().setLevel("DEBUG").configure();
         MDKRuntime runtime = new MDKRuntime();
+        runtime.dispatcher = new MessageDispatcher(new _QuarkRuntimeLaterCaller());
         runtime.dependencies.registerService("envvar", new RealEnvVars());
         QuarkRuntimeTime timeService = new QuarkRuntimeTime();
         QuarkRuntimeWebSockets websockets = new QuarkRuntimeWebSockets();

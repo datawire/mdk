@@ -221,6 +221,7 @@ namespace mdk_runtime {
     MDKRuntime fakeRuntime() {
         MDKRuntime runtime = new MDKRuntime();
         runtime.dependencies.registerService("envvar", new FakeEnvVars());
+        runtime.dispatcher = new MessageDispatcher(new _ManualLaterCaller());
         FakeTime timeService = new FakeTime();
         FakeWebSockets websockets = new FakeWebSockets();
         runtime.dependencies.registerService("time", timeService);
