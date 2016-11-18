@@ -55,8 +55,12 @@ class MDKConnector(object):
 
     URL = "ws://localhost:1234/"
 
-    def __init__(self, failurepolicy_factory=None, env={}, start=True):
+    def __init__(self, failurepolicy_factory=None, env={}, start=True, real_msg=False):
         self.runtime = fakeRuntime()
+        if real_msg:
+            self.runtime.dispatcher.pump()
+            import mdk_runtime
+            self.runtime.dispatcher.callLater = mdk_runtime.actors._QuarkRuntimeLaterCaller()
         env_vars = self.runtime.getEnvVarsService()
         for key, value in env.items():
             env_vars.set(key, value)
@@ -85,8 +89,7 @@ class MDKConnector(object):
         """Advance the clock."""
         ts = self.runtime.getTimeService()
         ts.advance(seconds)
-        ts.pump()
-        ts.pump()
+        self.pump()
 
     def expectSocket(self):
         """Return the FakeWSActor we expect to have connected to a URL."""

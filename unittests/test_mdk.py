@@ -79,7 +79,7 @@ class InteractionTestCase(TestCase):
 
     def init(self):
         """Initialize an empty environment."""
-        self.connector = MDKConnector(RecordingFailurePolicyFactory())
+        self.connector = MDKConnector(RecordingFailurePolicyFactory(), real_msg=True)
         self.runtime = self.connector.runtime
         self.mdk = self.connector.mdk
         self.disco = self.mdk._disco
@@ -448,6 +448,7 @@ class ConnectionStartupShutdownTests(TestCase):
         """
         Node identity is randomly generated each time.
         """
+        assert False
         connector = MDKConnector()
         ws_actor = connector.expectSocket()
         open = connector.connect(ws_actor)
@@ -538,17 +539,17 @@ class InteractionReportingTests(TestCase):
         session = connector.mdk.session()
         session.start_interaction()
         start_time = time_service.time()
-        time_service.advance(123)
+        connector.advance_time(123)
         session.resolve("service1", "1.0")
         session.fail_interaction("fail")
         session.resolve("service2", "1.0")
-        time_service.advance(5)
-        time_service.pump()
+        connector.advance_time(5)
+        connector.pump()
         end_time = time_service.time()
         session.finish_interaction()
-        time_service.pump()
-        time_service.advance(5)
-        time_service.pump()
+        connector.pump()
+        connector.advance_time(5)
+        connector.pump()
 
         # Skip log messages:
         ws_actor.swallowLogMessages()
@@ -635,4 +636,3 @@ class LoggingTests(TestCase):
         lmid = session.info("cat", "another message")
         self.assertEqual((lmid.traceId, lmid.causalLevel),
                          (session._context.traceId, [2]))
-
