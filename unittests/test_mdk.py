@@ -448,6 +448,11 @@ class ConnectionStartupShutdownTests(TestCase):
         """
         Node identity is randomly generated each time.
         """
+        # XXX FIXME Short-circuit the test. Otherwise
+        #   open2 = connector.connect(ws_actor2)
+        # kills the test framework via
+        #   runtime.fail("no remaining message found").
+        # Obviously, need to investigate this further.
         assert False
         connector = MDKConnector()
         ws_actor = connector.expectSocket()
