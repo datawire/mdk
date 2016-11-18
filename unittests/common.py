@@ -72,8 +72,14 @@ class MDKConnector(object):
 
     def pump(self):
         """Deliver scheduled events."""
-        self.runtime.getTimeService().pump()
-        self.runtime.dispatcher.pump()
+        # Keep pumping the clock and message delivery until no new
+        # messages are available.
+        while True:
+            self.runtime.getTimeService().pump()
+            if self.runtime.dispatcher._queued:
+                self.runtime.dispatcher.pump()
+            else:
+                break
 
     def advance_time(self, seconds):
         """Advance the clock."""

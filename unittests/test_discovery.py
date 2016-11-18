@@ -660,6 +660,7 @@ class DiscoveryProtocolTests(TestCase):
         return self.connector.connect(ws_actor)
 
     def expectActive(self, ws_actor):
+        self.pump()
         return self.connector.expectSerializable(
             ws_actor, "mdk_discovery.protocol.Active")
 
@@ -674,7 +675,6 @@ class DiscoveryProtocolTests(TestCase):
 
     def startDisco(self):
         self.connector.mdk.start()
-        self.pump()
         self.pump()
         ws_actor = self.connector.expectSocket()
         self.connector.connect(ws_actor)
@@ -730,6 +730,7 @@ class DiscoveryProtocolTests(TestCase):
         active.node.address = addr
         active.node.version = version
         sev.send(active.encode())
+        self.pump()
         return active.node
 
     def testResolvePreStart(self):
@@ -895,6 +896,7 @@ class DiscoveryProtocolTests(TestCase):
 
         # It should reconnect:
         self.connector.advance_time(1)
+        self.connector.pump()
         ws_actor2 = self.connector.expectSocket()
         self.connector.connect(ws_actor2)
         # And it should resent registration message:
