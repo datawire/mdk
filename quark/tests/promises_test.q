@@ -70,11 +70,23 @@ class StoreContext extends UnaryCallable {
 macro Object makeUndefined() $js{undefined} $java{null};
 
 class PromiseTest extends MockRuntimeTest {
+    MessageDispatcher dispatcher;
+
+    void setup() {
+        super.setup();
+        dispatcher = new MessageDispatcher(new _ManualLaterCaller());
+    }
+
     void spinCollector() {
+        self.dispatcher.pump();
         self.pump();
+        self.dispatcher.pump();
         self.pump();
+        self.dispatcher.pump();
         self.pump();
+        self.dispatcher.pump();
         self.pump();
+        self.dispatcher.pump();
     }
 
     static String theValue = "success!";
@@ -82,7 +94,7 @@ class PromiseTest extends MockRuntimeTest {
 
     // No value on initial creation
     void testNoValue() {
-        Promise p = new PromiseResolver(new MessageDispatcher()).promise;
+        Promise p = new PromiseResolver(self.dispatcher).promise;
         StoreValue success = new StoreValue();
         StoreValue failure = new StoreValue();
         StoreValue both = new StoreValue();
@@ -99,7 +111,7 @@ class PromiseTest extends MockRuntimeTest {
     // Success value becomes available to success callback and either-way
     // callback when a resolve() is done before a callback is added.
     void testSuccessValueCallbackBefore() {
-        PromiseResolver f = new PromiseResolver(new MessageDispatcher());
+        PromiseResolver f = new PromiseResolver(self.dispatcher);
         Promise p = f.promise;
         f.resolve(?theValue);
         spinCollector();
@@ -122,7 +134,7 @@ class PromiseTest extends MockRuntimeTest {
     // Success value becomes available to success callback and either-way
     // callback when a resolve() is done after a callback is added.
     void testSuccessValueCallbackAfter() {
-        PromiseResolver f = new PromiseResolver(new MessageDispatcher());
+        PromiseResolver f = new PromiseResolver(self.dispatcher);
         Promise p = f.promise;
         StoreValue success = new StoreValue();
         StoreValue failure = new StoreValue();
@@ -145,7 +157,7 @@ class PromiseTest extends MockRuntimeTest {
     // Error value becomes available to error callback and either-way callback
     // when a resolve() is done before a callback is added.
     void testErrorValueCallbackBefore() {
-        PromiseResolver f = new PromiseResolver(new MessageDispatcher());
+        PromiseResolver f = new PromiseResolver(self.dispatcher);
         Promise p = f.promise;
         f.reject(?theError);
         spinCollector();
@@ -168,7 +180,7 @@ class PromiseTest extends MockRuntimeTest {
     // Error value becomes available to error callback and either-way callback
     // when a resolve() is done after a callback is added.
     void testErrorValueCallbackAfter() {
-        PromiseResolver f = new PromiseResolver(new MessageDispatcher());
+        PromiseResolver f = new PromiseResolver(self.dispatcher);
         Promise p = f.promise;
         StoreValue success = new StoreValue();
         StoreValue failure = new StoreValue();
@@ -190,7 +202,7 @@ class PromiseTest extends MockRuntimeTest {
 
     // andCatch only catches errors that are instances of given class.
     void testErrorFiltering() {
-        PromiseResolver f = new PromiseResolver(new MessageDispatcher());
+        PromiseResolver f = new PromiseResolver(self.dispatcher);
         Promise p = f.promise;
         HTTPError err = new HTTPError("ONO");
         f.reject(err);
@@ -211,7 +223,7 @@ class PromiseTest extends MockRuntimeTest {
 
     // Success callback passes through error values:
     void testErrorPassthrough() {
-        PromiseResolver f = new PromiseResolver(new MessageDispatcher());
+        PromiseResolver f = new PromiseResolver(self.dispatcher);
         Promise p = f.promise;
         f.reject(theError);
         spinCollector();
@@ -226,7 +238,7 @@ class PromiseTest extends MockRuntimeTest {
 
     // Error callback passes through success values:
     void testSuccessPassthrough() {
-        PromiseResolver f = new PromiseResolver(new MessageDispatcher());
+        PromiseResolver f = new PromiseResolver(self.dispatcher);
         Promise p = f.promise;
         StoreValue success = new StoreValue();
         StoreValue failure = new StoreValue();
@@ -240,7 +252,7 @@ class PromiseTest extends MockRuntimeTest {
 
     // Success callback returning error switches to error path
     void testSuccessReturningError() {
-        PromiseResolver f = new PromiseResolver(new MessageDispatcher());
+        PromiseResolver f = new PromiseResolver(self.dispatcher);
         Promise p = f.promise;
         StoreValue failure = new StoreValue();
         p.andThen(new ReturnValue(theError)).andCatch(Class.ERROR, failure);
@@ -253,7 +265,7 @@ class PromiseTest extends MockRuntimeTest {
     // Calling resolve() with an error turns it into a reject():
     // (Made this mistake myself... seems most reasonable thing to do).
     void testResolveWithErrorDoesReject() {
-        PromiseResolver f = new PromiseResolver(new MessageDispatcher());
+        PromiseResolver f = new PromiseResolver(self.dispatcher);
         Promise p = f.promise;
         StoreValue failure = new StoreValue();
         p.andCatch(Class.ERROR, failure);
@@ -265,7 +277,7 @@ class PromiseTest extends MockRuntimeTest {
 
     // Error callback returning not-error switches to success path
     void testErrorReturningSuccess() {
-        PromiseResolver f = new PromiseResolver(new MessageDispatcher());
+        PromiseResolver f = new PromiseResolver(self.dispatcher);
         Promise p = f.promise;
         StoreValue success = new StoreValue();
         p.andCatch(Class.ERROR, new ReturnValue(theValue)).andThen(success);
@@ -278,8 +290,8 @@ class PromiseTest extends MockRuntimeTest {
     // Callback returning value-less promise is chained on success path when the
     // promise is resolved.
     void testCallbackReturningUnresolvedPromiseSuccess() {
-        PromiseResolver f = new PromiseResolver(new MessageDispatcher());
-        PromiseResolver o = new PromiseResolver(new MessageDispatcher());
+        PromiseResolver f = new PromiseResolver(self.dispatcher);
+        PromiseResolver o = new PromiseResolver(self.dispatcher);
         Promise p = f.promise;
         StoreValue success = new StoreValue();
         p.andThen(new ReturnValue(o.promise)).andThen(success);
@@ -295,8 +307,8 @@ class PromiseTest extends MockRuntimeTest {
     // Callback returning promise with value is chained on success path when the
     // promise is resolved.
     void testCallbackReturningResolvedPromiseSuccess() {
-        PromiseResolver f = new PromiseResolver(new MessageDispatcher());
-        PromiseResolver o = new PromiseResolver(new MessageDispatcher());
+        PromiseResolver f = new PromiseResolver(self.dispatcher);
+        PromiseResolver o = new PromiseResolver(self.dispatcher);
         o.resolve(456);
         Promise p = f.promise;
         StoreValue success = new StoreValue();
@@ -310,8 +322,8 @@ class PromiseTest extends MockRuntimeTest {
     // Callback returning value-less promise is chained on error path when the
     // promise is rejected.
     void testCallbackReturningUnresolvedPromiseError() {
-        PromiseResolver f = new PromiseResolver(new MessageDispatcher());
-        PromiseResolver o = new PromiseResolver(new MessageDispatcher());
+        PromiseResolver f = new PromiseResolver(self.dispatcher);
+        PromiseResolver o = new PromiseResolver(self.dispatcher);
         Promise p = f.promise;
         StoreValue failure = new StoreValue();
         p.andThen(new ReturnValue(o.promise)).andCatch(Class.ERROR, failure);
@@ -327,8 +339,8 @@ class PromiseTest extends MockRuntimeTest {
     // Callback returning promise with value is chained on error path when the
     // promise is rejected.
     void testCallbackReturningResolvedPromiseError() {
-        PromiseResolver f = new PromiseResolver(new MessageDispatcher());
-        PromiseResolver o = new PromiseResolver(new MessageDispatcher());
+        PromiseResolver f = new PromiseResolver(self.dispatcher);
+        PromiseResolver o = new PromiseResolver(self.dispatcher);
         o.reject(theError);
         Promise p = f.promise;
         StoreValue failure = new StoreValue();
@@ -341,7 +353,7 @@ class PromiseTest extends MockRuntimeTest {
 
     // Resolving a Promise calls the success callback when both are given
     void testResolveEitherSuccess() {
-        PromiseResolver f = new PromiseResolver(new MessageDispatcher());
+        PromiseResolver f = new PromiseResolver(self.dispatcher);
         Promise p = f.promise;
         StoreValue success = new StoreValue();
         StoreValue failure = new StoreValue();
@@ -355,7 +367,7 @@ class PromiseTest extends MockRuntimeTest {
 
     // Rejecting a Promise calls the error callback when both are given
     void testResolveEitherError() {
-        PromiseResolver f = new PromiseResolver(new MessageDispatcher());
+        PromiseResolver f = new PromiseResolver(self.dispatcher);
         Promise p = f.promise;
         StoreValue success = new StoreValue();
         StoreValue failure = new StoreValue();
@@ -377,7 +389,7 @@ class PromiseTest extends MockRuntimeTest {
         if (!isJavascript()) {
             return;
         }
-        PromiseResolver f = new PromiseResolver(new MessageDispatcher());
+        PromiseResolver f = new PromiseResolver(self.dispatcher);
         Promise p = f.promise;
         StoreValue success = new StoreValue();
         p.andThen(bind(self, "_jsUndefined", [])).andThen(success);
