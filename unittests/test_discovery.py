@@ -127,6 +127,7 @@ class DiscoveryTests(TestCase):
 
         node = create_node("somewhere")
         disco.onMessage(None, NodeActive(node))
+        disco.runtime.dispatcher.pump()
         self.assertNodesEqual(result[0], node)
 
     def test_expired(self):
@@ -188,6 +189,7 @@ class DiscoveryTests(TestCase):
         disco.onMessage(None, ReplaceCluster("myservice",
                                              SANDBOX_ENV,
                                              [node]))
+        disco.runtime.dispatcher.pump()
         self.assertNodesEqual(result[0], node)
 
     def test_activeDoesNotMutate(self):
