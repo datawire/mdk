@@ -73,6 +73,7 @@ class MDKConnector(object):
     def pump(self):
         """Deliver scheduled events."""
         self.runtime.getTimeService().pump()
+        self.runtime.dispatcher.pump()
 
     def advance_time(self, seconds):
         """Advance the clock."""
