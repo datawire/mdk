@@ -613,6 +613,7 @@ class StaticDiscoverySourceTests(TestCase):
                  create_node("b", "service2")]
         static = StaticRoutes(nodes).create(self.disco, self.runtime)
         self.runtime.dispatcher.startActor(static)
+        self.runtime.dispatcher.pump()
 
         self.assertEqual(knownNodes(self.disco, "service1", "sandbox"), [nodes[0]])
         self.assertEqual(knownNodes(self.disco, "service2", "sandbox"), [nodes[1]])
@@ -632,6 +633,7 @@ class StaticDiscoverySourceTests(TestCase):
         )).create(self.disco, self.runtime)
 
         self.runtime.dispatcher.startActor(static)
+        self.runtime.dispatcher.pump()
 
         [node1] = knownNodes(self.disco, "service1", "myenv")
         self.assertEqual((node1.address, node1.version), ("a", "1.0"))
@@ -672,6 +674,7 @@ class DiscoveryProtocolTests(TestCase):
 
     def startDisco(self):
         self.connector.mdk.start()
+        self.pump()
         self.pump()
         ws_actor = self.connector.expectSocket()
         self.connector.connect(ws_actor)
@@ -863,9 +866,11 @@ class DiscoveryProtocolTests(TestCase):
             active.node.version = "1.2.3"
             sev.send(active.encode())
             idx = idx + 1
+        self.connector.pump()
 
         for idx in range(count*10):
             node = disco.resolve("svc", "1.0", SANDBOX_ENV).value().getValue()
+            assert node is not None
             self.assertEqual("addr" + str(idx % count), node.address)
 
     def testReconnect(self):
@@ -879,6 +884,7 @@ class DiscoveryProtocolTests(TestCase):
         ws_actor = self.startDisco()
         node = create_node("myaddress")
         disco.register(node)
+        self.connector.pump()
         active = self.expectActive(ws_actor)
         self.assertFalse(active == None)
         self.assertEqualNodes(node, active.node)
