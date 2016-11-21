@@ -304,6 +304,7 @@ namespace mdk_protocol {
         static String _json_type = "open";
 
         String version = "2.0.0";
+        String mdkVersion = "";
         Map<String,String> properties = {};
         String nodeId;
         OperationalEnvironment environment = new OperationalEnvironment();
@@ -437,6 +438,10 @@ namespace mdk_protocol {
         void onWSConnected(Actor websocket) {
             // Send Open message to the server:
             Open open = new Open();
+            // The following line is automatically modified by bumpconfig as part of
+            // the release process. Changing it in any way might break that! So fix
+            // '.bumpversion.cfg' if you change this line in any way:
+            open.mdkVersion = "2.0.35"; // AUTOMATICALLY MODIFIED
             open.nodeId = self._node_id;
             open.environment = _environment;
             self._dispatcher.tell(self, open.encode(), websocket);

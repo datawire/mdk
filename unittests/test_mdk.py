@@ -8,6 +8,7 @@ from past.builtins import unicode
 from unittest import TestCase
 from tempfile import mkdtemp
 from collections import Counter
+import configparser
 
 import hypothesis.strategies as st
 from hypothesis import given, assume
@@ -428,6 +429,7 @@ def assertEnvironmentEquals(test, environment, name, fallback):
 
 class ConnectionStartupShutdownTests(TestCase):
     """Tests for initial setup and shutdown of MCP connections."""
+
     def test_connection_node_identity(self):
         """
         Each connection to MCP sends an Open message with the same node identity.
@@ -441,7 +443,7 @@ class ConnectionStartupShutdownTests(TestCase):
         # Should be new connection:
         self.assertNotEqual(ws_actor, ws_actor2)
         open2 = connector.connect(ws_actor2)
-        self.assertEqual(open.nodeId,open2.nodeId)
+        self.assertEqual(open.nodeId, open2.nodeId)
         self.assertEqual(open.nodeId, connector.mdk.procUUID)
 
     def test_random_node_identity(self):
@@ -477,6 +479,18 @@ class ConnectionStartupShutdownTests(TestCase):
         ws_actor = connector.expectSocket()
         open = connector.connect(ws_actor)
         assertEnvironmentEquals(self, open.environment, "sandbox", None)
+
+    def test_mdk_version(self):
+        """
+        The Open message reports the MDK version.
+        """
+        connector = MDKConnector()
+        ws_actor = connector.expectSocket()
+        open = connector.connect(ws_actor)
+        parser = configparser.ConfigParser()
+        parser.read([".bumpversion.cfg"])
+        expected_version = parser.get("bumpversion", "current_version")
+        self.assertEqual(open.mdkVersion, expected_version)
 
     def test_close_no_error(self):
         """
