@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_util 2.0.35;
+package datawire_mdk_util 2.0.36;
 
 use js bluebird 3.4.1;
 include mdk_promises.js;
