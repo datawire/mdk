@@ -1,4 +1,5 @@
 var datawire_mdk = require('datawire_mdk');
+var mdk_request = require("datawire_mdk_request");
 var cls = require("datawire_mdk/cls.js");
 var process = require('process');
 
@@ -44,3 +45,6 @@ exports.mdkErrorHandler = function (err, req, res, next) {
 
 // Get the current session:
 exports.getMdkSession = cls.getMDKSession;
+
+// request.js wrapper that knows about cls-based MDK session:
+//exports.request = mdk_request.requestFactory(cls.getMDKSession);

@@ -41,12 +41,13 @@ function wrapRequestMethod (method, optionsFactory, requester, verb) {
     };
 }
 
-// Create a wrapper for Request that injects the MDK session header and sets an
-// appropriate timeout.
-exports.forMDKSession = function (mdkSession, requester) {
+// Create a Request.js-wrapper given a function that returns the current MDK
+// session.
+exports.requestFactory = function (getMdkSession, requester) {
     var self = request;
 
     function optionsFactory() {
+        var mdkSession = getMdkSession();
         var options = {headers: {"X-MDK-CONTEXT": mdkSession.externalize()}};
         var timeout = mdkSession.getRemainingTime() * 1000;
         if (timeout !== null) {
@@ -66,4 +67,10 @@ exports.forMDKSession = function (mdkSession, requester) {
     defaults.jar      = self.jar;
     defaults.defaults = self.defaults;
     return defaults;
+};
+
+// Create a wrapper for Request that injects the MDK session header and sets an
+// appropriate timeout.
+exports.forMDKSession = function (mdkSession, requester) {
+    return exports.requestFactory(function() { return mdkSession; }, requester);
 };
