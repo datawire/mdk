@@ -47,4 +47,4 @@ exports.mdkErrorHandler = function (err, req, res, next) {
 exports.getMdkSession = cls.getMDKSession;
 
 // request.js wrapper that knows about cls-based MDK session:
-//exports.request = mdk_request.requestFactory(cls.getMDKSession);
+exports.request = mdk_request.requestFactory(cls.getMDKSession);
