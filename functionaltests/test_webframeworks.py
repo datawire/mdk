@@ -179,7 +179,7 @@ def test_interaction(webserver, port_number):
     assert result2 == {"address1": [1, 1]}
 
     result3 = requests.get(url, timeout=5).json()
-    # One success from first query, onse failure from second query, one success
+    # One success from first query, one failure from second query, one success
     # from third query:
     assert result3 == {"address1": [2, 1]}
 
