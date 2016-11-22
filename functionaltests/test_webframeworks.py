@@ -10,16 +10,22 @@ We want to verify:
 To test a web framework you must create a server using that has the following
 setup:
 
-1. An endpoint /context that returns the result of externalize() on the current
+1. An endpoint '/context' that returns the result of externalize() on the current
    session. This verifies X-MDK-CONTEXT handling.
 2. RecordingFailurePolicy used as the FailurePolicy.
-3. An endpoint /resolve[?error=1]. Service "service1" should be resolved, and if
+3. An endpoint '/resolve[?error=1]'. Service "service1" should be resolved, and if
    error query flag is set an error should abort handling (e.g. raise an
    exception). Otherwise the result returned as a JSON object mapping resulting
    address to a list with first value being number of successes, second value
    being number of failures recorded.
 4. A default timeout of 10 seconds.
-5. An endpoint /timeout that returns the MDK session seconds to timeout as JSON.
+5. An endpoint '/timeout' that returns the MDK session seconds to timeout as JSON.
+
+Optional:
+
+6. An endpoint '/http-client' that uses a HTTP client to send a request to
+   /contect and returns its result. This is useful for testing HTTP client
+   integration when available.
 """
 
 import pathlib
@@ -95,20 +101,28 @@ def webserver(request, port_number):
             sleep(1.0)
         else:
             break
-    yield
+    yield command
     p.terminate()
     p.wait()
+
 
 def get_url(port, path):
     """Return the URL for a request."""
     return "http://localhost:%d%s" % (port, path)
+
+
+def create_context():
+    """Create a new MDK context."""
+    return run_python(sys.executable, "create-context.py", output=True,
+                      additional_env={"MDK_DISCOVERY_SOURCE": "static:nodes={}"})
+
 
 def test_session_with_context(webserver, port_number):
     """
     If a X-MDK-CONTEXT header is sent to the webserver it reads it and uses the
     encoded session.
     """
-    context = run_python(sys.executable, "create-context.py", output=True)
+    context = create_context()
     returned_context = requests.get(get_url(port_number, "/context"),
                                     headers={"X-MDK-CONTEXT": context},
                                     timeout=5).json()
@@ -120,10 +134,23 @@ def test_session_without_context(webserver, port_number):
     If no X-MDK-CONTEXT header is sent to the webserver it creates a new
     session.
     """
-    context = run_python(sys.executable, "create-context.py", output=True)
+    context = create_context()
     returned_context = requests.get(get_url(port_number, "/context"), timeout=5).json()
     assert loads(context.decode("utf-8"))["traceId"] != returned_context["traceId"]
 
+
+def test_http_client_integration(webserver, port_number):
+    """
+    The web framework integrates a client that transfers the MDK session context
+    automatically.
+    """
+    if "express" not in "".join(webserver):
+        pytest.skip("Only Express.js has HTTP client integration at the moment.")
+    context = create_context()
+    returned_context = requests.get(get_url(port_number, "/http-client"),
+                                    headers={"X-MDK-CONTEXT": context},
+                                    timeout=5).json()
+    assert loads(context.decode("utf-8"))["traceId"] == returned_context["traceId"]
 
 def test_interaction(webserver, port_number):
     """
@@ -168,7 +195,7 @@ def test_timeout(webserver, port_number):
     assert abs(10 - default) < 2
 
     # Create a context with deadline of 5 seconds:
-    context = run_python(sys.executable, "create-context.py", output=True)
+    context = create_context()
     overriden = requests.get(url, headers={"X-MDK-CONTEXT": context},
                              timeout=5).json()
     assert abs(5 - overriden) < 2
