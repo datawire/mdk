@@ -450,18 +450,12 @@ class ConnectionStartupShutdownTests(TestCase):
         """
         Node identity is randomly generated each time.
         """
-        # XXX FIXME Short-circuit the test. Otherwise
-        #   open2 = connector.connect(ws_actor2)
-        # kills the test framework via
-        #   runtime.fail("no remaining message found").
-        # Obviously, need to investigate this further.
-        assert False
         connector = MDKConnector()
         ws_actor = connector.expectSocket()
         open = connector.connect(ws_actor)
         connector2 = MDKConnector()
         ws_actor2 = connector2.expectSocket()
-        open2 = connector.connect(ws_actor2)
+        open2 = connector2.connect(ws_actor2)
         self.assertNotEqual(open.nodeId, open2.nodeId)
 
     def test_environment(self):
@@ -559,9 +553,14 @@ class InteractionReportingTests(TestCase):
         session.start_interaction()
         start_time = time_service.time()
         connector.advance_time(123)
-        session.resolve("service1", "1.0")
+        # Can't use blocking resolve() with fake scheduling because it'll block
+        # until timeout waiting for async events to be delivered. So use async
+        # version:
+        session._resolve("service1", "1.0")
+        connector.pump()
         session.fail_interaction("fail")
-        session.resolve("service2", "1.0")
+        session._resolve("service2", "1.0")
+        connector.pump()
         connector.advance_time(5)
         connector.pump()
         end_time = time_service.time()
