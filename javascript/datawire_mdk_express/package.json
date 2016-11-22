@@ -1,9 +1,13 @@
 {
     "name": "datawire_mdk_express",
-    "version": "2.0.35",
+    "version": "2.0.36",
     "main": "datawire_mdk_express.js",
     "license": "Apache-2.0",
     "url": "https://www.datawire.io",
+    "dependencies": {
+        "datawire_mdk": ">=2.0.36",
+        "datawire_mdk_request": ">=2.0.36"
+    },
     "peerDependencies": {
         "express": "4.x"
     },

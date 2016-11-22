@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk 2.0.35;
+package datawire_mdk 2.0.36;
 
 // Quark includes:
 include mdk_runtime.q;
@@ -615,7 +615,7 @@ namespace mdk {
             // Start a dummy interaction so that we don't blow up if someone
             // does something that requires an interaction to be
             // started. Well-written code shouldn't rely on this.
-            self.start_interaction();
+            self._start_interaction();
         }
 
         OperationalEnvironment getEnvironment() {
@@ -788,6 +788,12 @@ namespace mdk {
         }
 
         void start_interaction() {
+            InteractionEvent interactionReport = _start_interaction();
+            LoggedMessageId lmid = info("MDK", "Starting interaction.");
+            interactionReport.startClock = lmid.causalLevel;
+        }
+
+        InteractionEvent _start_interaction() {
             InteractionEvent interactionReport = new InteractionEvent();
             interactionReport.node = _mdk.procUUID;
             interactionReport.startTimestamp =
@@ -796,6 +802,7 @@ namespace mdk {
             interactionReport.environment = _context.environment;
             _interactionReports.add(interactionReport);
             _resolved.add([]);
+            return interactionReport;
         }
 
         String inject() {
@@ -841,6 +848,8 @@ namespace mdk {
                 .remove(_interactionReports.size() - 1);
             report.endTimestamp =
                 (1000.0 * _mdk._runtime.getTimeService().time()).round();
+            LoggedMessageId lmid = info("MDK", "Finished interaction.");
+            report.endClock = lmid.causalLevel;
             int idx = 0;
             while (idx < nodes.size()) {
                 Node node = nodes[idx];

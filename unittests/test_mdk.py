@@ -8,6 +8,7 @@ from past.builtins import unicode
 from unittest import TestCase
 from tempfile import mkdtemp
 from collections import Counter
+import configparser
 
 import hypothesis.strategies as st
 from hypothesis import given, assume
@@ -428,6 +429,7 @@ def assertEnvironmentEquals(test, environment, name, fallback):
 
 class ConnectionStartupShutdownTests(TestCase):
     """Tests for initial setup and shutdown of MCP connections."""
+
     def test_connection_node_identity(self):
         """
         Each connection to MCP sends an Open message with the same node identity.
@@ -441,7 +443,7 @@ class ConnectionStartupShutdownTests(TestCase):
         # Should be new connection:
         self.assertNotEqual(ws_actor, ws_actor2)
         open2 = connector.connect(ws_actor2)
-        self.assertEqual(open.nodeId,open2.nodeId)
+        self.assertEqual(open.nodeId, open2.nodeId)
         self.assertEqual(open.nodeId, connector.mdk.procUUID)
 
     def test_random_node_identity(self):
@@ -483,6 +485,18 @@ class ConnectionStartupShutdownTests(TestCase):
         ws_actor = connector.expectSocket()
         open = connector.connect(ws_actor)
         assertEnvironmentEquals(self, open.environment, "sandbox", None)
+
+    def test_mdk_version(self):
+        """
+        The Open message reports the MDK version.
+        """
+        connector = MDKConnector()
+        ws_actor = connector.expectSocket()
+        open = connector.connect(ws_actor)
+        parser = configparser.ConfigParser()
+        parser.read([".bumpversion.cfg"])
+        expected_version = parser.get("bumpversion", "current_version")
+        self.assertEqual(open.mdkVersion, expected_version)
 
     def test_close_no_error(self):
         """
@@ -564,6 +578,32 @@ class InteractionReportingTests(TestCase):
         self.assertEqual(interaction.startTimestamp, int(1000*start_time))
         self.assertEqual(interaction.endTimestamp, int(1000*end_time))
         self.assertEqual(interaction.environment.name, "myenv")
+
+    def test_interactionClocks(self):
+        """
+        The interaction event records the clock level at start and end.
+        """
+        connector = MDKConnector()
+        ws_actor = connector.expectSocket()
+        connector.connect(ws_actor)
+        session = connector.mdk.session()
+
+        # Figure out previous level of clock for start
+        [start_level] = session.info("doop", "didoop").causalLevel
+        session.start_interaction()
+        session.info("doop", "didup")
+        # Figure out previous level of clock for end
+        [end_level] = session.info("doop", "didoop").causalLevel
+        session.finish_interaction()
+        # Ensure message is sent:
+        connector.advance_time(5)
+
+        ws_actor.swallowLogMessages()
+        interaction = connector.expectInteraction(self, ws_actor, session,
+                                                  [], [])
+
+        self.assertEqual((interaction.startClock, interaction.endClock),
+                         ([start_level + 1], [end_level + 1]))
 
 
 class LoggingTests(TestCase):

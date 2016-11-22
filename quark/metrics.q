@@ -2,7 +2,7 @@ quark 1.0;
 
 /* Metric reporting sub-protocol. */
 
-package datawire_mdk_tracing 2.0.35;
+package datawire_mdk_tracing 2.0.36;
 
 include protocol-1.0.q;
 include discovery-3.0.q;
@@ -39,6 +39,12 @@ namespace mdk_metrics {
 
         @doc("Map destination node UUID to success=1/failure=0 of interaction.")
         Map<String,int> results = {};
+
+        @doc("Causal clock level at start.")
+        List<int> startClock = [];
+
+        @doc("Causal clock level at end.")
+        List<int> endClock = [];
 
         @doc("Add the result of communicating with a specific node.")
         void addNode(Node destination, bool success) {
