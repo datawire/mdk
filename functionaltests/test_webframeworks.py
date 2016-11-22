@@ -175,7 +175,7 @@ def test_interaction(webserver, port_number):
     assert requests.get(url + "?error=1").status_code in (500, 503)
 
     result2 = requests.get(url, timeout=5).json()
-    # One success from first query, onse failure from second query:
+    # One success from first query, one failure from second query:
     assert result2 == {"address1": [1, 1]}
 
     result3 = requests.get(url, timeout=5).json()
