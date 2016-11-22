@@ -130,7 +130,6 @@ namespace actors {
         Lock _lock = new Lock(); // Will become unnecessary once we abandon Quark runtime
 
         MessageDispatcher(_CallLater callLater) {
-            logging.makeConfig().setLevel("DEBUG").configure();
             self.callLater = callLater;
         }
 
