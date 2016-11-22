@@ -15,6 +15,7 @@ from hypothesis import given, assume
 
 from mdk import MDKImpl
 from mdk_runtime import fakeRuntime
+from mdk_runtime.actors import _QuarkRuntimeLaterCaller
 from mdk_discovery import (
     ReplaceCluster, NodeActive, RecordingFailurePolicyFactory,
 )
@@ -80,7 +81,10 @@ class InteractionTestCase(TestCase):
 
     def init(self):
         """Initialize an empty environment."""
-        self.connector = MDKConnector(RecordingFailurePolicyFactory(), real_msg=True)
+        self.connector = MDKConnector(RecordingFailurePolicyFactory())
+        # Because we want to use blocking resolve() we need async message delivery:
+        self.connector.runtime.dispatcher.pump()
+        self.connector.runtime.dispatcher.callLater = _QuarkRuntimeLaterCaller()
         self.runtime = self.connector.runtime
         self.mdk = self.connector.mdk
         self.disco = self.mdk._disco
