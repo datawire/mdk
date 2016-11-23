@@ -216,11 +216,6 @@ namespace mdk_runtime {
             }
             Schedule sched = ?msg;
             float seconds = sched.seconds;
-            if (seconds == 0.0) {
-                // Reduce chances of reentrant scheduled event; shouldn't be
-                // necessary in non-threaded versions.
-                seconds = 0.1;
-            }
             Context.runtime().schedule(new _ScheduleTask(self, origin, sched.event), seconds);
         }
 
