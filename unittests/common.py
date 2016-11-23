@@ -72,14 +72,20 @@ class MDKConnector(object):
 
     def pump(self):
         """Deliver scheduled events."""
-        self.runtime.getTimeService().pump()
+        # Keep pumping the clock and message delivery until no new
+        # messages are available.
+        while True:
+            self.runtime.getTimeService().pump()
+            if self.runtime.dispatcher._queued:
+                self.runtime.dispatcher.pump()
+            else:
+                break
 
     def advance_time(self, seconds):
         """Advance the clock."""
         ts = self.runtime.getTimeService()
         ts.advance(seconds)
-        ts.pump()
-        ts.pump()
+        self.pump()
 
     def expectSocket(self):
         """Return the FakeWSActor we expect to have connected to a URL."""

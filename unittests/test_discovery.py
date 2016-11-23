@@ -127,6 +127,7 @@ class DiscoveryTests(TestCase):
 
         node = create_node("somewhere")
         disco.onMessage(None, NodeActive(node))
+        disco.runtime.dispatcher.pump()
         self.assertNodesEqual(result[0], node)
 
     def test_expired(self):
@@ -188,6 +189,7 @@ class DiscoveryTests(TestCase):
         disco.onMessage(None, ReplaceCluster("myservice",
                                              SANDBOX_ENV,
                                              [node]))
+        disco.runtime.dispatcher.pump()
         self.assertNodesEqual(result[0], node)
 
     def test_activeDoesNotMutate(self):
@@ -613,6 +615,7 @@ class StaticDiscoverySourceTests(TestCase):
                  create_node("b", "service2")]
         static = StaticRoutes(nodes).create(self.disco, self.runtime)
         self.runtime.dispatcher.startActor(static)
+        self.runtime.dispatcher.pump()
 
         self.assertEqual(knownNodes(self.disco, "service1", "sandbox"), [nodes[0]])
         self.assertEqual(knownNodes(self.disco, "service2", "sandbox"), [nodes[1]])
@@ -632,6 +635,7 @@ class StaticDiscoverySourceTests(TestCase):
         )).create(self.disco, self.runtime)
 
         self.runtime.dispatcher.startActor(static)
+        self.runtime.dispatcher.pump()
 
         [node1] = knownNodes(self.disco, "service1", "myenv")
         self.assertEqual((node1.address, node1.version), ("a", "1.0"))
@@ -658,6 +662,7 @@ class DiscoveryProtocolTests(TestCase):
         return self.connector.connect(ws_actor)
 
     def expectActive(self, ws_actor):
+        self.pump()
         return self.connector.expectSerializable(
             ws_actor, "mdk_discovery.protocol.Active")
 
@@ -727,6 +732,7 @@ class DiscoveryProtocolTests(TestCase):
         active.node.address = addr
         active.node.version = version
         sev.send(active.encode())
+        self.pump()
         return active.node
 
     def testResolvePreStart(self):
@@ -863,9 +869,11 @@ class DiscoveryProtocolTests(TestCase):
             active.node.version = "1.2.3"
             sev.send(active.encode())
             idx = idx + 1
+        self.connector.pump()
 
         for idx in range(count*10):
             node = disco.resolve("svc", "1.0", SANDBOX_ENV).value().getValue()
+            assert node is not None
             self.assertEqual("addr" + str(idx % count), node.address)
 
     def testReconnect(self):
@@ -879,6 +887,7 @@ class DiscoveryProtocolTests(TestCase):
         ws_actor = self.startDisco()
         node = create_node("myaddress")
         disco.register(node)
+        self.connector.pump()
         active = self.expectActive(ws_actor)
         self.assertFalse(active == None)
         self.assertEqualNodes(node, active.node)
@@ -889,6 +898,7 @@ class DiscoveryProtocolTests(TestCase):
 
         # It should reconnect:
         self.connector.advance_time(1)
+        self.connector.pump()
         ws_actor2 = self.connector.expectSocket()
         self.connector.connect(ws_actor2)
         # And it should resent registration message:

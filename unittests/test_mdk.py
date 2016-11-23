@@ -15,6 +15,7 @@ from hypothesis import given, assume
 
 from mdk import MDKImpl
 from mdk_runtime import fakeRuntime
+from mdk_runtime.actors import _QuarkRuntimeLaterCaller
 from mdk_discovery import (
     ReplaceCluster, NodeActive, RecordingFailurePolicyFactory,
 )
@@ -81,6 +82,9 @@ class InteractionTestCase(TestCase):
     def init(self):
         """Initialize an empty environment."""
         self.connector = MDKConnector(RecordingFailurePolicyFactory())
+        # Because we want to use blocking resolve() we need async message delivery:
+        self.connector.runtime.dispatcher.pump()
+        self.connector.runtime.dispatcher.callLater = _QuarkRuntimeLaterCaller()
         self.runtime = self.connector.runtime
         self.mdk = self.connector.mdk
         self.disco = self.mdk._disco
@@ -455,7 +459,7 @@ class ConnectionStartupShutdownTests(TestCase):
         open = connector.connect(ws_actor)
         connector2 = MDKConnector()
         ws_actor2 = connector2.expectSocket()
-        open2 = connector.connect(ws_actor2)
+        open2 = connector2.connect(ws_actor2)
         self.assertNotEqual(open.nodeId, open2.nodeId)
 
     def test_environment(self):
@@ -552,17 +556,22 @@ class InteractionReportingTests(TestCase):
         session = connector.mdk.session()
         session.start_interaction()
         start_time = time_service.time()
-        time_service.advance(123)
-        session.resolve("service1", "1.0")
+        connector.advance_time(123)
+        # Can't use blocking resolve() with fake scheduling because it'll block
+        # until timeout waiting for async events to be delivered. So use async
+        # version:
+        session._resolve("service1", "1.0")
+        connector.pump()
         session.fail_interaction("fail")
-        session.resolve("service2", "1.0")
-        time_service.advance(5)
-        time_service.pump()
+        session._resolve("service2", "1.0")
+        connector.pump()
+        connector.advance_time(5)
+        connector.pump()
         end_time = time_service.time()
         session.finish_interaction()
-        time_service.pump()
-        time_service.advance(5)
-        time_service.pump()
+        connector.pump()
+        connector.advance_time(5)
+        connector.pump()
 
         # Skip log messages:
         ws_actor.swallowLogMessages()
@@ -675,4 +684,3 @@ class LoggingTests(TestCase):
         lmid = session.info("cat", "another message")
         self.assertEqual((lmid.traceId, lmid.causalLevel),
                          (session._context.traceId, [2]))
-

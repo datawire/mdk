@@ -7,7 +7,7 @@ from builtins import object
 
 from unittest import TestCase
 
-from mdk_runtime.actors import MessageDispatcher
+from mdk_runtime.actors import MessageDispatcher, _ManualLaterCaller as CallLater
 from mdk_runtime.promise import PromiseResolver
 
 
@@ -132,13 +132,16 @@ class MessageDispatcherTests(TestCase):
     """
     Tests for MessageDispatcher.
     """
+    def setup_method(self, method):
+        self.dispatcher = MessageDispatcher(CallLater())
+
     def test_no_start_reentrancy(self):
         """
         MessageDispatcher does not allow re-entrancy of actor starts.
         """
-        dispatcher = MessageDispatcher()
         actor = StartingActor()
-        dispatcher.startActor(actor)
+        self.dispatcher.startActor(actor)
+        self.dispatcher.pump()
         self.assertEqual(actor.record,
                          ["start started",
                           "start finished",
@@ -148,9 +151,9 @@ class MessageDispatcherTests(TestCase):
         """
         MessageDispatcher does not allow re-entrancy of actor stop.
         """
-        dispatcher = MessageDispatcher()
         actor = StoppingActor()
-        dispatcher.startActor(actor)
+        self.dispatcher.startActor(actor)
+        self.dispatcher.pump()
         self.assertEqual(actor.record,
                          ["start started",
                           "start finished",
@@ -160,12 +163,14 @@ class MessageDispatcherTests(TestCase):
         """
         Calling tell() multiple times still delivers messages.
         """
-        dispatcher = MessageDispatcher()
         actor = StartingActor()
-        dispatcher.startActor(actor)
-        actor.record = []
-        dispatcher.tell(actor, "what's", actor)
-        dispatcher.tell(actor, "up", actor)
+        self.dispatcher.startActor(actor)
+        self.dispatcher.pump()
+
+        actor.record = []  # Clear startup stuff from the recording
+        self.dispatcher.tell(actor, "what's", actor)
+        self.dispatcher.tell(actor, "up", actor)
+        self.dispatcher.pump()
         self.assertEqual(actor.record, ["what's", "up"])
 
     def test_no_message_reentrancy(self):
@@ -177,10 +182,10 @@ class MessageDispatcherTests(TestCase):
         A = RecordingActor("A", record, None)
         B = RecordingActor("B", record, A)
         A.destination = B
-        dispatcher = MessageDispatcher()
-        dispatcher.startActor(A)
-        dispatcher.startActor(B)
-        dispatcher.tell(Origin, 123, A)
+        self.dispatcher.startActor(A)
+        self.dispatcher.startActor(B)
+        self.dispatcher.tell(Origin, 123, A)
+        self.dispatcher.pump()
         self.assertEqual(
             record, [
                 # A receives first message, sends on to B
@@ -199,11 +204,11 @@ class MessageDispatcherTests(TestCase):
         """
         MessageDispatcher does not allow re-entrancy of Promise callbacks.
         """
-        dispatcher = MessageDispatcher()
         actor = PromiseActor()
-        dispatcher.startActor(actor)
-        dispatcher.tell(actor, "hello", actor)
+        self.dispatcher.startActor(actor)
+        self.dispatcher.tell(actor, "hello", actor)
         # Promise callback should only happen *after* message delivery is done:
+        self.dispatcher.pump()
         self.assertEqual(actor.record, ["start", "end", "callback: hello"])
 
     def test_handle_delivery_errors(self):
@@ -211,9 +216,9 @@ class MessageDispatcherTests(TestCase):
         An exception from delivering a message does not prevent future message
         delivery; instead it is caught by the MessageDispatcher.
         """
-        dispatcher = MessageDispatcher()
         actor = BrokenActor()
-        dispatcher.startActor(actor)
-        dispatcher.tell(None, "hello", actor)
-        dispatcher.tell(None, "world", actor)
+        self.dispatcher.startActor(actor)
+        self.dispatcher.tell(None, "hello", actor)
+        self.dispatcher.tell(None, "world", actor)
+        self.dispatcher.pump()
         self.assertEqual(actor.record, ["hello", "world"])

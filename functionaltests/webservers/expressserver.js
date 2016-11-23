@@ -24,7 +24,7 @@ app.get('/resolve', function (req, res) {
             var result = {};
             result[node.address] = [policy.successes, policy.failures];
             if (isError) {
-                throw "Erroring as requested.";
+                throw new Error("Erroring as requested.");
             } else {
                 res.json(result);
             }

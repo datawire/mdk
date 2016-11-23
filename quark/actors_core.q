@@ -78,6 +78,43 @@ namespace actors {
         }
     }
 
+
+    interface _CallLater {
+        void schedule(Task t);
+        void runAll();
+    }
+
+    class _QuarkRuntimeLaterCaller extends _CallLater {
+        void schedule(Task t) {
+            Context.runtime().schedule(t, 0.0);
+        }
+
+        void runAll() { }
+    }
+
+    class _ManualLaterCaller extends _CallLater {
+        List<Task> tasks = [];
+
+        void schedule(Task t) {
+            tasks.add(t);
+        }
+
+        void doNext() {
+            Task t = tasks.remove(0);
+            t.onExecute(null);
+        }
+
+        bool hasNext() {
+            return tasks.size() > 0;
+        }
+
+        void runAll() {
+            while (hasNext()) {
+                doNext();
+            }
+        }
+    }
+
     @doc("""
     Manage a group of related Actors.
 
@@ -85,11 +122,16 @@ namespace actors {
 
     Reduce accidental re-entrancy by making sure messages are run asynchronously.
     """)
-    class MessageDispatcher {
+    class MessageDispatcher extends Task {
+        _CallLater callLater = null;
         Logger logger = new Logger("actors");
         List<_QueuedMessage> _queued = [];
         bool _delivering = false;
         Lock _lock = new Lock(); // Will become unnecessary once we abandon Quark runtime
+
+        MessageDispatcher(_CallLater callLater) {
+            self.callLater = callLater;
+        }
 
         @doc("Queue a message from origin to destination, and trigger delivery if necessary.")
         void tell(Actor origin, Object message, Actor destination) {
@@ -117,13 +159,31 @@ namespace actors {
             logger.debug("Queued " + inFlight.toString());
             self._lock.acquire();
             self._queued.add(inFlight);
-            if (self._delivering) {
-                // Someone higher in call stack is doing delivery, they'll deal
-                // with it.
-                self._lock.release();
-                return;
+            if (!self._delivering) {
+                self._delivering = true;
+                callLater.schedule(self);
             }
-            self._delivering = true;
+            self._lock.release();
+        }
+
+        @doc("Are there any messages waiting to be delivered?")
+        bool queued() {
+            self._lock.acquire();
+            bool result = self._delivering;
+            self._lock.release();
+            return result;
+        }
+
+        @doc("Causes message delivery to occur when using manual CallLater")
+        void pump() {
+            while (self.queued()) {
+                self.callLater.runAll();
+            }
+        }
+
+        void onExecute(Runtime runtime) {
+            self._lock.acquire();
+
             // Delivering messages may cause additional ones to be queued:
             while (self._queued.size() > 0) {
                 List<_QueuedMessage> toDeliver = self._queued;
@@ -134,7 +194,10 @@ namespace actors {
                 while (idx < toDeliver.size()) {
                     logger.debug("Delivering " + toDeliver[idx].toString());
                     UnaryCallable deliver = bind(self, "_callQueuedMessage", [toDeliver[idx]]);
-                    Context.runtime().callSafely(deliver, false);
+                    bool success = ?Context.runtime().callSafely(deliver, false);
+                    if (!success) {
+                        logger.warn("FAILURE when delivering " + toDeliver[idx].toString());
+                    }
                     idx = idx + 1;
                 }
                 self._lock.acquire();

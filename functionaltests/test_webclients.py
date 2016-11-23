@@ -9,7 +9,7 @@ Web clients should:
 3. Exit with exit code 123 if the request times out.
 """
 
-import sys
+import os
 import pathlib
 from subprocess import check_call, CalledProcessError
 
@@ -43,7 +43,8 @@ class ServerResource(Resource):
         self.received.append(
             request.requestHeaders.getRawHeaders(b"X-MDK-CONTEXT")[0])
         def done():
-            request.write("")
+            request.setHeader('content-length', '3')
+            request.write(b'abc')
             request.finish()
         reactor.callLater(delay, done)
         return NOT_DONE_YET
@@ -77,8 +78,10 @@ def webserver():
     ["node", str(WEBCLIENTS_ROOT / "request.js")],
 ])
 def webclient(request):
+    env = os.environ.copy()
+    env.update({"MDK_DISCOVERY_SOURCE": "static:nodes={}"})
     def client(url):
-        return check_call(request.param + [url])
+        return check_call(request.param + [url], env=env)
     return client
 
 
@@ -93,7 +96,6 @@ def test_timeout(webserver, webclient):
         assert e.returncode == TIMEOUT_CODE
     else:
         assert False # didn't get timeout error
-
 
 def test_context_header(webserver, webclient):
     """The client sends a X-MDK-CONTEXT header to the server."""

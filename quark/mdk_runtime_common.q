@@ -46,7 +46,7 @@ namespace mdk_runtime {
     """)
     class MDKRuntime {
         Dependencies dependencies = new Dependencies();
-        MessageDispatcher dispatcher = new MessageDispatcher();
+        MessageDispatcher dispatcher = null;
 
         @doc("Return Time service.")
         Time getTimeService() {

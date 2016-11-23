@@ -1,5 +1,5 @@
 Gem::Specification.new do |s|
-  s.add_dependency 'faraday', ['>= 0.8', '<0.10']
+  s.add_dependency 'faraday', ['>= 0.8', '<0.11']
   s.name        = 'faraday_mdk'
   s.version     = '2.0.36'
   s.summary     = "Datawire MDK integration for the Faraday HTTP client."

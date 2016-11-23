@@ -82,19 +82,24 @@ namespace mdk_runtime {
         void onMessage(Actor origin, Object message) {
             logPrologue("ws onMessage (actor message)");
             logTS("   message is from " + origin.toString());
-            if (message.getClass().id == "quark.String"
+            String messageId = message.getClass().id;
+            if  (messageId == "quark.String"
                 && self.state == "CONNECTED") {
                 logTS("   send-ish, message is: " + message.toString());
                 log_to_file("sending: " + ?message);
                 self.socket.send(?message);
                 return;
             }
-            if (message.getClass().id == "mdk_runtime.WSClose"
+            if (messageId == "mdk_runtime.WSClose"
                 && self.state == "CONNECTED") {
                 logTS("   close-ish, switching to DISCONNECTING state");
                 self.state = "DISCONNECTING";
                 self.socket.close();
                 return;
+            }
+            if (messageId == "mdk_runtime.WSClose"
+                && self.state == "CONNECTING") {
+                self.state = "DISCONNECTING";
             }
             logger.warn("ws onMessage got unhandled message: " +
                         message.getClass().id + " in state " + self.state);
@@ -103,8 +108,10 @@ namespace mdk_runtime {
         // WSHandler
         void onWSConnected(WebSocket socket) {
             logPrologue("onWSConnected");
-            if (self.state == "ERROR") {
-                logTS("Connection event after error event!");
+            if (self.state != "CONNECTING") {
+                logTS("Connection event when transitioned out of CONNECTING." +
+                      "Current state: " + self.state);
+                socket.close();
                 return;
             }
             self.state = "CONNECTED";
@@ -216,11 +223,6 @@ namespace mdk_runtime {
             }
             Schedule sched = ?msg;
             float seconds = sched.seconds;
-            if (seconds == 0.0) {
-                // Reduce chances of reentrant scheduled event; shouldn't be
-                // necessary in non-threaded versions.
-                seconds = 0.1;
-            }
             Context.runtime().schedule(new _ScheduleTask(self, origin, sched.event), seconds);
         }
 
@@ -242,6 +244,7 @@ namespace mdk_runtime {
     MDKRuntime defaultRuntime() {
         //logging.makeConfig().setLevel("DEBUG").configure();
         MDKRuntime runtime = new MDKRuntime();
+        runtime.dispatcher = new MessageDispatcher(new _QuarkRuntimeLaterCaller());
         runtime.dependencies.registerService("envvar", new RealEnvVars());
         QuarkRuntimeTime timeService = new QuarkRuntimeTime();
         QuarkRuntimeWebSockets websockets = new QuarkRuntimeWebSockets();
