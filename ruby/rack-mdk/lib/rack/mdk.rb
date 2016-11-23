@@ -1,10 +1,12 @@
-require 'mdk'
-
 module Rack
   module MDK
 
     class Session
       def initialize(app, params={})
+        # Quark runtime has at_exit that stops it... and sinatra only runs via
+        # at_exit! So we want to make sure Quark runtime starts *after* sinatra
+        # has started. Which is why we only require 'mdk' here:
+        require 'mdk'
         @app = app
         @mdk = ::Quark::Mdk.start
         if params[:timeout] != nil
