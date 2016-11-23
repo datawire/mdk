@@ -43,7 +43,8 @@ class ServerResource(Resource):
         self.received.append(
             request.requestHeaders.getRawHeaders(b"X-MDK-CONTEXT")[0])
         def done():
-            request.write("")
+            request.setHeader('content-length', '3')
+            request.write(b'abc')
             request.finish()
         reactor.callLater(delay, done)
         return NOT_DONE_YET
@@ -95,7 +96,6 @@ def test_timeout(webserver, webclient):
         assert e.returncode == TIMEOUT_CODE
     else:
         assert False # didn't get timeout error
-
 
 def test_context_header(webserver, webclient):
     """The client sends a X-MDK-CONTEXT header to the server."""
