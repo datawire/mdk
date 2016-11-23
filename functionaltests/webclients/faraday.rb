@@ -15,6 +15,9 @@ begin
   puts "Got: #{response.body}"
 rescue Faraday::Error::TimeoutError => err
   exit 123
+rescue
+  puts $!
+  puts $@
 ensure
   mdk.stop
 end
