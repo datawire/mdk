@@ -9,7 +9,7 @@ Web clients should:
 3. Exit with exit code 123 if the request times out.
 """
 
-import sys
+import os
 import pathlib
 from subprocess import check_call, CalledProcessError
 
@@ -77,8 +77,10 @@ def webserver():
     ["node", str(WEBCLIENTS_ROOT / "request.js")],
 ])
 def webclient(request):
+    env = os.environ.copy()
+    env.update({"MDK_DISCOVERY_SOURCE": "static:nodes={}"})
     def client(url):
-        return check_call(request.param + [url])
+        return check_call(request.param + [url], env=env)
     return client
 
 
