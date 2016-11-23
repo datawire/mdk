@@ -12,7 +12,7 @@ conn = Faraday.new(:url => ARGV[0]) do |faraday|
 end
 begin
   response = conn.get
-  response.body
+  puts "Got: #{response.body}"
 rescue Faraday::Error::TimeoutError => err
   exit 123
 ensure
