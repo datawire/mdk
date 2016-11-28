@@ -44,8 +44,8 @@ namespace actors {
         }
 
         String toString() {
-            return ("{" + origin.getClass().id + "->" + destination.getClass().id
-                    + ": " + msg.getClass().id + "}");
+            return ("{" + origin.toString() + "->" + destination.toString()
+                    + ": " + msg.toString() + "}");
         }
     }
 
