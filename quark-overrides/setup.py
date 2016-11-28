@@ -10,7 +10,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
 
 
 setup(name="datawire_mdk",
-      version='2.0.36',
+      version='2.0.37',
       install_requires=["wheel", "ws4py==0.3.4", "future==0.15.2",
                         # Technically only need this for Flask users, but it's
                         # nicer experience if you don't have to tell users 'and

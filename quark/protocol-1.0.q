@@ -1,6 +1,6 @@
 quark 1.0;
 
-package datawire_mdk_protocol 2.0.36;
+package datawire_mdk_protocol 2.0.37;
 
 import quark.concurrent;
 import quark.reflect;
@@ -441,7 +441,7 @@ namespace mdk_protocol {
             // The following line is automatically modified by bumpconfig as part of
             // the release process. Changing it in any way might break that! So fix
             // '.bumpversion.cfg' if you change this line in any way:
-            open.mdkVersion = "2.0.36"; // AUTOMATICALLY MODIFIED
+            open.mdkVersion = "2.0.37"; // AUTOMATICALLY MODIFIED
             open.nodeId = self._node_id;
             open.environment = _environment;
             self._dispatcher.tell(self, open.encode(), websocket);
