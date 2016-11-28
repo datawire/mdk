@@ -786,7 +786,10 @@ namespace mdk_protocol {
         @doc("Call when (re)connected to other side.")
         void onConnected(SendAckableEvent sender) {
             // Resend everything:
-            _buffered.update(_inFlight);
+            // WORKAROUND FOR BUG IN QUARK 1.0.452 (Map.update doesn't do bind()
+            // on generated function():
+            Map<long,AckableEvent> buffered = _buffered; // <-- the workaround
+            buffered.update(_inFlight);
             _inFlight = {};
             onPump(sender);
         }
