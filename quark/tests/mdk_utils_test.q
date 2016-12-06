@@ -1,3 +1,5 @@
+import mdk_utils;
+
 class Division extends Callable {
     int divisor;
     int result;
@@ -16,15 +18,14 @@ class CallSafelyTest {
         Division d = new Division(2);
         Error result = callSafely(d);
         assertEqual(d.result, 5);
-        assertEqual(result, nil);
+        assertEqual(result, null);
     }
 
     void failure() {
         Division d = new Division(2);
         Error result = callSafely(d);
-        assertEqual(true,
-                    (result.substring("zero") != -1) ||
-                    (result.substring("zero") != -1));
+        assertEqual(true, result.message.contains("zero") ||
+                          result.message.contains("zero"));
     }
 }
 

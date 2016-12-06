@@ -205,6 +205,4 @@ upload-packages: packages
 
 ## TEMPORARY, DELETE ONCE WE SWITCH WHOLESALE TO QUARK 2:
 test-quark2:
-	quark --python quark/mdk_utils.q
-	#pip install output/pkg
-	#py.test unittest/test_actors.py
+	quark-test run quark/mdk_utils.q quark/tests/mdk_utils_test.q
