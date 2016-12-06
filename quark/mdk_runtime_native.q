@@ -1,20 +1,28 @@
 quark 1.0;
 
+include native.js;
+
+use py PyOpenSSL 16.1.0;
+use py service_identity 16.0.0;
+use py autobahn[twisted] 0.16.0;
+use py crochet 1.5.0;
+include native.py;
+
 include mdk_runtime_common.q;
 
-import quark.os;
 import mdk_runtime.actors;
 import mdk_runtime.promise;
+
 
 namespace mdk_runtime {
 
     @doc("""
-    WSActor that uses current Quark runtime as temporary expedient.
+    Native WSActor.
 
     State can be 'ERROR', 'CONNECTING', 'CONNECTED', 'DISCONNECTING',
     'DISCONNECTED'.
     """)
-    class QuarkRuntimeWSActor extends WSActor, WSHandler {
+    class NativeWSActor extends WSActor, WSHandler {
         // XXX need better story for logging; perhaps integrate MDK Session with
         // the MessageDispatcher?
         Logger logger = new Logger("protocol");
@@ -26,7 +34,7 @@ namespace mdk_runtime {
         MessageDispatcher dispatcher;
         String state = "CONNECTING";
 
-        QuarkRuntimeWSActor(String url, Actor originator, PromiseResolver factory) {
+        NativeWSActor(String url, Actor originator, PromiseResolver factory) {
             self.url = url;
             self.originator = originator;
             self.factory = factory;
@@ -41,7 +49,7 @@ namespace mdk_runtime {
         // Debugging
         void logTS(String message) {
             if (true) { return; }  // Ludicrous logging disabled. See also top of defaultRuntime().
-            long now = Context.runtime().now();
+            long now = Context.runtime().now();  // XXX FIXME
             int tenths = (now.truncateToInt() / 100) % 100000;  // in tenths of seconds
             if (tenths < 0) { tenths = tenths + 100000; }
             float seconds = tenths.toFloat() / 10.0;
@@ -65,14 +73,14 @@ namespace mdk_runtime {
         void onStart(MessageDispatcher dispatcher) {
             logPrologue("ws onStart");
             self.dispatcher = dispatcher;
-            Context.runtime().open(self.url, self);
+            _connect(self.url, self);
         }
 
         void onMessage(Actor origin, Object message) {
             logPrologue("ws onMessage (actor message)");
             logTS("   message is from " + origin.toString());
             String messageId = message.getClass().id;
-            if  (messageId == "quark.String"
+            if (messageId == "quark.String"
                 && self.state == "CONNECTED") {
                 logTS("   send-ish, message is: " + message.toString());
                 log_to_file("sending: " + ?message);
@@ -89,6 +97,7 @@ namespace mdk_runtime {
             if (messageId == "mdk_runtime.WSClose"
                 && self.state == "CONNECTING") {
                 self.state = "DISCONNECTING";
+                return;
             }
             logger.warn("ws onMessage got unhandled message: " +
                         message.getClass().id + " in state " + self.state);
@@ -137,10 +146,15 @@ namespace mdk_runtime {
         }
     }
 
-    @doc("""
-    WebSocket that uses current Quark runtime as temporary expedient.
-    """)
-    class QuarkRuntimeWebSockets extends WebSockets {
+    macro void _connect(String url, WSHandler handler)
+        $java{}
+        $py{native.connect(($url), ($handler))}
+        $js{native.connect(($url), ($handler))}
+        $rb{false}
+    ;
+
+    @doc("Client WebSocket support")
+    class NativeWebSockets extends WebSockets {
         // XXX need better story for logging; perhaps integrate MDK Session with
         // the MessageDispatcher?
         Logger logger = new Logger("protocol");
@@ -151,8 +165,8 @@ namespace mdk_runtime {
         mdk_runtime.promise.Promise connect(String url, Actor originator) {
             logger.debug(originator.toString() + "requested connection to "
                          + url);
-            PromiseResolver factory =  new PromiseResolver(self.dispatcher);
-            QuarkRuntimeWSActor actor = new QuarkRuntimeWSActor(url, originator, factory);
+            PromiseResolver factory = new PromiseResolver(self.dispatcher);
+            NativeWSActor actor = new NativeWSActor(url, originator, factory);
             connections.add(actor);
             self.dispatcher.startActor(actor);
             return factory.promise;
@@ -173,28 +187,40 @@ namespace mdk_runtime {
         }
     }
 
-    class _ScheduleTask extends Task {
-        QuarkRuntimeTime timeService;
+    class _ScheduleCallable extends UnaryCallable {
+        NativeTime timeService;
         Actor requester;
         String event;
 
-        _ScheduleTask(QuarkRuntimeTime timeService, Actor requester, String event) {
+        _ScheduleCallable(NativeTime timeService, Actor requester, String event) {
             self.timeService = timeService;
             self.requester = requester;
             self.event = event;
         }
 
-        void onExecute(Runtime runtime) {
+        Object call(Object arg) {
             timeService.dispatcher.tell(
                 self.timeService, new Happening(self.event, self.timeService.time()), self.requester);
+            return null;
         }
     }
 
-    @doc("""
-    Temporary implementation based on Quark runtime, until we have native
-    implementation.
-    """)
-    class QuarkRuntimeTime extends Time, SchedulingActor {
+    macro void _schedule(UnaryCallable callable, float delayInSeconds)
+        $java{}
+        $py{native.schedule(($callable), ($delayInSeconds))}
+        $js{native.schedule(($callable), ($delayInSeconds))}
+        $rb{false}
+    ;
+
+    macro float _now()
+        $java{(1.0)}
+        $py{native.now()}
+        $js{native.now()}
+        $rb{(1.0)}
+    ;
+
+    @doc("Time and scheduling via native code.")
+    class NativeTime extends Time, SchedulingActor {
         MessageDispatcher dispatcher;
         bool stopped = false;
 
@@ -212,39 +238,86 @@ namespace mdk_runtime {
             }
             Schedule sched = ?msg;
             float seconds = sched.seconds;
-            Context.runtime().schedule(new _ScheduleTask(self, origin, sched.event), seconds);
+            _schedule(new _ScheduleCallable(self, origin, sched.event), seconds);
         }
 
         float time() {
-            float milliseconds = Context.runtime().now().toFloat();
-            return milliseconds / 1000.0;
+            return _now();
         }
     }
 
-    @doc("Use real environment variables.")
-    class RealEnvVars extends EnvironmentVariables {
-        EnvironmentVariable var(String name) {
-            return new EnvironmentVariable(name,
-                                           Environment.getEnvironment()[name]);
+    class _NativeLaterCallerCallable extends UnaryCallable {
+        Task toCall;
+
+        _NativeLaterCallerCallable(Task t) {
+            self.toCall = t;
+        }
+
+        Object call(Object arg) {
+            self.toCall.onExecute(null);
+            return null;
         }
     }
+
+    class _NativeLaterCaller extends _CallLater {
+        void schedule(Task t) {
+            _schedule(new _NativeLaterCallerCallable(t), 0.0);
+        }
+
+        void runAll() { }
+    }
+
+    macro String _env_get(String name)
+        $java{($name)}
+        $py{native.env_get($name)}
+        $js{native.env_get($name)}
+        $rb{($name)}
+    ;
+
+    @doc("Environment variables via native code.")
+    class NativeEnvVars extends EnvironmentVariables {
+        EnvironmentVariable var(String name) {
+            return new EnvironmentVariable(name, _env_get(name));
+        }
+    }
+
+    macro bool isJava() $py{False} $js{false} $java{true} $rb{false};
+    macro bool isRuby() $py{False} $js{false} $java{false} $rb{true};
 
     @doc("Create a MDKRuntime with the default configuration and start its actors.")
-    MDKRuntime quarkRuntimeRuntime() {
+    MDKRuntime defaultRuntime() {
         //logging.makeConfig().setLevel("DEBUG").configure();
         MDKRuntime runtime = new MDKRuntime();
-        runtime.dispatcher = new MessageDispatcher(new _QuarkRuntimeLaterCaller());
-        runtime.dependencies.registerService("envvar", new RealEnvVars());
-        QuarkRuntimeTime timeService = new QuarkRuntimeTime();
-        QuarkRuntimeWebSockets websockets = new QuarkRuntimeWebSockets();
+
+        EnvironmentVariables envVars;
+        Time timeService;
+        SchedulingActor schedActor;
+        WebSockets websockets;
+        if (isJava() || isRuby()) {
+            runtime.dispatcher = new MessageDispatcher(new _QuarkRuntimeLaterCaller());
+            envVars = new RealEnvVars();
+            timeService = new QuarkRuntimeTime();
+            schedActor = ?timeService;
+            websockets = new QuarkRuntimeWebSockets();
+        } else {
+            runtime.dispatcher = new MessageDispatcher(new _NativeLaterCaller());
+            envVars = new NativeEnvVars();
+            timeService = new NativeTime();
+            schedActor = ?timeService;
+            websockets = new NativeWebSockets();
+        }
+        runtime.dependencies.registerService("envvar", envVars);
         runtime.dependencies.registerService("time", timeService);
-        runtime.dependencies.registerService("schedule", timeService);
+        runtime.dependencies.registerService("schedule", schedActor);
         runtime.dependencies.registerService("websockets", websockets);
+
         mdk_runtime.files.FileActor fileActor = new mdk_runtime.files.FileActorImpl(runtime);
         runtime.dependencies.registerService("files", fileActor);
-        runtime.dispatcher.startActor(timeService);
+
+        runtime.dispatcher.startActor(schedActor);
         runtime.dispatcher.startActor(websockets);
         runtime.dispatcher.startActor(fileActor);
+
         return runtime;
     }
 

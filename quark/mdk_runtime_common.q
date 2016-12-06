@@ -9,6 +9,17 @@ import mdk_runtime.promise;
 
 namespace mdk_runtime {
 
+    @doc("On Python, log to a per-process file if MDK_LOG_MESSAGES env variable is set.")
+    void log_to_file(String s) {
+        if (quark.os.Environment.getEnvironment()["MDK_LOG_MESSAGES"] != null) {  // FIXME
+            Object o = _log_to_file(s);
+        }
+    }
+
+    macro Object _log_to_file(String s)
+        $py{open("/tmp/mdk-messages-pid-%s.log" % __import__("os").getpid(), "a", 1).write(__import__("time").asctime() + ">   " + $s + "\n\n")}
+    $rb{""} $js{""} $java{""} ;
+
     @doc("Trivial dependency injection setup.")
     class Dependencies {
         Map<String,Object> _services = {};
