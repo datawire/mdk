@@ -200,3 +200,11 @@ packages: .make-guards/python-packages .make-guards/ruby-packages .make-guards/j
 .PHONY: upload-packages
 upload-packages: packages
 	source virtualenv/bin/activate; python scripts/upload.py
+
+
+
+## TEMPORARY, DELETE ONCE WE SWITCH WHOLESALE TO QUARK 2:
+test-quark2:
+	quark --python quark/mdk_utils.q
+	#pip install output/pkg
+	#py.test unittest/test_actors.py

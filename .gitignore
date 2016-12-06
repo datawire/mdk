@@ -2,6 +2,7 @@ build
 *.tgz
 *.zip
 *.qc
+*.qp
 *.pyc
 
 node_modules
