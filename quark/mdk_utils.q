@@ -17,6 +17,29 @@ namespace mdk_utils {
         return new Error(message);
     }
 
+    /* Throw an exception. */
+    void panic(String message);
+
+    void panic(String message) for go {
+        panic($message)
+    }
+
+    void panic(String message) for java {
+        throw new RuntimeException($message);
+    }
+
+    void panic(String message) for ruby {
+        raise $message
+    }
+
+    void panic(String message) for python {
+        raise Exception($message);
+    }
+
+    void panic(String message) for javascript {
+        throw new Error(message);
+    }
+
     /* Call a Callable, catching native exceptions.
 
     Returns an Error on error, null on failure.
@@ -32,14 +55,16 @@ namespace mdk_utils {
         }
     }
 
-    Error callSafely(Callable c) for go {
-        err := nil
+    Error callSafely(Callable c) for go import "fmt" {
+        // Workaround for lack of ability to reference Error class:
+        err := $buildError("");
+        err = nil;
         defer func() {
             if r := recover(); r != nil {
-                err = $buildError(fmt.Errorf("%v", r))
+                err = $buildError(fmt.Sprintf("%v", r))
             }
         }()
-        c.call()
+        c.Call()
         return err
     }
 
@@ -63,8 +88,8 @@ namespace mdk_utils {
         begin
             c.call()
             return nil
-        catch Exception => e
-            return $buildError(e.to_s)
+        rescue Exception => e
+            return $buildError("#{e.class.to_s}: #{e.to_s}")
         end
     }
 }

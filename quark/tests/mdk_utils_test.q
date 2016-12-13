@@ -1,31 +1,31 @@
 import mdk_utils;
 
-class Division extends Callable {
-    int divisor;
-    int result;
+class Panicker extends Callable {
+    bool doit;
 
-    Division(int d) {
-        self.divisor = d;
+    Panicker(bool doit) {
+        self.doit = doit;
     }
 
     void call() {
-        self.result = 10 / self.divisor;
+        if (doit) {
+            panic("PANIC!");
+        }
     }
 }
 
 class CallSafelyTest {
     void success() {
-        Division d = new Division(2);
-        Error result = callSafely(d);
-        assertEqual(d.result, 5);
+        Panicker p = new Panicker(false);
+        Error result = callSafely(p);
         assertEqual(result, null);
     }
 
     void failure() {
-        Division d = new Division(2);
-        Error result = callSafely(d);
-        assertEqual(true, result.message.contains("zero") ||
-                          result.message.contains("zero"));
+        Panicker p = new Panicker(true);
+        Error result = callSafely(p);
+        assertEqual(false, result == null);
+        assertEqual(true, result.message == "PANIC!");
     }
 }
 
